@@ -179,18 +179,23 @@ PENTING:
 - Jika pengguna minta tukar dari surat ke memo (atau sebaliknya), pindahkan field yang sama (rujukan, tarikh, tajuk, isi)
 - Pastikan JSON sah"""
 
-_sessions: dict[str, dict] = {}
+_NS = "letter"  # namespace dalam SessionStore
 
 
 def _get_session(session_id: str) -> dict:
-    if session_id not in _sessions:
-        _sessions[session_id] = {
-            "phase": 0,
-            "doc_type": None,
-            "fields": {},
-            "document": None,
-        }
-    return _sessions[session_id]
+    from backend.session_store import get_store
+    store = get_store()
+    data = store.get_all(session_id, _NS)
+    if not data or "phase" not in data:
+        default = {"phase": 0, "doc_type": None, "fields": {}, "document": None}
+        store.set_all(session_id, _NS, default)
+        return default
+    return data
+
+
+def _save_session(session_id: str, session: dict):
+    from backend.session_store import get_store
+    get_store().set_all(session_id, _NS, session)
 
 
 def _get_field_schema(doc_type: str) -> list[dict]:
@@ -462,25 +467,26 @@ Status sesi semasa:
         "missing": [f["label"] for f in _find_missing_fields(session["doc_type"], session["fields"])] if session["doc_type"] else [],
     }
 
+    _save_session(session_id, session)
     return json.dumps(parsed, ensure_ascii=False)
 
 
 def get_document(session_id: str) -> str | None:
-    session = _sessions.get(session_id)
+    session = _get_session(session_id)
     if session and session.get("document"):
         return session["document"]
     return None
 
 
 def get_fields(session_id: str) -> dict:
-    session = _sessions.get(session_id)
+    session = _get_session(session_id)
     return session["fields"].copy() if session else {}
 
 
 def apply_improvement(session_id: str, improved_fields: dict) -> str | None:
     """Update session fields and rebuild document using original template. Returns new doc text."""
-    session = _sessions.get(session_id)
-    if not session:
+    session = _get_session(session_id)
+    if not session or not session.get("doc_type"):
         return None
     for key in ("isi",):
         if key in improved_fields and improved_fields[key]:
@@ -493,6 +499,7 @@ def apply_improvement(session_id: str, improved_fields: dict) -> str | None:
     # Rebuild document from updated fields using original template
     new_doc = _build_document(session["doc_type"], session["fields"])
     session["document"] = new_doc
+    _save_session(session_id, session)
     return new_doc
 
 
@@ -500,7 +507,7 @@ GENERATED_FIELD_KEYS = ["isi"]
 
 
 def build_docx(session_id: str) -> bytes | None:
-    session = _sessions.get(session_id)
+    session = _get_session(session_id)
     doc_text = get_document(session_id)
     if not doc_text:
         return None
@@ -1030,7 +1037,8 @@ def _build_memo_docx(doc, fields: dict):
 
 
 def get_session_info(session_id: str) -> dict | None:
-    return _sessions.get(session_id)
+    s = _get_session(session_id)
+    return s if s.get("doc_type") else None
 
 
 def send_email(session_id: str, to_email: str, subject: str) -> dict:
@@ -1052,7 +1060,7 @@ def send_email(session_id: str, to_email: str, subject: str) -> dict:
 
         msg.attach(MIMEText(document, "plain", "utf-8"))
 
-        session = _sessions.get(session_id, {})
+        session = _get_session(session_id)
         doc_type = session.get("doc_type", "dokumen")
         filename = f"{doc_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         attachment = MIMEBase("application", "octet-stream")
@@ -1075,7 +1083,8 @@ def send_email(session_id: str, to_email: str, subject: str) -> dict:
 
 
 def clear_session(session_id: str):
-    _sessions.pop(session_id, None)
+    from backend.session_store import get_store
+    get_store().delete_ns(session_id, _NS)
 
 
 def _try_parse_json(text: str) -> dict | None:

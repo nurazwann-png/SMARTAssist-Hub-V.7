@@ -4,7 +4,7 @@ import json
 import re
 from backend.deepseek_client import chat_completion
 
-_sessions: dict[str, dict] = {}
+_NS = "reviewer"
 
 _SYSTEM_PROMPT = """Anda ialah editor dan penyemak bahasa berpengalaman dalam SMARTAssist Hub.
 Anda menyemak surat rasmi, memo, dan laporan sebelum ia dimuktamadkan.
@@ -65,15 +65,24 @@ Jenis dokumen: {doc_type}
 
 
 def _get_session(session_id: str) -> dict:
-    if session_id not in _sessions:
-        _sessions[session_id] = {
+    from backend.session_store import get_store
+    data = get_store().get_all(session_id, _NS)
+    if not data:
+        default = {
             "reviewed_docs": [],
             "last_review": None,
             "uploaded_doc": None,
             "uploaded_doc_type": None,
             "uploaded_filename": None,
         }
-    return _sessions[session_id]
+        get_store().set_all(session_id, _NS, default)
+        return default
+    return data
+
+
+def _save_session(session_id: str, session: dict):
+    from backend.session_store import get_store
+    get_store().set_all(session_id, _NS, session)
 
 
 def set_uploaded_document(session_id: str, text: str, filename: str, doc_type: str = "Dokumen"):
@@ -81,12 +90,11 @@ def set_uploaded_document(session_id: str, text: str, filename: str, doc_type: s
     session["uploaded_doc"] = text
     session["uploaded_doc_type"] = doc_type
     session["uploaded_filename"] = filename
+    _save_session(session_id, session)
 
 
 def get_uploaded_document(session_id: str) -> tuple[str | None, str, str | None]:
-    session = _sessions.get(session_id)
-    if not session:
-        return None, "Dokumen", None
+    session = _get_session(session_id)
     return session.get("uploaded_doc"), session.get("uploaded_doc_type", "Dokumen"), session.get("uploaded_filename")
 
 
@@ -213,6 +221,7 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
                 parsed["issues"] = placeholder_issues + existing
             session["last_review"] = parsed
             session["reviewed_docs"].append(doc_type)
+            _save_session(session_id, session)
             return json.dumps(parsed, ensure_ascii=False)
 
         return raw
@@ -232,10 +241,8 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
 
 
 def get_last_review(session_id: str) -> dict | None:
-    session = _sessions.get(session_id)
-    if session:
-        return session.get("last_review")
-    return None
+    session = _get_session(session_id)
+    return session.get("last_review")
 
 
 def auto_review(document: str, doc_type: str, session_id: str = "default", lang: str = "bm") -> dict | None:
@@ -265,6 +272,7 @@ def auto_review(document: str, doc_type: str, session_id: str = "default", lang:
             parsed["issues"] = placeholder_issues + existing
         session = _get_session(session_id)
         session["last_review"] = parsed
+        _save_session(session_id, session)
     return parsed
 
 
@@ -352,7 +360,8 @@ def auto_improve(
 
 
 def clear_session(session_id: str):
-    _sessions.pop(session_id, None)
+    from backend.session_store import get_store
+    get_store().delete_ns(session_id, _NS)
 
 
 def _try_parse_json(text: str) -> dict | None:

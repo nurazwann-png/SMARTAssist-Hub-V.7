@@ -4,7 +4,7 @@ import json
 from backend.deepseek_client import chat_completion
 from backend.mcp_server import search_documents, search_documents_tfidf
 
-_sessions: dict[str, dict] = {}
+_NS = "kpm"
 
 _SYSTEM_PROMPT = """Anda ialah SMARTAssist Hub KPM Support Agent — seorang pegawai khidmat pelanggan yang mesra, penyabar dan penuh empati.
 
@@ -50,9 +50,19 @@ PENTING:
 
 
 def _get_session(session_id: str) -> dict:
-    if session_id not in _sessions:
-        _sessions[session_id] = {"history_queries": []}
-    return _sessions[session_id]
+    from backend.session_store import get_store
+    store = get_store()
+    data = store.get_all(session_id, _NS)
+    if not data:
+        default = {"history_queries": []}
+        store.set_all(session_id, _NS, default)
+        return default
+    return data
+
+
+def _save_session(session_id: str, session: dict):
+    from backend.session_store import get_store
+    get_store().set_all(session_id, _NS, session)
 
 
 def _build_retrieval_query(query: str, history: list[dict] | None = None) -> str:
@@ -108,6 +118,7 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
 
     session = _get_session(session_id)
     session["history_queries"].append(query)
+    _save_session(session_id, session)
 
     docs = _retrieve_docs(query, history)
     doc_context = _format_doc_context(docs)
@@ -136,4 +147,5 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
 
 
 def clear_session(session_id: str):
-    _sessions.pop(session_id, None)
+    from backend.session_store import get_store
+    get_store().delete_ns(session_id, _NS)

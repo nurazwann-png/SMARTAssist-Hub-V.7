@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from fastapi.responses import PlainTextResponse, Response
 
 from backend.orchestrator import run_query
+from backend.session_store import get_store as _get_store
 from agents.data_analysis import upload_file as da_upload, get_session_data as da_get_data
 from agents.letter_generator import (
     get_document as lg_get_document,
@@ -34,8 +35,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 _jinja_env = Environment(loader=FileSystemLoader("templates"), autoescape=True)
 
-_sessions: dict[str, list[dict]] = {}
-_session_meta: dict[str, dict] = {}
 _feedback: list[dict] = []
 
 AGENT_LABELS = {
@@ -81,7 +80,9 @@ class AgentChatRequest(BaseModel):
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest):
-    history = _sessions.setdefault(req.session_id, [])
+    store = _get_store()
+    history = store.get_messages(req.session_id)
+    store.append_message(req.session_id, {"role": "user", "content": req.message})
     history.append({"role": "user", "content": req.message})
 
     result = run_query(query=req.message, conversation_history=history, session_id=req.session_id)
@@ -89,20 +90,13 @@ async def chat(req: ChatRequest):
     agent = result.get("active_agent", "fallback")
     output = result.get("agent_output", "Tiada respons.")
 
-    history.append({"role": "assistant", "content": output, "agent": agent})
-
-    if req.session_id not in _session_meta:
-        _session_meta[req.session_id] = {
-            "agent": agent,
-            "title": req.message[:60],
-            "created": datetime.now().isoformat(),
-            "updated": datetime.now().isoformat(),
-            "message_count": 0,
-        }
-    meta = _session_meta[req.session_id]
-    meta["updated"] = datetime.now().isoformat()
-    meta["message_count"] = len(history)
-    meta["agent"] = agent
+    store.append_message(req.session_id, {"role": "assistant", "content": output, "agent": agent})
+    meta = store.get_meta(req.session_id) or {}
+    store.upsert_meta(
+        req.session_id,
+        agent=agent,
+        title=meta.get("title") or req.message[:60],
+    )
 
     agent_info = AGENT_LABELS.get(agent, {"icon": "\U0001f4ac", "name": agent})
 
@@ -128,8 +122,7 @@ async def upload(file: UploadFile = File(...), session_id: str = Form("default")
     result = da_upload(contents, file.filename, session_id)
 
     if result["ok"]:
-        history = _sessions.setdefault(session_id, [])
-        history.append({
+        _get_store().append_message(session_id, {
             "role": "assistant",
             "content": f"Fail '{result['filename']}' berjaya dimuat naik. "
                        f"{result['rows']} baris x {result['columns']} lajur. "
@@ -178,8 +171,7 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
     set_uploaded_document(session_id, text, fname, doc_type)
 
     # Add to session history so context is preserved
-    history = _sessions.setdefault(session_id, [])
-    history.append({"role": "user", "content": f"[Fail dimuat naik: {fname}]"})
+    _get_store().append_message(session_id, {"role": "user", "content": f"[Fail dimuat naik: {fname}]"})
 
     return JSONResponse({
         "ok": True,
@@ -419,7 +411,7 @@ async def letterhead_image(filename: str):
 
 @app.post("/api/clear")
 async def clear(req: ChatRequest):
-    _sessions.pop(req.session_id, None)
+    _get_store().clear_session(req.session_id)
     from agents.data_analysis import clear_session_data
     from agents.letter_generator import clear_session as lg_clear
     from agents.report_generator import clear_session as rg_clear
@@ -467,13 +459,15 @@ async def submit_feedback(req: FeedbackRequest):
 
 @app.get("/api/stats")
 async def get_stats():
+    store = _get_store()
+    all_sessions = store.list_sessions()
     agent_counts: dict[str, int] = {}
     agent_messages: dict[str, int] = {}
     total_messages = 0
-    for meta in _session_meta.values():
+    for meta in all_sessions:
         agent = meta.get("agent", "unknown")
         agent_counts[agent] = agent_counts.get(agent, 0) + 1
-        mc = meta.get("message_count", 0)
+        mc = meta.get("msg_count", 0)
         agent_messages[agent] = agent_messages.get(agent, 0) + mc
         total_messages += mc
 
@@ -484,33 +478,28 @@ async def get_stats():
             fb_by_agent[a] = {"up": 0, "down": 0}
         fb_by_agent[a][f["feedback"]] = fb_by_agent[a].get(f["feedback"], 0) + 1
 
-    recent = sorted(_session_meta.items(), key=lambda x: x[1].get("updated", ""), reverse=True)[:10]
+    recent = all_sessions[:10]
     return JSONResponse({
-        "total_sessions": len(_session_meta),
+        "total_sessions": len(all_sessions),
         "total_messages": total_messages,
         "agent_counts": agent_counts,
         "agent_messages": agent_messages,
         "feedback_total": {"up": sum(f["feedback"] == "up" for f in _feedback), "down": sum(f["feedback"] == "down" for f in _feedback)},
         "feedback_by_agent": fb_by_agent,
-        "recent_sessions": [{"session_id": sid, **meta} for sid, meta in recent],
+        "recent_sessions": [{"session_id": s["session_id"], **s} for s in recent],
         "agent_labels": {k: v["name"] for k, v in AGENT_LABELS.items()},
     })
 
 
 @app.get("/api/sessions")
 async def list_sessions(agent: str = ""):
-    sessions = []
-    for sid, meta in _session_meta.items():
-        if agent and meta.get("agent") != agent:
-            continue
-        sessions.append({"session_id": sid, **meta})
-    sessions.sort(key=lambda s: s.get("updated", ""), reverse=True)
+    sessions = _get_store().list_sessions(agent=agent)
     return JSONResponse(sessions)
 
 
 @app.get("/api/sessions/{session_id}/messages")
 async def get_session_messages(session_id: str):
-    history = _sessions.get(session_id, [])
+    history = _get_store().get_messages(session_id)
     messages = []
     for msg in history:
         agent = msg.get("agent", "")
@@ -528,9 +517,11 @@ async def get_session_messages(session_id: str):
 @app.post("/api/agent-chat")
 async def agent_chat(req: AgentChatRequest):
     """Direct chat with a specific agent, bypassing intent classification."""
+    store = _get_store()
     is_intro = req.message == "__INTRO__"
-    history = _sessions.setdefault(req.session_id, [])
+    history = store.get_messages(req.session_id)
     if not is_intro:
+        store.append_message(req.session_id, {"role": "user", "content": req.message})
         history.append({"role": "user", "content": req.message})
 
     agent = req.agent
@@ -574,18 +565,13 @@ async def agent_chat(req: AgentChatRequest):
         output = f"Ralat: {e}"
 
     if not is_intro:
-        history.append({"role": "assistant", "content": output, "agent": agent})
-        if req.session_id not in _session_meta:
-            _session_meta[req.session_id] = {
-                "agent": agent,
-                "title": req.message[:60],
-                "created": datetime.now().isoformat(),
-                "updated": datetime.now().isoformat(),
-                "message_count": 0,
-            }
-        meta = _session_meta[req.session_id]
-        meta["updated"] = datetime.now().isoformat()
-        meta["message_count"] = len(history)
+        store.append_message(req.session_id, {"role": "assistant", "content": output, "agent": agent})
+        existing_meta = store.get_meta(req.session_id) or {}
+        store.upsert_meta(
+            req.session_id,
+            agent=agent,
+            title=existing_meta.get("title") or req.message[:60],
+        )
 
     structured = None
     if agent in ("data_analysis", "letter_generator", "report_generator", "document_reviewer"):

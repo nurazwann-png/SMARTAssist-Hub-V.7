@@ -77,11 +77,10 @@ PENTING:
 - Gunakan KEY TEPAT seperti senarai di atas dalam fields_collected
 - Pastikan JSON sah"""
 
-_sessions: dict[str, dict] = {}
-
 MAX_IMAGES = 4
 _IMAGES_DIR = pathlib.Path("static/report_images")
-_image_store: dict[str, list[dict]] = {}
+_NS = "report"  # namespace dalam SessionStore
+_NS_IMG = "report_images"
 
 
 def _validate_landscape(image_bytes: bytes, filename: str) -> str | None:
@@ -97,53 +96,67 @@ def _validate_landscape(image_bytes: bytes, filename: str) -> str | None:
 
 
 def add_report_image(session_id: str, image_bytes: bytes, filename: str) -> dict:
+    from backend.session_store import get_store
     _IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     err = _validate_landscape(image_bytes, filename)
     if err:
         return {"ok": False, "error": err}
-    images = _image_store.setdefault(session_id, [])
+    store = get_store()
+    images = store.get(session_id, _NS_IMG, "list", [])
     if len(images) >= MAX_IMAGES:
         return {"ok": False, "error": f"Maksimum {MAX_IMAGES} gambar sahaja dibenarkan."}
     safe_name = re.sub(r'[^\w\-_\.]', '_', f"{session_id}_{len(images)}_{filename}")
     file_path = _IMAGES_DIR / safe_name
     file_path.write_bytes(image_bytes)
     images.append({"filename": filename, "path": str(file_path), "safe_name": safe_name})
+    store.set(session_id, _NS_IMG, "list", images)
     return {"ok": True, "index": len(images) - 1, "count": len(images), "max": MAX_IMAGES}
 
 
 def remove_report_image(session_id: str, index: int) -> dict:
-    images = _image_store.get(session_id, [])
+    from backend.session_store import get_store
+    store = get_store()
+    images = store.get(session_id, _NS_IMG, "list", [])
     if 0 <= index < len(images):
         img = images.pop(index)
         try:
             pathlib.Path(img["path"]).unlink(missing_ok=True)
         except Exception:
             pass
+        store.set(session_id, _NS_IMG, "list", images)
         return {"ok": True, "count": len(images)}
     return {"ok": False, "error": "Indeks tidak sah"}
 
 
 def get_report_images(session_id: str) -> list[dict]:
-    return _image_store.get(session_id, [])
+    from backend.session_store import get_store
+    return get_store().get(session_id, _NS_IMG, "list", [])
 
 
 def clear_report_images(session_id: str):
-    images = _image_store.pop(session_id, [])
+    from backend.session_store import get_store
+    images = get_store().get(session_id, _NS_IMG, "list", [])
     for img in images:
         try:
             pathlib.Path(img["path"]).unlink(missing_ok=True)
         except Exception:
             pass
+    get_store().delete_ns(session_id, _NS_IMG)
 
 
 def _get_session(session_id: str) -> dict:
-    if session_id not in _sessions:
-        _sessions[session_id] = {
-            "phase": 0,
-            "fields": {},
-            "document": None,
-        }
-    return _sessions[session_id]
+    from backend.session_store import get_store
+    data = get_store().get_all(session_id, _NS)
+    if not data or "phase" not in data:
+        default = {"phase": 0, "fields": {}, "document": None}
+        get_store().set_all(session_id, _NS, default)
+        return default
+    return data
+
+
+def _save_session(session_id: str, session: dict):
+    from backend.session_store import get_store
+    get_store().set_all(session_id, _NS, session)
 
 
 def _find_missing_fields(collected: dict) -> list[dict]:
@@ -379,6 +392,7 @@ Status sesi semasa:
         "missing": [f["label"] for f in _find_missing_fields(session["fields"])],
     }
 
+    _save_session(session_id, session)
     return json.dumps(parsed, ensure_ascii=False)
 
 
@@ -473,21 +487,21 @@ def _build_report_html(f: dict) -> str:
 
 
 def get_document(session_id: str) -> str | None:
-    session = _sessions.get(session_id)
+    session = _get_session(session_id)
     if session and session.get("document"):
         return session["document"]
     return None
 
 
 def get_fields(session_id: str) -> dict:
-    session = _sessions.get(session_id)
+    session = _get_session(session_id)
     return session.get("fields", {}).copy() if session else {}
 
 
 def apply_improvement(session_id: str, improved_fields: dict) -> str | None:
     """Update session fields and rebuild document using original template. Returns new doc text."""
-    session = _sessions.get(session_id)
-    if not session:
+    session = _get_session(session_id)
+    if not session or not session.get("fields"):
         return None
     for key in ("rumusan", "cadangan"):
         if key in improved_fields and improved_fields[key]:
@@ -495,6 +509,7 @@ def apply_improvement(session_id: str, improved_fields: dict) -> str | None:
     # Rebuild document from updated fields using original template
     new_doc = _build_report(session["fields"])
     session["document"] = new_doc
+    _save_session(session_id, session)
     return new_doc
 
 
@@ -502,11 +517,12 @@ GENERATED_FIELD_KEYS = ["rumusan", "cadangan"]
 
 
 def get_session_info(session_id: str) -> dict | None:
-    return _sessions.get(session_id)
+    s = _get_session(session_id)
+    return s if s.get("fields") else None
 
 
 def build_docx(session_id: str) -> bytes | None:
-    session = _sessions.get(session_id)
+    session = _get_session(session_id)
     if not session or not session.get("document"):
         return None
 
@@ -846,7 +862,8 @@ def send_email(session_id: str, to_email: str, subject: str) -> dict:
 
 
 def clear_session(session_id: str):
-    _sessions.pop(session_id, None)
+    from backend.session_store import get_store
+    get_store().delete_ns(session_id, _NS)
     clear_report_images(session_id)
 
 
