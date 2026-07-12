@@ -173,7 +173,7 @@ function initParticles() {
     resize();
     window.addEventListener('resize', resize);
 
-    const colors = ['#3b82f6', '#22d3ee', '#f59e0b', '#ef4444', '#22c55e', '#a855f7', '#ec4899'];
+    const colors = ['#4f46e5', '#7c3aed', '#0891b2', '#d97706', '#059669', '#dc2626', '#2563eb'];
     for (let i = 0; i < 80; i++) {
         particles.push({
             x: Math.random() * w, y: Math.random() * h,
@@ -200,7 +200,7 @@ function initParticles() {
                 if (dist < 150) {
                     ctx.beginPath();
                     ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
-                    ctx.strokeStyle = `rgba(255,255,255,${0.06 * (1 - dist / 150)})`;
+                    ctx.strokeStyle = `rgba(79,70,229,${0.12 * (1 - dist / 150)})`;
                     ctx.lineWidth = 0.5; ctx.stroke();
                 }
             }
@@ -1237,32 +1237,86 @@ async function openWordPreview() {
         }
     } catch (_) {}
 
+    // Paginate content into A4 pages
+    const pages = _paginateWordContent(text, !!lhImgHtml);
+    const totalPages = pages.length;
+
+    const pagesHtml = pages.map((pageText, i) => {
+        const lh = i === 0 ? lhImgHtml : '';
+        const editable = i === 0 ? 'contenteditable="true" id="wordPreviewText"' : '';
+        const pageNum = totalPages > 1
+            ? `<div class="word-page-num">${i + 1} / ${totalPages}</div>` : '';
+        return `<div class="word-page" style="position:relative">${lh}<pre ${editable} spellcheck="false">${escapeHtml(pageText)}</pre>${pageNum}</div>`;
+    }).join('');
+
     const dict = I18N[currentLang];
     const overlay = document.createElement('div');
     overlay.className = 'word-preview-overlay';
     overlay.id = 'wordPreviewOverlay';
     overlay.innerHTML = `
         <div class="word-preview-toolbar">
-            <div class="word-preview-title">📄 ${dict.word_preview}</div>
+            <div class="word-preview-title">📄 ${dict.word_preview}${totalPages > 1 ? ` &nbsp;<span style="font-size:12px;opacity:0.7">(${totalPages} mukasurat)</span>` : ''}</div>
             <div class="word-preview-actions">
                 <button class="word-preview-dl-btn" onclick="downloadDocument()">📥 ${currentLang === 'bm' ? 'Muat Turun .docx' : 'Download .docx'}</button>
                 <button class="word-preview-email-btn" onclick="showEmailDialog()">📧 ${currentLang === 'bm' ? 'Hantar Emel' : 'Send Email'}</button>
                 <button class="word-preview-close-btn" onclick="closeWordPreview()">${dict.word_close}</button>
             </div>
         </div>
-        <div class="word-preview-scroll">
-            <div class="word-page">
-                ${lhImgHtml}
-                <pre contenteditable="true" id="wordPreviewText" spellcheck="false">${escapeHtml(text)}</pre>
-            </div>
-        </div>`;
+        <div class="word-preview-scroll">${pagesHtml}</div>`;
     document.body.appendChild(overlay);
 
-    // Sync edits back to original docPreview
+    // Sync edits on page 1 back to original docPreview
     const wordText = document.getElementById('wordPreviewText');
-    wordText.addEventListener('input', () => {
-        if (preview) preview.innerText = wordText.innerText;
+    if (wordText) {
+        wordText.addEventListener('input', () => {
+            if (preview) preview.innerText = wordText.innerText;
+        });
+    }
+}
+
+function _paginateWordContent(fullText, hasLetterhead) {
+    // A4 content area: (297 - 50.8)mm height, (210 - 57.1)mm width at 96dpi (1px ≈ 0.2646mm)
+    const MM_TO_PX = 3.7795;
+    const contentH = Math.round((297 - 50.8) * MM_TO_PX);   // ~926px
+    const contentW = Math.round((210 - 57.1) * MM_TO_PX);   // ~578px
+    const letterheadH = hasLetterhead ? 108 : 0;             // approx header + divider
+
+    const measurer = document.createElement('pre');
+    Object.assign(measurer.style, {
+        position: 'fixed', top: '-9999px', left: '-9999px',
+        width: contentW + 'px', visibility: 'hidden', pointerEvents: 'none',
+        fontFamily: "'Arial', sans-serif", fontSize: '11pt', lineHeight: '1.5',
+        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        margin: '0', padding: '0', border: 'none', background: 'none',
     });
+    document.body.appendChild(measurer);
+
+    const lines = fullText.split('\n');
+    const pages = [];
+    let current = [];
+    let isFirst = true;
+
+    for (let i = 0; i < lines.length; i++) {
+        current.push(lines[i]);
+        measurer.textContent = current.join('\n');
+        const limit = isFirst ? contentH - letterheadH : contentH;
+        if (measurer.scrollHeight > limit) {
+            current.pop();
+            if (current.length > 0) {
+                pages.push(current.join('\n'));
+                isFirst = false;
+                current = [lines[i]];
+            } else {
+                // Line itself is too long — keep it and continue
+                pages.push(lines[i]);
+                isFirst = false;
+                current = [];
+            }
+        }
+    }
+    if (current.length > 0) pages.push(current.join('\n'));
+    document.body.removeChild(measurer);
+    return pages.length > 0 ? pages : [fullText];
 }
 
 function closeWordPreview() {
