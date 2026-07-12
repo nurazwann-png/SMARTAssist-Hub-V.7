@@ -356,6 +356,7 @@ Status sesi semasa:
         doc_text = _build_report(session["fields"])
         placeholders = _has_placeholders(doc_text)
         parsed["document_preview"] = doc_text
+        parsed["document_html"] = _build_report_html(session["fields"])
         if placeholders:
             parsed["validation_errors"] = [f"Masih ada placeholder yang belum diisi: {', '.join(placeholders)}"]
             parsed["ready_to_save"] = False
@@ -381,11 +382,123 @@ Status sesi semasa:
     return json.dumps(parsed, ensure_ascii=False)
 
 
+def _build_report_html(f: dict) -> str:
+    logo_url = None
+    try:
+        from backend.letterhead_store import get_active_by_type
+        lh = get_active_by_type("logo")
+        if lh and lh.get("filename"):
+            logo_url = f"/api/letterhead/image/{lh['filename']}"
+    except Exception:
+        pass
+
+    if logo_url:
+        logo_block = f'<img src="{logo_url}" style="max-width:100%;max-height:100px;display:block;margin:0 auto">'
+    else:
+        logo_block = '<div style="height:60px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:10pt;border:1px dashed #ccc">[Logo]</div>'
+
+    def _split_f(val):
+        if isinstance(val, list):
+            return [x.strip() for x in val if str(x).strip()]
+        return [x.strip() for x in str(val).split(",") if x.strip()]
+
+    nama_pg = _split_f(f.get("pegawai_nama", ""))
+    jawatan_pg = _split_f(f.get("pegawai_jawatan", ""))
+    pg_parts = []
+    for i, nm in enumerate(nama_pg):
+        jw = jawatan_pg[i] if i < len(jawatan_pg) else ""
+        pg_parts.append(f"{i+1}) {nm}" + (f"<br>&nbsp;&nbsp;&nbsp;{jw}" if jw else ""))
+    pegawai_html = "<br>".join(pg_parts) if pg_parts else ""
+
+    objektif = f.get("objektif", "")
+    if isinstance(objektif, list):
+        obj_items = objektif
+    else:
+        obj_items = [o.strip() for o in objektif.split(",") if o.strip()]
+    obj_html = "<br>".join(f"{i+1}) {o}" for i, o in enumerate(obj_items)) if obj_items else objektif
+
+    rumusan = f.get("rumusan", "").replace("\n", "<br>")
+    cadangan = f.get("cadangan", "").replace("\n", "<br>")
+
+    TH = 'style="border:1px solid #000;padding:5px 8px;font-weight:bold"'
+    TC = 'style="border:1px solid #000;padding:5px 8px;vertical-align:top"'
+    TL = 'style="border:1px solid #000;padding:5px 8px;width:20%"'
+    TV = 'style="border:1px solid #000;padding:5px 8px;width:30%"'
+
+    return (
+        f'<div style="font-family:Arial,sans-serif;font-size:10pt;line-height:1.5;color:#000">'
+        f'{logo_block}'
+        f'<hr style="border:none;border-top:2px solid #000;margin:8px 0">'
+        f'<table style="width:100%;border-collapse:collapse">'
+        f'<tr><td colspan="4" style="border:1px solid #000;padding:6px 8px;text-align:center;font-weight:bold;font-size:11pt">ONE PAGE REPORT</td></tr>'
+        f'<tr><td colspan="4" {TH}>NAMA PROGRAM</td></tr>'
+        f'<tr><td colspan="4" {TC}>{f.get("nama_program","")}</td></tr>'
+        f'<tr><td colspan="4" {TH}>BUTIRAN PERLAKSANAAN</td></tr>'
+        f'<tr>'
+        f'<td {TL}>Tarikh</td><td {TV}>{f.get("tarikh_program","")}</td>'
+        f'<td {TL}>Hari</td><td {TV}>{f.get("hari","")}</td>'
+        f'</tr>'
+        f'<tr>'
+        f'<td {TL}>Masa</td><td {TV}>{f.get("masa","")}</td>'
+        f'<td {TL}>Nama Sekolah</td><td {TV}>{f.get("organisasi","")}</td>'
+        f'</tr>'
+        f'<tr><td colspan="4" {TH}>PEGAWAI YANG TERLIBAT</td></tr>'
+        f'<tr><td colspan="4" style="border:1px solid #000;padding:5px 8px;min-height:50px;vertical-align:top">{pegawai_html}</td></tr>'
+        f'<tr><td colspan="4" {TH}>OBJEKTIF</td></tr>'
+        f'<tr><td colspan="4" style="border:1px solid #000;padding:5px 8px;min-height:50px;vertical-align:top">{obj_html}</td></tr>'
+        f'<tr><td colspan="4" {TH}>RUMUSAN / LAPORAN</td></tr>'
+        f'<tr><td colspan="4" style="border:1px solid #000;padding:5px 8px;min-height:70px;vertical-align:top">{rumusan}</td></tr>'
+        f'<tr><td colspan="4" {TH}>CADANGAN / TINDAKAN</td></tr>'
+        f'<tr><td colspan="4" style="border:1px solid #000;padding:5px 8px;min-height:70px;vertical-align:top">{cadangan}</td></tr>'
+        f'<tr>'
+        f'<td colspan="2" {TH}>DISEDIAKAN OLEH</td>'
+        f'<td colspan="2" style="border:1px solid #000;padding:5px 8px;font-weight:bold;text-align:center">DISAHKAN OLEH</td>'
+        f'</tr>'
+        f'<tr>'
+        f'<td colspan="2" style="border:1px solid #000;padding:8px;height:80px;vertical-align:bottom">'
+        f'............................................................<br>'
+        f'NAMA &nbsp;&nbsp;&nbsp;: {f.get("penyedia_nama","")}<br>'
+        f'JAWATAN : {f.get("penyedia_jawatan","")}<br>'
+        f'TARIKH &nbsp;&nbsp;: {f.get("tarikh_disediakan","")}'
+        f'</td>'
+        f'<td colspan="2" style="border:1px solid #000;padding:8px;height:80px;vertical-align:bottom">'
+        f'............................................................<br>'
+        f'NAMA &nbsp;&nbsp;&nbsp;: {f.get("pengesah_nama","")}<br>'
+        f'JAWATAN : {f.get("pengesah_jawatan","")}'
+        f'</td>'
+        f'</tr>'
+        f'</table>'
+        f'</div>'
+    )
+
+
 def get_document(session_id: str) -> str | None:
     session = _sessions.get(session_id)
     if session and session.get("document"):
         return session["document"]
     return None
+
+
+def get_fields(session_id: str) -> dict:
+    session = _sessions.get(session_id)
+    return session.get("fields", {}).copy() if session else {}
+
+
+def apply_improvement(session_id: str, improved_fields: dict) -> str | None:
+    """Update session fields and rebuild document using original template. Returns new doc text."""
+    session = _sessions.get(session_id)
+    if not session:
+        return None
+    for key in ("rumusan", "cadangan"):
+        if key in improved_fields and improved_fields[key]:
+            session.setdefault("fields", {})[key] = improved_fields[key]
+    # Rebuild document from updated fields using original template
+    new_doc = _build_report(session["fields"])
+    session["document"] = new_doc
+    return new_doc
+
+
+GENERATED_FIELD_KEYS = ["rumusan", "cadangan"]
 
 
 def get_session_info(session_id: str) -> dict | None:
@@ -610,21 +723,13 @@ def build_docx(session_id: str) -> bytes | None:
     objektif_text = "\n".join(f"{i+1}) {o}" for i, o in enumerate(obj_items)) if obj_items else objektif
     _add_full_row(objektif_text, bold=False, center=False, min_height="800")
 
-    # Row 8: RUMUSAN/LAPORAN (left label, right content)
-    _add_two_col_row(
-        "RUMUSAN/LAPORAN",
-        f.get("rumusan", ""),
-        left_bold=True, right_bold=False,
-        min_height="2000",
-    )
+    # Row 8: RUMUSAN/LAPORAN (title row + content row)
+    _add_full_row("RUMUSAN / LAPORAN", bold=True, center=False)
+    _add_full_row(f.get("rumusan", ""), bold=False, center=False, min_height="2000")
 
-    # Row 9: CADANGAN/TINDAKAN (left label, right content)
-    _add_two_col_row(
-        "CADANGAN/TINDAKAN",
-        f.get("cadangan", ""),
-        left_bold=True, right_bold=False,
-        min_height="2000",
-    )
+    # Row 9: CADANGAN/TINDAKAN (title row + content row)
+    _add_full_row("CADANGAN / TINDAKAN", bold=True, center=False)
+    _add_full_row(f.get("cadangan", ""), bold=False, center=False, min_height="2000")
 
     # Row 10: DISEDIAKAN OLEH | DISAHKAN OLEH header
     _add_two_col_row("DISEDIAKAN OLEH", "DISAHKAN OLEH", left_bold=True, right_bold=True, right_center=True, min_height=None)
@@ -653,12 +758,19 @@ def build_docx(session_id: str) -> bytes | None:
     images = get_report_images(session_id)
     if images:
         spacer = doc.add_paragraph()
-        spacer.paragraph_format.space_before = Pt(10)
+        spacer.paragraph_format.space_before = Pt(6)
+        spacer.paragraph_format.space_after = Pt(0)
         lh_p = doc.add_paragraph()
         lh_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        lh_p.paragraph_format.space_after = Pt(8)
+        lh_p.paragraph_format.space_before = Pt(0)
+        lh_p.paragraph_format.space_after = Pt(6)
         lr = lh_p.add_run("LAMPIRAN GAMBAR")
         lr.font.name = "Arial"; lr.font.size = Pt(11); lr.bold = True
+
+        # Fixed image dimensions — all same size, 2 per row
+        IMG_W = Cm(7.8)
+        IMG_H = Cm(5.2)  # ~landscape ratio 3:2
+
         for pair_start in range(0, len(images), 2):
             pair = images[pair_start:pair_start + 2]
             img_tbl = doc.add_table(rows=1, cols=2)
@@ -666,19 +778,25 @@ def build_docx(session_id: str) -> bytes | None:
             img_tbl.autofit = False
             for j, img_info in enumerate(pair):
                 cell = img_tbl.rows[0].cells[j]
-                cell.width = Cm(7.5)
+                cell.width = Cm(8.5)
                 para = cell.paragraphs[0]
                 para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                para.paragraph_format.space_before = Pt(4)
+                para.paragraph_format.space_after = Pt(4)
                 try:
-                    para.add_run().add_picture(img_info["path"], width=Cm(7))
+                    from PIL import Image as PILImage
+                    with PILImage.open(img_info["path"]) as im:
+                        w, h = im.size
+                    # Crop to uniform ratio before embedding — keep width fixed, calc height
+                    run = para.add_run()
+                    run.add_picture(img_info["path"], width=IMG_W, height=IMG_H)
                 except Exception:
-                    para.add_run(f"[Gambar {pair_start + j + 1}]")
-                cap = cell.add_paragraph()
-                cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                cr = cap.add_run(f"Gambar {pair_start + j + 1}")
-                cr.font.size = Pt(9); cr.font.name = "Arial"
+                    try:
+                        para.add_run().add_picture(img_info["path"], width=IMG_W)
+                    except Exception:
+                        para.add_run(f"[Gambar {pair_start + j + 1}]")
             if len(pair) == 1:
-                img_tbl.rows[0].cells[1].width = Cm(7.5)
+                img_tbl.rows[0].cells[1].width = Cm(8.5)
 
     buf = io.BytesIO()
     doc.save(buf)

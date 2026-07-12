@@ -94,7 +94,7 @@ PHASES:
 - Phase 1: Kumpul maklumat secara berperingkat (satu field setiap giliran). JANGAN tanya "isi" — isi akan dijana automatik.
 - Phase 2: JANA ISI KANDUNGAN SECARA AUTOMATIK berdasarkan tajuk dan semua maklumat yang dikumpul. Simpan hasil dalam fields_collected dengan key "isi". Jika maklumat tidak mencukupi untuk menjana isi yang bermakna (cth: tajuk terlalu umum), tanya pengguna soalan spesifik untuk mendapat konteks tambahan (cth: "Boleh nyatakan tujuan utama dan jumlah yang dipohon?"). JANGAN minta pengguna tulis isi sendiri.
   * Untuk SURAT: tulis isi dengan bernombor perenggan (2., 3., 4. dst), bahasa formal, lengkap dan profesional.
-  * Untuk MEMO: tulis SATU ayat pendahuluan SAHAJA untuk perenggan 2 — contoh: "Sukacita dimaklumkan bahawa mesyuarat akan diadakan seperti berikut:". JANGAN masukkan tarikh/masa/tempat dalam field 'isi' — ia akan dipaparkan secara berasingan dari field tarikh_acara, masa_acara, tempat_acara.
+  * Untuk MEMO: field 'isi' WAJIB mengandungi SATU AYAT PENDEK SAHAJA tanpa sebarang newline — contoh: "Sukacita dimaklumkan bahawa mesyuarat akan diadakan seperti butiran berikut:". DILARANG KERAS memasukkan tarikh/masa/tempat, nombor perenggan (3., 4.), atau kandungan lain dalam 'isi'. Sistem akan papar tarikh_acara/masa_acara/tempat_acara secara berasingan.
 - Phase 3: Tunjukkan pratonton dokumen lengkap — SEMAK tiada [PLACEHOLDER] kekal
 - Phase 4: Dokumen disahkan dan sedia untuk dimuat turun / dihantar emel
 
@@ -105,14 +105,17 @@ Untuk memo: rujukan, tarikh, pengerusi, penyelaras, ahli, urus_setia, tajuk, tar
 FORMAT TEMPLATE YANG MESTI DIIKUTI:
 
 === SURAT RASMI ===
-[penerima_nama]                                 No. Rujukan : [rujukan]
-[penerima_jawatan]                              Tarikh      : [tarikh]
+                                      No. Rujukan : [rujukan]
+                                      Tarikh      : [tarikh]
+
+[penerima_nama]
+[penerima_jawatan]
 [penerima_organisasi]
 [penerima_alamat]
 
 [Panggilan Hormat — contoh: Tuan/Puan, atau Yang Berbahagia Dato',]
 
-[TAJUK SURAT DALAM HURUF BESAR DAN TENGAH]
+[TAJUK SURAT DALAM HURUF BESAR — RATA KIRI]
 
     Dengan hormatnya perkara di atas adalah dirujuk.
 
@@ -239,28 +242,23 @@ def _auto_panggilan(nama: str) -> str:
 def _build_surat(f: dict) -> str:
     sk = f.get("salinan_kepada", "")
     sk_lines = ""
-    if sk:
-        items = [s.strip() for s in sk.split(",") if s.strip()]
+    _sk_skip = {"tiada", "none", "kosong", "tak ada", "tidak ada", "-", "–", "tiada s.k.", "tiada sk"}
+    if sk and sk.strip().lower() not in _sk_skip:
+        items = [s.strip() for s in sk.split(",") if s.strip() and s.strip().lower() not in _sk_skip]
         if items:
             sk_lines = "\n\ns.k.:\n" + "\n".join(f"{i+1}. {item}" for i, item in enumerate(items))
 
-    # Two-column header: penerima (left) | Ruj.Kami + Tarikh (right)
-    LEFT_W = 48
-    penerima_rows = [
+    # Ruj/Tarikh right-aligned block, then penerima address below
+    RIGHT_W = 70
+    header_lines = [
+        f"{'No. Rujukan : ' + f.get('rujukan', '[PLACEHOLDER]'):>{RIGHT_W}}",
+        f"{'Tarikh      : ' + f.get('tarikh', '[PLACEHOLDER]'):>{RIGHT_W}}",
+        "",
         f.get('penerima_nama', '[PLACEHOLDER]'),
         f.get('penerima_jawatan', '[PLACEHOLDER]'),
         f.get('penerima_organisasi', '[PLACEHOLDER]'),
         f.get('penerima_alamat', '[PLACEHOLDER]'),
     ]
-    right_rows = [
-        f"No. Rujukan : {f.get('rujukan', '[PLACEHOLDER]')}",
-        f"Tarikh      : {f.get('tarikh', '[PLACEHOLDER]')}",
-    ]
-    header_lines = []
-    for i in range(max(len(penerima_rows), len(right_rows))):
-        left = penerima_rows[i] if i < len(penerima_rows) else ""
-        right = right_rows[i] if i < len(right_rows) else ""
-        header_lines.append(f"{left:<{LEFT_W}}{right}".rstrip())
 
     panggilan = _auto_panggilan(f.get('penerima_nama', ''))
 
@@ -424,9 +422,21 @@ Status sesi semasa:
 
     if parsed.get("fields_collected"):
         session["fields"].update(parsed["fields_collected"])
+        # For memo, isi must be one sentence only — trim anything after first newline
+        if session.get("doc_type") == "memo" and "isi" in session["fields"]:
+            isi_val = session["fields"]["isi"]
+            if "\n" in isi_val:
+                session["fields"]["isi"] = isi_val.split("\n")[0].strip()
 
     if parsed.get("phase") is not None:
         session["phase"] = parsed["phase"]
+
+    # Auto-generate memo isi if all other fields are filled but isi is missing
+    if session.get("doc_type") == "memo" and "isi" not in session["fields"]:
+        tajuk = session["fields"].get("tajuk", "")
+        required_keys = {f["key"] for f in MEMO_FIELDS["fields"] if not f.get("optional") and f["key"] != "isi"}
+        if tajuk and required_keys.issubset(session["fields"].keys()):
+            session["fields"]["isi"] = f"Sukacita dimaklumkan bahawa {tajuk.rstrip('.')} akan diadakan seperti butiran berikut:"
 
     all_filled = session["doc_type"] and not _find_missing_fields(session["doc_type"], session["fields"])
     if session["doc_type"] and (session["phase"] >= 3 or all_filled):
@@ -436,6 +446,10 @@ Status sesi semasa:
         doc_text = _build_document(session["doc_type"], session["fields"])
         placeholders = _has_placeholders(doc_text)
         parsed["document_preview"] = doc_text
+        if session["doc_type"] == "memo":
+            parsed["document_html"] = _build_memo_html(session["fields"])
+        elif session["doc_type"] == "surat":
+            parsed["document_html"] = _build_surat_html(session["fields"])
         if placeholders:
             parsed["validation_errors"] = [f"Masih ada placeholder yang belum diisi: {', '.join(placeholders)}"]
             parsed["ready_to_save"] = False
@@ -456,6 +470,33 @@ def get_document(session_id: str) -> str | None:
     if session and session.get("document"):
         return session["document"]
     return None
+
+
+def get_fields(session_id: str) -> dict:
+    session = _sessions.get(session_id)
+    return session["fields"].copy() if session else {}
+
+
+def apply_improvement(session_id: str, improved_fields: dict) -> str | None:
+    """Update session fields and rebuild document using original template. Returns new doc text."""
+    session = _sessions.get(session_id)
+    if not session:
+        return None
+    for key in ("isi",):
+        if key in improved_fields and improved_fields[key]:
+            session["fields"][key] = improved_fields[key]
+    # Memo isi must stay single sentence
+    if session.get("doc_type") == "memo":
+        isi = session["fields"].get("isi", "")
+        if "\n" in isi:
+            session["fields"]["isi"] = isi.split("\n")[0].strip()
+    # Rebuild document from updated fields using original template
+    new_doc = _build_document(session["doc_type"], session["fields"])
+    session["document"] = new_doc
+    return new_doc
+
+
+GENERATED_FIELD_KEYS = ["isi"]
 
 
 def build_docx(session_id: str) -> bytes | None:
@@ -480,22 +521,41 @@ def build_docx(session_id: str) -> bytes | None:
     pf.line_spacing = 1.0
 
     for section in doc.sections:
-        section.top_margin = Cm(2.54)
-        section.bottom_margin = Cm(2.54)
-        section.left_margin = Cm(3.17)
-        section.right_margin = Cm(2.54)
+        section.top_margin = Cm(2)
+        section.bottom_margin = Cm(2)
+        section.left_margin = Cm(2)
+        section.right_margin = Cm(2)
 
-    # Insert active letterhead at top
+    # Insert letterhead into Word header section (surat only)
+    _doc_type_check = session.get("doc_type", "surat") if session else "surat"
     try:
         from backend.letterhead_store import get_active_path_by_type
-        lh_path = get_active_path_by_type("letterhead")
+        from docx.oxml.ns import qn as _qn
+        from docx.oxml import OxmlElement as _OxmlElement
+        lh_path = get_active_path_by_type("letterhead") if _doc_type_check != "memo" else None
         if lh_path:
-            lh_para = doc.add_paragraph()
+            section = doc.sections[0]
+            section.header_distance = Cm(0.5)
+            header = section.header
+            for p in header.paragraphs:
+                p.clear()
+            lh_para = header.paragraphs[0]
             lh_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            lh_para.paragraph_format.space_after = Pt(6)
-            run = lh_para.add_run()
-            run.add_picture(str(lh_path), width=Cm(16))
-            doc.add_paragraph("")
+            lh_para.paragraph_format.space_before = Pt(0)
+            lh_para.paragraph_format.space_after = Pt(4)
+            lh_para.add_run().add_picture(str(lh_path), width=Cm(17))
+            hr_para = header.add_paragraph()
+            hr_para.paragraph_format.space_before = Pt(0)
+            hr_para.paragraph_format.space_after = Pt(0)
+            pPr = hr_para._p.get_or_add_pPr()
+            pBdr = _OxmlElement('w:pBdr')
+            bottom = _OxmlElement('w:bottom')
+            bottom.set(_qn('w:val'), 'single')
+            bottom.set(_qn('w:sz'), '6')
+            bottom.set(_qn('w:space'), '1')
+            bottom.set(_qn('w:color'), '000000')
+            pBdr.append(bottom)
+            pPr.append(pBdr)
     except Exception:
         pass
 
@@ -503,6 +563,26 @@ def build_docx(session_id: str) -> bytes | None:
     fields = session.get("fields", {}) if session else {}
 
     if doc_type == "memo":
+        # Memo: logo in body (no letterhead header)
+        try:
+            from backend.letterhead_store import get_active_path_by_type
+            logo_path = get_active_path_by_type("logo")
+            if logo_path:
+                import io as _io
+                from PIL import Image as _PILImage
+                from docx.enum.text import WD_ALIGN_PARAGRAPH
+                # Convert to PNG in memory so python-docx can always read it
+                _img = _PILImage.open(str(logo_path)).convert("RGBA")
+                _buf = _io.BytesIO()
+                _img.save(_buf, format="PNG")
+                _buf.seek(0)
+                logo_para = doc.add_paragraph()
+                logo_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                logo_para.paragraph_format.space_before = Pt(0)
+                logo_para.paragraph_format.space_after = Pt(6)
+                logo_para.add_run().add_picture(_buf, width=Cm(7.67), height=Cm(4.31))
+        except Exception:
+            pass
         _build_memo_docx(doc, fields)
     else:
         _build_surat_docx(doc, doc_text, fields)
@@ -519,7 +599,11 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
     from docx.oxml import OxmlElement
 
     def _no_border(tbl):
-        tbl_pr = tbl._tbl.get_or_add_tblPr()
+        tbl_element = tbl._tbl
+        tbl_pr = tbl_element.find(qn('w:tblPr'))
+        if tbl_pr is None:
+            tbl_pr = OxmlElement('w:tblPr')
+            tbl_element.insert(0, tbl_pr)
         tbl_borders = OxmlElement('w:tblBorders')
         for edge in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
             b = OxmlElement(f'w:{edge}')
@@ -527,55 +611,50 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
             tbl_borders.append(b)
         tbl_pr.append(tbl_borders)
 
-    if fields:
-        # Two-column header table: penerima (left) | Ruj.Kami + Tarikh (right)
-        tbl = doc.add_table(rows=1, cols=2)
-        _no_border(tbl)
-        tbl.columns[0].width = Cm(10)
-        tbl.columns[1].width = Cm(7)
+    def _p(text="", bold=False, align=WD_ALIGN_PARAGRAPH.LEFT, indent_cm=0, size=11):
+        para = doc.add_paragraph()
+        para.alignment = align
+        para.paragraph_format.space_after = Pt(0)
+        para.paragraph_format.space_before = Pt(0)
+        if indent_cm:
+            para.paragraph_format.first_line_indent = Cm(indent_cm)
+        if text:
+            run = para.add_run(text)
+            run.font.name = "Arial"
+            run.font.size = Pt(size)
+            run.bold = bold
+        return para
 
-        row = tbl.rows[0]
-        # Penerima cell
-        left_cell = row.cells[0]
-        left_cell.width = Cm(10)
-        left_cell._tc.clear_content()
+    if fields:
+        # Ruj/Tarikh right-aligned, then penerima address below
+        for line in [
+            f"No. Rujukan : {fields.get('rujukan', '')}",
+            f"Tarikh      : {fields.get('tarikh', '')}",
+        ]:
+            _p(line, align=WD_ALIGN_PARAGRAPH.RIGHT)
+
+        doc.add_paragraph("")
+
         for line in [
             fields.get('penerima_nama', ''),
             fields.get('penerima_jawatan', ''),
             fields.get('penerima_organisasi', ''),
             fields.get('penerima_alamat', ''),
         ]:
-            p = left_cell.add_paragraph(line)
-            p.paragraph_format.space_after = Pt(0)
-            p.paragraph_format.space_before = Pt(0)
-
-        # Ruj/Tarikh cell
-        right_cell = row.cells[1]
-        right_cell.width = Cm(7)
-        right_cell._tc.clear_content()
-        for line in [
-            f"No. Rujukan : {fields.get('rujukan', '')}",
-            f"Tarikh      : {fields.get('tarikh', '')}",
-        ]:
-            p = right_cell.add_paragraph(line)
-            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            p.paragraph_format.space_after = Pt(0)
-            p.paragraph_format.space_before = Pt(0)
+            if line:
+                _p(line)
 
         doc.add_paragraph("")
 
         panggilan = _auto_panggilan(fields.get('penerima_nama', ''))
-        doc.add_paragraph(f"{panggilan},").paragraph_format.space_after = Pt(0)
+        _p(f"{panggilan},")
         doc.add_paragraph("")
 
-        tajuk_para = doc.add_paragraph()
-        tajuk_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        tajuk_run = tajuk_para.add_run(fields.get('tajuk', '').upper())
-        tajuk_run.bold = True
-        tajuk_run.font.size = Pt(11)
+        # Tajuk — LEFT, bold
+        _p(fields.get('tajuk', '').upper(), bold=True)
         doc.add_paragraph("")
 
-        # Body from doc_text: skip the header lines, start from "Dengan hormatnya"
+        # Body from doc_text starting from "Dengan hormatnya"
         lines = doc_text.split("\n")
         body_started = False
         for line in lines:
@@ -590,32 +669,21 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
                 doc.add_paragraph("")
                 continue
 
-            para = doc.add_paragraph()
-            para.paragraph_format.space_after = Pt(0)
-            para.paragraph_format.space_before = Pt(0)
-
             is_bold = False
-            if stripped.startswith('"') and stripped.endswith('"'):
-                is_bold = True
-                para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            elif stripped.startswith("s.k.:"):
-                is_bold = True
-                para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            elif stripped == stripped.upper() and len(stripped) > 5 and stripped[0].isalpha():
-                is_bold = True
-                para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            else:
-                para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            align = WD_ALIGN_PARAGRAPH.JUSTIFY
+            indent = 0
 
-            # Indent opening paragraph
             if stripped.startswith("Dengan hormatnya"):
-                para.paragraph_format.first_line_indent = Cm(1.27)
+                indent = 1.27
+            elif stripped.startswith('"') and stripped.endswith('"'):
+                # "MALAYSIA MADANI" and "BERKHIDMAT UNTUK NEGARA" — left, bold
+                is_bold = True
+                align = WD_ALIGN_PARAGRAPH.LEFT
+            elif stripped.startswith("s.k.:") or stripped.startswith("(") or stripped == stripped.upper() and len(stripped) > 5 and stripped[0].isalpha():
+                is_bold = False
+                align = WD_ALIGN_PARAGRAPH.LEFT
 
-            run = para.add_run(stripped)
-            run.font.size = Pt(11)
-            run.font.name = "Arial"
-            if is_bold:
-                run.bold = True
+            _p(stripped, bold=is_bold, align=align, indent_cm=indent)
     else:
         # Fallback: plain line-by-line rendering
         lines = doc_text.split("\n")
@@ -644,89 +712,316 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
                 run.bold = True
 
 
+def _build_memo_html(f: dict) -> str:
+    logo_url = _get_lh_img_url("logo")
+    if logo_url:
+        logo_block = f'<img src="{logo_url}" style="max-width:100%;max-height:120px;display:block;margin:0 auto 8px auto">'
+    else:
+        logo_block = ""
+
+    ahli_str = f.get('ahli', '')
+    ahli_list = [a.strip() for a in ahli_str.split(',') if a.strip()] if ahli_str else []
+    pengerusi = f.get('pengerusi', '')
+    penyelaras = f.get('penyelaras', '')
+
+    TD = 'style="padding:4px 8px;border:1px solid #000;vertical-align:top"'
+    rows = []
+    if pengerusi:
+        rows.append((f'<b>Kepada</b>', ':', pengerusi))
+        if penyelaras:
+            rows.append(('', '', penyelaras))
+        for ahli in ahli_list:
+            if ahli:
+                rows.append(('', '', ahli))
+    rows.append((f'<b>Daripada</b>', ':', f.get('urus_setia', '')))
+    rows.append((f'<b>Tarikh</b>', ':', f.get('tarikh', '')))
+    rows.append((f'<b>Ruj. Kami</b>', ':', f.get('rujukan', '')))
+    rows.append((f'<b>Perkara</b>', ':', f'<b>{f.get("tajuk", "").upper()}</b>'))
+
+    rows_html = ''.join(
+        f'<tr>'
+        f'<td {TD} style="padding:4px 8px;border:1px solid #000;vertical-align:top;width:110px">{r[0]}</td>'
+        f'<td {TD} style="padding:4px 6px;border:1px solid #000;vertical-align:top;width:18px;text-align:center">{r[1]}</td>'
+        f'<td {TD} style="padding:4px 8px;border:1px solid #000;vertical-align:top">{r[2]}</td>'
+        f'</tr>'
+        for r in rows
+    )
+
+    panggilan = _auto_panggilan(f.get('pengerusi', 'Tuan'))
+    isi = f.get('isi', '').replace('\n', '<br>')
+    tarikh_acara = f.get('tarikh_acara', '')
+    masa_acara = f.get('masa_acara', '')
+    tempat_acara = f.get('tempat_acara', '')
+
+    # Hanging indent style for numbered paragraphs
+    hang = 'style="margin:6px 0;padding-left:2em;text-indent:-2em;line-height:1.6"'
+    acara_indent = 'style="margin:2px 0 2px 4em;line-height:1.6"'
+    normal = 'style="margin:6px 0;line-height:1.6"'
+
+    return (
+        f'<div style="font-family:Arial,sans-serif;font-size:11pt;line-height:1.5;color:#000">'
+        f'{logo_block}'
+        f'<table style="width:100%;border-collapse:collapse;margin-bottom:12px">'
+        f'<tr><td colspan="3" style="background:#000;color:#fff;text-align:center;font-weight:bold;'
+        f'padding:6px 8px;font-size:12pt;letter-spacing:1px">MEMO DALAMAN</td></tr>'
+        f'{rows_html}'
+        f'</table>'
+        f'<p {normal}>{panggilan},</p>'
+        f'<p {normal}>Dengan segala hormatnya perkara di atas adalah dirujuk.</p>'
+        f'<p {hang}>2.&nbsp;&nbsp;&nbsp;&nbsp;{isi}</p>'
+        f'<p {acara_indent}><b>Tarikh</b>&emsp;&nbsp;: {tarikh_acara}</p>'
+        f'<p {acara_indent}><b>Masa</b>&emsp;&emsp;: {masa_acara}</p>'
+        f'<p {acara_indent}><b>Tempat</b>&emsp;: {tempat_acara}</p>'
+        f'<p {hang}>3.&nbsp;&nbsp;&nbsp;&nbsp;Kehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.</p>'
+        f'<p {normal}>Sekian.</p>'
+        f'<br>'
+        f'<p {normal}><b>&ldquo;MALAYSIA MADANI&rdquo;</b></p>'
+        f'<p {normal}><b>&ldquo;BERKHIDMAT UNTUK NEGARA&rdquo;</b></p>'
+        f'<br>'
+        f'<p {normal}>Saya yang menjalankan amanah,</p>'
+        f'<br><br><br>'
+        f'<p {normal}><b>({f.get("penandatangan_nama", "").upper()})</b></p>'
+        f'<p {normal}>{f.get("penandatangan_jawatan", "")}</p>'
+        f'<p {normal}>{f.get("nama_pejabat", "")}</p>'
+        f'</div>'
+    )
+
+
+def _get_lh_img_url(lh_type: str = "letterhead") -> str | None:
+    try:
+        from backend.letterhead_store import get_active_by_type
+        lh = get_active_by_type(lh_type)
+        if lh and lh.get("filename"):
+            return f"/api/letterhead/image/{lh['filename']}"
+    except Exception:
+        pass
+    return None
+
+
+def _build_surat_html(f: dict) -> str:
+    lh_url = _get_lh_img_url("letterhead")
+    if lh_url:
+        lh_block = f'<img src="{lh_url}" style="max-width:100%;max-height:150px;display:block;margin:0 auto">'
+    else:
+        lh_block = '<div style="height:80px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:10pt;border:1px dashed #ccc">[Kepala Surat]</div>'
+
+    sk = f.get("salinan_kepada", "")
+    sk_html = ""
+    _sk_skip = {"tiada", "none", "kosong", "tak ada", "tidak ada", "-", "–", "tiada s.k.", "tiada sk"}
+    if sk and sk.strip().lower() not in _sk_skip:
+        items = [s.strip() for s in sk.split(",") if s.strip() and s.strip().lower() not in _sk_skip]
+        if items:
+            sk_html = '<p style="margin:16px 0 4px 0"><b>s.k.:</b></p>'
+            for i, item in enumerate(items):
+                sk_html += f'<p style="margin:2px 0">{i+1}. {item}</p>'
+
+    panggilan = _auto_panggilan(f.get('penerima_nama', ''))
+    isi_raw = f.get('isi', '')
+    # Isi paragraphs: no indent, justify (matches Word format)
+    isi_paras = isi_raw.split('\n\n') if '\n\n' in isi_raw else [isi_raw]
+    isi_html = "".join(
+        f'<p style="margin:6px 0;line-height:1.6;text-align:justify">{p.replace(chr(10),"<br>")}</p>'
+        for p in isi_paras if p.strip()
+    )
+
+    n = 'style="margin:6px 0;line-height:1.6"'
+    # Penerima (left) + Rujukan/Tarikh (right) — same table per KPM format
+    penerima_lines = [
+        f.get("penerima_nama", ""), f.get("penerima_jawatan", ""),
+        f.get("penerima_organisasi", ""), f.get("penerima_alamat", ""),
+    ]
+    penerima_html = "<br>".join(l for l in penerima_lines if l)
+    rujukan_html = (
+        f'No. Rujukan : {f.get("rujukan","")}<br>'
+        f'Tarikh &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: {f.get("tarikh","")}'
+    )
+
+    return (
+        f'<div style="font-family:Arial,sans-serif;font-size:11pt;line-height:1.5;color:#000">'
+        f'{lh_block}'
+        f'<hr style="border:none;border-top:2px solid #000;margin:8px 0 14px 0">'
+        f'<table style="width:100%;border:none;margin-bottom:14px">'
+        f'<tr>'
+        f'<td style="border:none;vertical-align:top;width:60%;line-height:1.8">{penerima_html}</td>'
+        f'<td style="border:none;text-align:right;vertical-align:top;line-height:1.8">{rujukan_html}</td>'
+        f'</tr></table>'
+        f'<p {n}>{panggilan},</p>'
+        f'<p style="margin:10px 0;font-weight:bold">{f.get("tajuk","").upper()}</p>'
+        f'<p style="margin:8px 0;line-height:1.6;text-align:justify">Dengan hormatnya perkara di atas adalah dirujuk.</p>'
+        f'{isi_html}'
+        f'<p {n}>Sekian, terima kasih.</p>'
+        f'<br>'
+        f'<p {n}><b>&ldquo;MALAYSIA MADANI&rdquo;</b></p>'
+        f'<p {n}><b>&ldquo;BERKHIDMAT UNTUK NEGARA&rdquo;</b></p>'
+        f'<br>'
+        f'<p {n}>Saya yang menjalankan amanah,</p>'
+        f'<br><br><br>'
+        f'<p {n}><b>({f.get("penandatangan_nama","").upper()})</b></p>'
+        f'<p style="margin:2px 0">{f.get("penandatangan_jawatan","")}</p>'
+        f'{sk_html}'
+        f'</div>'
+    )
+
+
 def _build_memo_docx(doc, fields: dict):
     from docx.shared import Pt, Cm, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
 
-    def _p(text="", bold=False, indent_cm=0, center=False):
+    def _p(text="", bold=False, indent_cm=0, align=WD_ALIGN_PARAGRAPH.LEFT, size=12):
         para = doc.add_paragraph()
         para.paragraph_format.space_after = Pt(0)
         para.paragraph_format.space_before = Pt(0)
+        para.alignment = align
         if indent_cm:
             para.paragraph_format.left_indent = Cm(indent_cm)
-        if center:
-            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
         if text:
             run = para.add_run(text)
-            run.font.size = Pt(11)
+            run.font.size = Pt(size)
             run.font.name = "Arial"
             run.bold = bold
         return para
 
-    # Title
-    _p("MEMO DALAMAN", bold=True, center=True)
-    doc.add_paragraph("")
-
-    # Header table
-    ahli_str = fields.get('ahli', '')
-    ahli_list = [a.strip() for a in ahli_str.split(',') if a.strip()] if ahli_str else ['']
-    num_ahli = max(1, len(ahli_list))
-    num_rows = 2 + num_ahli + 5  # pengerusi + penyelaras + ahli + urus_setia + tarikh + perkara + ruj. kami
-
-    table = doc.add_table(rows=num_rows, cols=3)
-    table.style = 'Table Grid'
-
-    def _cell(row, col, text, bold=False):
-        cell = table.cell(row, col)
-        cell.width = Cm([3, 3, 10][col])
+    def _cell_text(cell, text, bold=False, align=WD_ALIGN_PARAGRAPH.LEFT, size=12):
         para = cell.paragraphs[0]
         para.paragraph_format.space_after = Pt(0)
+        para.paragraph_format.space_before = Pt(0)
+        para.alignment = align
         run = para.add_run(text)
-        run.font.size = Pt(11)
+        run.font.size = Pt(size)
         run.font.name = "Arial"
         run.bold = bold
 
-    r = 0
-    _cell(r, 0, "Kepada", bold=True); _cell(r, 1, "Pengerusi"); _cell(r, 2, f": {fields.get('pengerusi', '')}")
-    r += 1
-    _cell(r, 0, ""); _cell(r, 1, "Penyelaras"); _cell(r, 2, f": {fields.get('penyelaras', '')}")
-    r += 1
-    for i, ahli in enumerate(ahli_list):
-        _cell(r, 0, ""); _cell(r, 1, "Ahli" if i == 0 else ""); _cell(r, 2, f": {ahli}")
-        r += 1
-    _cell(r, 0, "Daripada", bold=True); _cell(r, 1, "Urus setia"); _cell(r, 2, f": {fields.get('urus_setia', '')}")
-    r += 1
-    _cell(r, 0, "Tarikh", bold=True); _cell(r, 1, ""); _cell(r, 2, f": {fields.get('tarikh', '')}")
-    r += 1
-    _cell(r, 0, "Perkara", bold=True); _cell(r, 1, ""); _cell(r, 2, f": {fields.get('tajuk', '').upper()}")
-    r += 1
-    _cell(r, 0, "Ruj. Kami", bold=True); _cell(r, 1, ""); _cell(r, 2, f": {fields.get('rujukan', '')}")
+    def _no_border_table(tbl):
+        tbl_element = tbl._tbl
+        tbl_pr = tbl_element.find(qn('w:tblPr'))
+        if tbl_pr is None:
+            tbl_pr = OxmlElement('w:tblPr')
+            tbl_element.insert(0, tbl_pr)
+        tbl_borders = OxmlElement('w:tblBorders')
+        for edge in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
+            b = OxmlElement(f'w:{edge}')
+            b.set(qn('w:val'), 'none')
+            tbl_borders.append(b)
+        tbl_pr.append(tbl_borders)
+
+    def _add_hr(para):
+        pPr = para._p.get_or_add_pPr()
+        pBdr = OxmlElement('w:pBdr')
+        bottom = OxmlElement('w:bottom')
+        bottom.set(qn('w:val'), 'single')
+        bottom.set(qn('w:sz'), '6')
+        bottom.set(qn('w:space'), '1')
+        bottom.set(qn('w:color'), '000000')
+        pBdr.append(bottom)
+        pPr.append(pBdr)
+
+    def _shade_cell(cell, hex_color='000000'):
+        tc_pr = cell._tc.get_or_add_tcPr()
+        shd = OxmlElement('w:shd')
+        shd.set(qn('w:val'), 'clear')
+        shd.set(qn('w:color'), 'auto')
+        shd.set(qn('w:fill'), hex_color)
+        tc_pr.append(shd)
+
+    # ── "MEMO DALAMAN" title in black box ──
+    title_tbl = doc.add_table(rows=1, cols=1)
+    _no_border_table(title_tbl)
+    title_cell = title_tbl.cell(0, 0)
+    _shade_cell(title_cell, '000000')
+    _cell_text(title_cell, "MEMO DALAMAN", bold=True,
+               align=WD_ALIGN_PARAGRAPH.CENTER, size=12)
+    title_cell.paragraphs[0].runs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+    title_cell.paragraphs[0].paragraph_format.space_before = Pt(4)
+    title_cell.paragraphs[0].paragraph_format.space_after = Pt(4)
 
     doc.add_paragraph("")
-    _p("Tuan,")
-    doc.add_paragraph("")
-    _p("Dengan segala hormatnya saya diarah merujuk kepada perkara di atas.")
+
+    # ── Header info table (no borders, 3 cols: label | colon+value) ──
+    ahli_str = fields.get('ahli', '')
+    ahli_list = [a.strip() for a in ahli_str.split(',') if a.strip()] if ahli_str else ['']
+    pengerusi = fields.get('pengerusi', '')
+    penyelaras = fields.get('penyelaras', '')
+
+    # Build rows: (label, value) pairs
+    rows_data = []
+    if pengerusi:
+        rows_data.append(("Kepada", pengerusi))
+        if penyelaras:
+            rows_data.append(("", penyelaras))
+        for ahli in ahli_list:
+            if ahli:
+                rows_data.append(("", ahli))
+    rows_data.append(("Daripada", fields.get('urus_setia', '')))
+    rows_data.append(("Tarikh", fields.get('tarikh', '')))
+    rows_data.append(("Ruj. Kami", fields.get('rujukan', '')))
+    rows_data.append(("Perkara", fields.get('tajuk', '').upper()))
+
+    info_tbl = doc.add_table(rows=len(rows_data), cols=3, style='Table Grid')
+
+    COL_W = [Cm(3.5), Cm(0.5), Cm(13)]
+    for i, (label, value) in enumerate(rows_data):
+        row = info_tbl.rows[i]
+        row.cells[0].width = COL_W[0]
+        row.cells[1].width = COL_W[1]
+        row.cells[2].width = COL_W[2]
+
+        is_perkara = label == "Perkara"
+        label_bold = bool(label)
+
+        _cell_text(row.cells[0], label, bold=label_bold, size=12)
+        _cell_text(row.cells[1], ":" if label else "", size=12)
+        _cell_text(row.cells[2], value, bold=is_perkara,
+                   align=WD_ALIGN_PARAGRAPH.JUSTIFY if is_perkara else WD_ALIGN_PARAGRAPH.LEFT,
+                   size=12)
+
+
     doc.add_paragraph("")
 
-    isi = fields.get('isi', '')
-    _p(f"2.\t{isi}")
-    doc.add_paragraph("")
+    # ── Body ──
+    panggilan = _auto_panggilan(fields.get('pengerusi', 'Tuan'))
+    p_panggilan = _p(f"{panggilan},")
+    p_panggilan.paragraph_format.space_before = Pt(6)
+    p_panggilan.paragraph_format.space_after = Pt(6)
 
-    # Acara block (indented)
+    p_dengan = _p("Dengan segala hormatnya perkara di atas adalah dirujuk.",
+                  align=WD_ALIGN_PARAGRAPH.JUSTIFY)
+    p_dengan.paragraph_format.space_after = Pt(6)
+
+    isi = fields.get('isi', '').split('\n')[0].strip()
+    isi_para = doc.add_paragraph()
+    isi_para.paragraph_format.space_after = Pt(6)
+    isi_para.paragraph_format.space_before = Pt(0)
+    isi_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    isi_para.paragraph_format.left_indent = Cm(1.27)
+    isi_para.paragraph_format.first_line_indent = Cm(-1.27)
+    r2 = isi_para.add_run(f"2.\t{isi}")
+    r2.font.size = Pt(12); r2.font.name = "Arial"
+
+    # Acara block
     for label, key in [("Tarikh", "tarikh_acara"), ("Masa", "masa_acara"), ("Tempat", "tempat_acara")]:
-        _p(f"{label:<8}: {fields.get(key, '')}", indent_cm=1.5)
+        val = fields.get(key, '')
+        acara_p = _p(f"{label:<8}: {val}", indent_cm=2)
+        acara_p.paragraph_format.space_after = Pt(2)
+
+    p3 = doc.add_paragraph()
+    p3.paragraph_format.space_after = Pt(6)
+    p3.paragraph_format.space_before = Pt(6)
+    p3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    p3.paragraph_format.left_indent = Cm(1.27)
+    p3.paragraph_format.first_line_indent = Cm(-1.27)
+    r3 = p3.add_run("3.\tKehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.")
+    r3.font.size = Pt(12); r3.font.name = "Arial"
 
     doc.add_paragraph("")
-    _p("3.\tKehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.")
-    doc.add_paragraph("")
-    _p("Sekian, terima kasih")
+    _p("Sekian.")
     doc.add_paragraph("")
     _p('"MALAYSIA MADANI"', bold=True)
-    doc.add_paragraph("")
     _p('"BERKHIDMAT UNTUK NEGARA"', bold=True)
     doc.add_paragraph("")
-    _p("Saya yang menjalankan amanah")
+    _p("Saya yang menjalankan amanah,")
+    doc.add_paragraph("")
     doc.add_paragraph("")
     doc.add_paragraph("")
     _p(f"({fields.get('penandatangan_nama', '').upper()})", bold=True)

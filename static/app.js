@@ -653,7 +653,12 @@ function buildLetterHtml(data) {
         html += '<div class="da-section doc-preview-section">';
         html += '<div class="da-section-title">\u{1F4C4} Pratonton Dokumen <span class="edit-hint">(boleh diedit)</span>'
             + `<button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button></div>`;
-        html += `<pre class="doc-preview" contenteditable="true" id="docPreview">${escapeHtml(data.document_preview)}</pre>`;
+        if (data.document_html) {
+            html += `<pre class="doc-preview" contenteditable="true" id="docPreview" style="display:none">${escapeHtml(data.document_preview)}</pre>`;
+            html += `<div class="doc-preview doc-preview-html" contenteditable="true" id="docPreviewHtml">${data.document_html}</div>`;
+        } else {
+            html += `<pre class="doc-preview" contenteditable="true" id="docPreview">${escapeHtml(data.document_preview)}</pre>`;
+        }
         html += '</div>';
     }
 
@@ -661,6 +666,10 @@ function buildLetterHtml(data) {
         html += '<div class="da-section da-warning"><div class="da-section-title">\u{26A0}\u{FE0F} Ralat</div><ul>';
         data.validation_errors.forEach(e => { html += `<li>${escapeHtml(e)}</li>`; });
         html += '</ul></div>';
+    }
+
+    if (data.auto_review) {
+        html += renderAutoReviewPanel(data.auto_review);
     }
 
     // Image upload panel for report generator
@@ -677,14 +686,93 @@ function buildLetterHtml(data) {
     }
 
     if (data.ready_to_save) {
+        const remindMsg = currentLang === 'en'
+            ? '⚠️ Please review the generated document carefully before downloading. Ensure all information is accurate and complete.'
+            : '⚠️ Sila semak semula dokumen yang telah dijana sebelum dimuat turun. Pastikan semua maklumat adalah tepat dan lengkap.';
+        html += `<div class="doc-review-reminder">${remindMsg}</div>`;
         html += '<div class="doc-actions">';
         html += `<button class="doc-action-btn download-btn" onclick="downloadDocument()">\u{1F4E5} Muat Turun (.docx)</button>`;
-        html += `<button class="doc-action-btn email-btn" onclick="showEmailDialog()">\u{1F4E7} Hantar Emel</button>`;
         html += '</div>';
     }
 
     html += '</div>';
     return html;
+}
+
+function renderAutoReviewPanel(review) {
+    const score = review.score || '?';
+    const scoreClass = {'A': 'score-a', 'B': 'score-b', 'C': 'score-c', 'D': 'score-d'}[score] || 'score-b';
+    const issues = review.issues || [];
+    const mandatory = issues.filter(i => i.severity === 'WAJIB_BETULKAN');
+    const improvement = review.improvement || null;
+
+    let html = `<div class="auto-review-panel">
+        <div class="auto-review-header">
+            <span class="auto-review-title">📝 Semakan & Penambahbaikan Automatik</span>
+            <span class="review-score ${scoreClass}">${score}</span>
+        </div>
+        <p class="auto-review-summary">${escapeHtml(review.summary || review.message || '')}</p>`;
+
+    // Show what was improved
+    if (improvement) {
+        const applied = improvement.changes_applied || [];
+        const skipped = improvement.changes_skipped || [];
+        const needsInfo = improvement.needs_info;
+
+        if (applied.length > 0) {
+            html += `<div class="review-issues-group"><div class="review-group-label improved-label">✅ Telah Diperbaiki (${applied.length})</div>`;
+            applied.forEach(change => {
+                html += `<div class="review-issue improved-issue"><span class="issue-text">${escapeHtml(change)}</span></div>`;
+            });
+            html += '</div>';
+        }
+
+        if (skipped.length > 0) {
+            html += `<div class="review-issues-group review-skipped-group"><div class="review-group-label skipped-label">⏭ Diskip (berkaitan template/input pengguna)</div>`;
+            skipped.forEach(reason => {
+                html += `<div class="review-issue skipped-issue"><span class="issue-text">${escapeHtml(reason)}</span></div>`;
+            });
+            html += '</div>';
+        }
+
+        if (needsInfo) {
+            html += `<div class="review-needs-info">
+                <span class="needs-info-icon">❓</span>
+                <span class="needs-info-text">${escapeHtml(needsInfo)}</span>
+                <button class="needs-info-reply-btn" onclick="replyNeedsInfo(${JSON.stringify(needsInfo)})">Balas</button>
+            </div>`;
+        }
+
+        if (applied.length === 0 && skipped.length === 0 && !needsInfo) {
+            html += `<div class="review-all-good">✅ Dokumen sudah baik, tiada penambahbaikan diperlukan.</div>`;
+        }
+    } else if (issues.length === 0) {
+        html += `<div class="review-all-good">✅ ${escapeHtml(review.message || 'Dokumen dalam keadaan baik.')}</div>`;
+    }
+
+    // Show remaining mandatory issues (not auto-fixable)
+    if (mandatory.length > 0) {
+        html += `<div class="review-issues-group"><div class="review-group-label mandatory-label">⚠️ Masih Perlu Perhatian (${mandatory.length})</div>`;
+        mandatory.forEach(issue => {
+            html += `<div class="review-issue mandatory-issue">
+                <span class="issue-location">${escapeHtml(issue.location || '')}</span>
+                <span class="issue-text">${escapeHtml(issue.issue || '')}</span>
+                ${issue.suggestion ? `<span class="issue-suggestion">💡 ${escapeHtml(issue.suggestion)}</span>` : ''}
+            </div>`;
+        });
+        html += '</div>';
+    }
+
+    html += '</div>';
+    return html;
+}
+
+function replyNeedsInfo(question) {
+    const input = document.getElementById('messageInput');
+    if (input) {
+        input.focus();
+        input.placeholder = question;
+    }
 }
 
 // ═══ Report image upload ═══
@@ -738,7 +826,6 @@ async function _refreshReportImages() {
                 <div class="report-img-thumb">
                     <img src="${img.url}" alt="Gambar ${i + 1}">
                     <button class="report-img-remove" onclick="removeReportImage(${i})" title="Buang gambar">✕</button>
-                    <div class="report-img-label">Gambar ${i + 1}</div>
                 </div>`).join('');
         }
         if (counter) counter.textContent = images.length;
@@ -1347,9 +1434,9 @@ document.getElementById('adminRefreshBtn').addEventListener('click', loadAdminSt
 // ═══════════════════════════════════════
 
 async function openWordPreview() {
+    const previewHtml = document.getElementById('docPreviewHtml');
     const preview = document.getElementById('docPreview');
-    if (!preview) return;
-    const text = preview.innerText || preview.textContent;
+    const isHtmlMode = !!previewHtml;
 
     // Fetch active letterhead for current agent
     const lhType = currentAgent === 'report_generator' ? 'logo' : 'letterhead';
@@ -1364,17 +1451,23 @@ async function openWordPreview() {
         }
     } catch (_) {}
 
-    // Paginate content into A4 pages
-    const pages = _paginateWordContent(text, !!lhImgHtml);
-    const totalPages = pages.length;
-
-    const pagesHtml = pages.map((pageText, i) => {
-        const lh = i === 0 ? lhImgHtml : '';
-        const editable = i === 0 ? 'contenteditable="true" id="wordPreviewText"' : '';
-        const pageNum = totalPages > 1
-            ? `<div class="word-page-num">${i + 1} / ${totalPages}</div>` : '';
-        return `<div class="word-page" style="position:relative">${lh}<pre ${editable} spellcheck="false">${escapeHtml(pageText)}</pre>${pageNum}</div>`;
-    }).join('');
+    let pagesHtml;
+    if (isHtmlMode) {
+        // HTML preview already contains logo/letterhead — no need to add again
+        pagesHtml = `<div class="word-page" style="position:relative"><div class="word-page-html-content">${previewHtml.innerHTML}</div></div>`;
+    } else {
+        if (!preview) return;
+        const text = preview.innerText || preview.textContent;
+        const pages = _paginateWordContent(text, !!lhImgHtml);
+        const totalPages = pages.length;
+        pagesHtml = pages.map((pageText, i) => {
+            const lh = i === 0 ? lhImgHtml : '';
+            const editable = i === 0 ? 'contenteditable="true" id="wordPreviewText"' : '';
+            const pageNum = totalPages > 1
+                ? `<div class="word-page-num">${i + 1} / ${totalPages}</div>` : '';
+            return `<div class="word-page" style="position:relative">${lh}<pre ${editable} spellcheck="false">${escapeHtml(pageText)}</pre>${pageNum}</div>`;
+        }).join('');
+    }
 
     const dict = I18N[currentLang];
     const overlay = document.createElement('div');
@@ -1382,22 +1475,22 @@ async function openWordPreview() {
     overlay.id = 'wordPreviewOverlay';
     overlay.innerHTML = `
         <div class="word-preview-toolbar">
-            <div class="word-preview-title">📄 ${dict.word_preview}${totalPages > 1 ? ` &nbsp;<span style="font-size:12px;opacity:0.7">(${totalPages} mukasurat)</span>` : ''}</div>
+            <div class="word-preview-title">📄 ${dict.word_preview}</div>
             <div class="word-preview-actions">
                 <button class="word-preview-dl-btn" onclick="downloadDocument()">📥 ${currentLang === 'bm' ? 'Muat Turun .docx' : 'Download .docx'}</button>
-                <button class="word-preview-email-btn" onclick="showEmailDialog()">📧 ${currentLang === 'bm' ? 'Hantar Emel' : 'Send Email'}</button>
                 <button class="word-preview-close-btn" onclick="closeWordPreview()">${dict.word_close}</button>
             </div>
         </div>
         <div class="word-preview-scroll">${pagesHtml}</div>`;
     document.body.appendChild(overlay);
 
-    // Sync edits on page 1 back to original docPreview
-    const wordText = document.getElementById('wordPreviewText');
-    if (wordText) {
-        wordText.addEventListener('input', () => {
-            if (preview) preview.innerText = wordText.innerText;
-        });
+    if (!isHtmlMode) {
+        const wordText = document.getElementById('wordPreviewText');
+        if (wordText && preview) {
+            wordText.addEventListener('input', () => {
+                preview.innerText = wordText.innerText;
+            });
+        }
     }
 }
 

@@ -579,6 +579,68 @@ async def agent_chat(req: AgentChatRequest):
         except (json.JSONDecodeError, ValueError):
             pass
 
+    # Auto-review + auto-improve: when a document agent produces a ready document
+    _DOC_AGENTS = {
+        "letter_generator": lambda s: "Memo Dalaman" if s.get("doc_type") == "memo" else "Surat Rasmi",
+        "report_generator": lambda s: "Laporan Satu Muka Surat",
+    }
+    if agent in _DOC_AGENTS and structured and structured.get("ready_to_save") and structured.get("document_preview"):
+        try:
+            from agents.document_reviewer import auto_review, auto_improve
+            doc_text = structured["document_preview"]
+            doc_type = _DOC_AGENTS[agent](structured)
+
+            # Step 1: Review
+            review = auto_review(doc_text, doc_type, req.session_id, req.lang)
+            if review:
+                structured["auto_review"] = review
+
+                # Step 2: Auto-improve using review findings
+                agent_mod = __import__(f"agents.{agent}", fromlist=[agent])
+                all_fields = agent_mod.get_fields(req.session_id)
+                gen_keys = agent_mod.GENERATED_FIELD_KEYS
+
+                # Strip template-hardcoded opening from surat isi before sending to LLM
+                _SURAT_ISI_PREFIX = "dengan hormatnya perkara di atas adalah dirujuk"
+                clean_fields = dict(all_fields)
+                if agent == "letter_generator" and "isi" in clean_fields:
+                    isi_lines = clean_fields["isi"].strip().splitlines()
+                    if isi_lines and isi_lines[0].strip().lower().rstrip(".") == _SURAT_ISI_PREFIX:
+                        clean_fields["isi"] = "\n".join(isi_lines[1:]).strip()
+
+                improvement = auto_improve(
+                    doc_type=doc_type,
+                    user_fields=clean_fields,
+                    generated_field_keys=gen_keys,
+                    review=review,
+                    lang=req.lang,
+                )
+                if improvement and improvement.get("improved_fields"):
+                    # Strip template prefix from improved isi if LLM included it
+                    imp_fields = improvement["improved_fields"]
+                    if agent == "letter_generator" and "isi" in imp_fields:
+                        isi_lines = imp_fields["isi"].strip().splitlines()
+                        if isi_lines and isi_lines[0].strip().lower().rstrip(".") == _SURAT_ISI_PREFIX:
+                            imp_fields["isi"] = "\n".join(isi_lines[1:]).strip()
+                    # apply_improvement updates fields + rebuilds doc via original template
+                    new_doc = agent_mod.apply_improvement(req.session_id, imp_fields)
+                    if new_doc:
+                        structured["document_preview"] = new_doc
+                        # Rebuild memo HTML from updated fields
+                        if agent == "letter_generator" and structured.get("doc_type") == "memo":
+                            from agents.letter_generator import _build_memo_html
+                            new_fields = agent_mod.get_fields(req.session_id)
+                            structured["document_html"] = _build_memo_html(new_fields)
+                    structured["auto_review"]["improvement"] = {
+                        "changes_applied": improvement.get("changes_applied", []),
+                        "changes_skipped": improvement.get("changes_skipped", []),
+                        "needs_info": improvement.get("needs_info"),
+                    }
+
+                output = json.dumps(structured, ensure_ascii=False)
+        except Exception:
+            pass
+
     return JSONResponse({
         "response": output,
         "agent": agent,

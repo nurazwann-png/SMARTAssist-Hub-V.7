@@ -238,6 +238,119 @@ def get_last_review(session_id: str) -> dict | None:
     return None
 
 
+def auto_review(document: str, doc_type: str, session_id: str = "default", lang: str = "bm") -> dict | None:
+    """Called by other agents to automatically review a generated document."""
+    placeholder_issues = _check_placeholders(document)
+
+    lang_note = "\n\nIMPORTANT: The user has selected English. Respond in English." if lang == "en" else ""
+    system_content = _SYSTEM_PROMPT + lang_note
+
+    auto_note = "\n\nSemakan automatik selepas dokumen dijana. Berikan maklum balas ringkas dan fokus. Jika dokumen sudah baik, nyatakan dengan jelas."
+    review_prompt = _REVIEW_TRIGGER_PROMPT.format(document=document, doc_type=doc_type) + auto_note
+
+    messages = [
+        {"role": "system", "content": system_content},
+        {"role": "user", "content": review_prompt},
+    ]
+
+    try:
+        raw = chat_completion(messages=messages, temperature=0.2, max_tokens=1500)
+    except RuntimeError:
+        return None
+
+    parsed = _try_parse_json(raw)
+    if parsed:
+        if placeholder_issues:
+            existing = parsed.get("issues", [])
+            parsed["issues"] = placeholder_issues + existing
+        session = _get_session(session_id)
+        session["last_review"] = parsed
+    return parsed
+
+
+_AUTO_IMPROVE_SYSTEM = """Anda ialah editor kandungan dokumen rasmi kerajaan Malaysia yang pakar.
+Tugas: perbaiki TEKS ISI KANDUNGAN yang dijana automatik oleh sistem, berdasarkan cadangan semakan.
+
+PERATURAN WAJIB:
+1. KEMBALIKAN HANYA teks field yang diperbaiki — JANGAN hasilkan dokumen penuh atau ubah template
+2. JANGAN ubah maklumat yang diisi pengguna: nama, tarikh, rujukan, alamat, tajuk, nama penandatangan, jawatan
+3. HANYA perbaiki field yang disenaraikan dalam "KANDUNGAN DIJANA SISTEM"
+4. Jika cadangan memerlukan maklumat tambahan yang tiada, tandakan dalam "needs_info"
+5. Pastikan bahasa kekal formal, profesional, dan mengikut piawaian KPM
+6. Untuk field "isi" surat: tulis HANYA perenggan bernombor bermula dari "2.  ..." — JANGAN masukkan "Dengan hormatnya perkara di atas adalah dirujuk." kerana ia sudah ada dalam template
+7. Untuk "rumusan" laporan: ringkasan pelaksanaan yang padat dan jelas
+8. Untuk "cadangan" laporan: cadangan tindakan susulan yang konkrit
+
+FORMAT BALAS HANYA dalam JSON:
+{
+  "improved_fields": {"isi": "teks isi yang diperbaiki", "rumusan": "...", "cadangan": "..."},
+  "changes_applied": ["Perubahan 1 yang dilakukan pada field X", "Perubahan 2"],
+  "changes_skipped": ["Cadangan X diskip — berkaitan template/maklumat pengguna/tiada maklumat cukup"],
+  "needs_info": "Soalan kepada pengguna jika perlu maklumat tambahan, atau null"
+}
+
+PENTING: Hanya sertakan keys dalam "improved_fields" yang BENAR-BENAR diperbaiki."""
+
+_AUTO_IMPROVE_PROMPT = """JENIS DOKUMEN: {doc_type}
+
+KANDUNGAN DIJANA SISTEM (BOLEH DIPERBAIKI — kembalikan versi yang lebih baik):
+{generated_fields}
+
+KONTEKS DOKUMEN (maklumat pengguna untuk rujukan sahaja — JANGAN UBAH):
+{user_fields}
+
+CADANGAN SEMAKAN UNTUK DILAKSANAKAN:
+{issues}
+
+Perbaiki HANYA kandungan dalam "KANDUNGAN DIJANA SISTEM" berdasarkan cadangan di atas. Jangan hasilkan dokumen penuh."""
+
+
+def auto_improve(
+    doc_type: str,
+    user_fields: dict,
+    generated_field_keys: list[str],
+    review: dict,
+    lang: str = "bm",
+) -> dict | None:
+    """Improve only LLM-generated fields; document template is rebuilt separately."""
+    issues = review.get("issues", [])
+    if not issues:
+        return None
+
+    generated_fields = {k: v for k, v in user_fields.items() if k in generated_field_keys}
+    if not generated_fields:
+        return None
+
+    preserved_fields = {k: v for k, v in user_fields.items() if k not in generated_field_keys}
+
+    issues_text = "\n".join(
+        f"- [{i['severity']}] {i.get('location','')}: {i['issue']} → Cadangan: {i.get('suggestion','')}"
+        for i in issues
+    )
+
+    lang_note = "\n\nIMPORTANT: The user has selected English. Respond in English." if lang == "en" else ""
+    system_content = _AUTO_IMPROVE_SYSTEM + lang_note
+
+    prompt = _AUTO_IMPROVE_PROMPT.format(
+        doc_type=doc_type,
+        user_fields=json.dumps(preserved_fields, ensure_ascii=False, indent=2),
+        generated_fields=json.dumps(generated_fields, ensure_ascii=False, indent=2),
+        issues=issues_text,
+    )
+
+    messages = [
+        {"role": "system", "content": system_content},
+        {"role": "user", "content": prompt},
+    ]
+
+    try:
+        raw = chat_completion(messages=messages, temperature=0.3, max_tokens=2000)
+    except RuntimeError:
+        return None
+
+    return _try_parse_json(raw)
+
+
 def clear_session(session_id: str):
     _sessions.pop(session_id, None)
 
