@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Masuk — SMARTAssist Hub</title>
+    <style>
+        :root {
+            --bg: #0a0e1a;
+            --card: rgba(17, 24, 39, 0.85);
+            --border: rgba(255,255,255,0.09);
+            --gold: #f59e0b;
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+            --red: #ef4444;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Particle canvas */
+        #particleCanvas {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0; pointer-events: none;
+        }
+
+        /* Glow blob */
+        .glow-blob {
+            position: fixed;
+            width: 480px; height: 480px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%);
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0; pointer-events: none;
+        }
+
+        /* Card */
+        .login-card {
+            position: relative; z-index: 10;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 48px 44px;
+            width: 100%; max-width: 420px;
+            text-align: center;
+            backdrop-filter: blur(14px);
+            box-shadow: 0 0 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(245,158,11,0.06);
+            animation: fadeUp 0.5s ease;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Logo area */
+        .login-logo {
+            font-size: 36px; font-weight: 800; letter-spacing: -1px;
+            margin-bottom: 6px;
+        }
+        .login-logo span { color: var(--gold); }
+
+        .login-tagline {
+            font-size: 13px; color: var(--muted); margin-bottom: 36px;
+            letter-spacing: 0.03em;
+        }
+
+        /* Divider */
+        .divider {
+            display: flex; align-items: center; gap: 12px;
+            color: var(--muted); font-size: 12px; margin-bottom: 28px;
+        }
+        .divider::before, .divider::after {
+            content: ''; flex: 1; height: 1px;
+            background: var(--border);
+        }
+
+        /* Google button */
+        .btn-google {
+            display: flex; align-items: center; justify-content: center;
+            gap: 12px; width: 100%; padding: 13px 20px;
+            border-radius: 12px;
+            background: #fff;
+            color: #1e293b;
+            font-size: 15px; font-weight: 600;
+            border: none; cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+        }
+        .btn-google:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+        .btn-google:active { transform: translateY(0); }
+
+        .btn-google svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+        /* Info text */
+        .login-info {
+            margin-top: 28px; font-size: 12.5px; color: var(--muted);
+            line-height: 1.7;
+        }
+        .login-info strong { color: var(--text); }
+
+        /* Error banner */
+        .error-banner {
+            background: rgba(239,68,68,0.12);
+            border: 1px solid rgba(239,68,68,0.3);
+            color: #fca5a5;
+            border-radius: 10px;
+            padding: 11px 16px;
+            font-size: 13px;
+            margin-bottom: 20px;
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        /* Footer */
+        .login-footer {
+            position: fixed; bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px; color: var(--muted);
+            z-index: 10; white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="particleCanvas"></canvas>
+    <div class="glow-blob"></div>
+
+    <div class="login-card">
+        <div class="login-logo"><span>SMART</span>Assist Hub</div>
+        <div class="login-tagline">Sistem Pembantu AI untuk PPD / KPM</div>
+
+        {% if error == 'unauthorized_domain' %}
+        <div class="error-banner">
+            ⚠️ Akaun <strong>{{ email }}</strong> tidak dibenarkan. Sila gunakan emel rasmi anda.
+        </div>
+        {% elif error == 'auth_failed' %}
+        <div class="error-banner">
+            ⚠️ Log masuk gagal. Sila cuba semula.
+        </div>
+        {% endif %}
+
+        <div class="divider">Log masuk untuk teruskan</div>
+
+        <a href="/auth/google" class="btn-google">
+            <!-- Google SVG logo -->
+            <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                <path fill="none" d="M0 0h48v48H0z"/>
+            </svg>
+            Teruskan dengan Google
+        </a>
+
+        <div class="login-info">
+            Sistem ini menggunakan akaun Google anda untuk pengesahan.<br>
+            <strong>Kata laluan anda tidak disimpan</strong> oleh SMARTAssist Hub.
+        </div>
+    </div>
+
+    <div class="login-footer">SMARTAssist Hub V.7 &mdash; Pejabat Pendidikan Daerah</div>
+
+    <script>
+        // Particle background (same as main app)
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        let w, h, particles = [];
+
+        function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+        resize();
+        window.addEventListener('resize', resize);
+
+        const colors = ['#3b82f6','#22d3ee','#f59e0b','#ef4444','#22c55e','#a855f7'];
+        for (let i = 0; i < 60; i++) {
+            particles.push({
+                x: Math.random()*w, y: Math.random()*h,
+                vx: (Math.random()-0.5)*0.35, vy: (Math.random()-0.5)*0.35,
+                r: Math.random()*2+0.8,
+                color: colors[Math.floor(Math.random()*colors.length)]
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0,0,w,h);
+            particles.forEach((p,i) => {
+                p.x += p.vx; p.y += p.vy;
+                if (p.x<0) p.x=w; if (p.x>w) p.x=0;
+                if (p.y<0) p.y=h; if (p.y>h) p.y=0;
+                ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+                ctx.fillStyle = p.color; ctx.fill();
+                particles.slice(i+1).forEach(q => {
+                    const dx=p.x-q.x, dy=p.y-q.y, d=Math.sqrt(dx*dx+dy*dy);
+                    if (d<130) { ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y);
+                        ctx.strokeStyle=`rgba(255,255,255,${0.05*(1-d/130)})`; ctx.lineWidth=0.5; ctx.stroke(); }
+                });
+            });
+            requestAnimationFrame(draw);
+        }
+        draw();
+    </script>
+</body>
+</html>

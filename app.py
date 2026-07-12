@@ -1,16 +1,20 @@
 import json
+import os
 import uvicorn
 from datetime import datetime
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, UploadFile, File, Form, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel
 
 from fastapi.responses import PlainTextResponse, Response
 
 from backend.orchestrator import run_query
+from auth import router as auth_router, get_current_user
 from agents.data_analysis import upload_file as da_upload, get_session_data as da_get_data
 from agents.letter_generator import (
     get_document as lg_get_document,
@@ -26,6 +30,24 @@ from agents.report_generator import (
 )
 
 app = FastAPI(title="SMARTAssist Hub", version="7.0")
+
+# ── Session & Auth ──
+_SECRET_KEY = os.getenv("SECRET_KEY", "smartassist-hub-change-this-in-production")
+
+# Protect all routes except /login, /auth/*, /static/*
+# NOTE: add AuthGate BEFORE SessionMiddleware so Starlette wraps them in correct order
+# (middlewares run outermost-first; last registered = outermost)
+class AuthGate(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        public = path.startswith("/static") or path in ("/login", "/auth/google", "/auth/callback")
+        if not public and not request.session.get("user"):
+            return RedirectResponse("/login")
+        return await call_next(request)
+
+app.add_middleware(AuthGate)
+app.add_middleware(SessionMiddleware, secret_key=_SECRET_KEY, session_cookie="smartassist_session", max_age=86400 * 7)
+app.include_router(auth_router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 _jinja_env = Environment(loader=FileSystemLoader("templates"), autoescape=True)
@@ -56,15 +78,25 @@ class FeedbackRequest(BaseModel):
     agent: str = ""
 
 
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request, error: str = "", email: str = ""):
+    if request.session.get("user"):
+        return RedirectResponse("/")
+    template = _jinja_env.get_template("login.html")
+    html = template.render(error=error, email=email)
+    return HTMLResponse(html)
+
+
 @app.get("/", response_class=HTMLResponse)
-async def index():
+async def index(request: Request):
     agents_list = [
         {"key": k, "icon": v["icon"], "name": v["name"]}
         for k, v in AGENT_LABELS.items()
         if k != "fallback"
     ]
+    user = get_current_user(request)
     template = _jinja_env.get_template("index.html")
-    html = template.render(agents_list=agents_list)
+    html = template.render(agents_list=agents_list, user=user)
     return HTMLResponse(html)
 
 
