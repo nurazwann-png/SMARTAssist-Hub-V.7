@@ -33,12 +33,20 @@ SURAT_FIELDS = {
 MEMO_FIELDS = {
     "doc_type": "memo",
     "fields": [
-        {"key": "rujukan", "label": "Nombor Rujukan", "example": "PPD.BIL(M)200-1/1"},
-        {"key": "tarikh", "label": "Tarikh", "example": "10 Julai 2026"},
-        {"key": "kepada", "label": "Kepada (Penerima)", "example": "Semua Guru Besar"},
-        {"key": "daripada", "label": "Daripada (Pengirim)", "example": "Pegawai Pendidikan Daerah"},
-        {"key": "tajuk", "label": "Perkara", "example": "Mesyuarat Pengurusan Bil. 3/2026"},
+        {"key": "rujukan", "label": "Nombor Rujukan (Ruj. Kami)", "example": "PPD.XXX-X/X/X ( )"},
+        {"key": "tarikh", "label": "Tarikh Memo", "example": "10 Julai 2026"},
+        {"key": "pengerusi", "label": "Nama Pengerusi dan Jawatan", "example": "Ahmad bin Ali (Pengetua SK Taman Jaya)"},
+        {"key": "penyelaras", "label": "Nama Penyelaras dan Jawatan", "example": "Siti binti Hassan (Guru Kanan)"},
+        {"key": "ahli", "label": "Nama Ahli-Ahli (pisahkan dengan koma)", "example": "Razif bin Ramli (Unit ICT), Nora binti Aziz (Unit HEM)"},
+        {"key": "urus_setia", "label": "Nama Urus Setia dan Jawatan", "example": "Farah binti Zainudin (Pembantu Tadbir)"},
+        {"key": "tajuk", "label": "Perkara / Tajuk Memo (huruf besar)", "example": "JEMPUTAN MESYUARAT PENGURUSAN BIL. 3/2026"},
+        {"key": "tarikh_acara", "label": "Tarikh Acara", "example": "15 Julai 2026 (Isnin)"},
+        {"key": "masa_acara", "label": "Masa Acara", "example": "8.00 pagi - 1.00 tengah hari"},
+        {"key": "tempat_acara", "label": "Tempat Acara", "example": "Bilik Mesyuarat PPD Petaling Perdana"},
         {"key": "isi", "label": "Isi Kandungan", "example": "Butiran memo"},
+        {"key": "penandatangan_nama", "label": "Nama Penandatangan", "example": "Ahmad bin Ali"},
+        {"key": "penandatangan_jawatan", "label": "Jawatan Penandatangan", "example": "Pegawai Pendidikan Daerah"},
+        {"key": "nama_pejabat", "label": "Nama Pejabat", "example": "Pejabat Pendidikan Daerah Petaling Perdana"},
     ],
 }
 
@@ -56,7 +64,7 @@ CARA KERJA:
 
 URUTAN SOALAN (ikut susunan ini):
 - Surat: rujukan → tarikh → penerima_nama → penerima_jawatan → penerima_organisasi → penerima_alamat → tajuk → (jana isi secara automatik) → penandatangan_nama → penandatangan_jawatan → salinan_kepada (pilihan)
-- Memo: rujukan → tarikh → kepada → daripada → tajuk → (jana isi secara automatik)
+- Memo: rujukan → tarikh → pengerusi → penyelaras → ahli → urus_setia → tajuk → tarikh_acara → masa_acara → tempat_acara → (jana isi secara automatik) → penandatangan_nama → penandatangan_jawatan → nama_pejabat
 
 GAYA:
 - Bertanya seperti pembantu peribadi yang cekap — sopan, ringkas, dan spesifik
@@ -90,7 +98,76 @@ PHASES:
 
 FIELD KEYS YANG WAJIB DIGUNAKAN (guna key tepat ini dalam fields_collected):
 Untuk surat: rujukan, tarikh, penerima_nama, penerima_jawatan, penerima_organisasi, penerima_alamat, tajuk, isi, penandatangan_nama, penandatangan_jawatan, salinan_kepada
-Untuk memo: rujukan, tarikh, kepada, daripada, tajuk, isi
+Untuk memo: rujukan, tarikh, pengerusi, penyelaras, ahli, urus_setia, tajuk, tarikh_acara, masa_acara, tempat_acara, isi, penandatangan_nama, penandatangan_jawatan, nama_pejabat
+
+FORMAT TEMPLATE YANG MESTI DIIKUTI:
+
+=== SURAT RASMI ===
+Ruj. Kami : [rujukan]
+Tarikh : [tarikh]
+
+[penerima_nama]
+[penerima_jawatan]
+[penerima_organisasi]
+[penerima_alamat]
+
+Tuan/Puan,
+
+[TAJUK SURAT DALAM HURUF BESAR]
+
+Dengan hormatnya perkara di atas adalah dirujuk.
+
+2.  [perenggan isi pertama]
+3.  [perenggan isi kedua jika ada]
+4.  [perenggan penutup]
+
+Sekian, terima kasih.
+
+"MALAYSIA MADANI"
+"BERKHIDMAT UNTUK NEGARA"
+
+Saya yang menjalankan amanah,
+
+
+([NAMA PENANDATANGAN])
+[Jawatan]
+
+s.k.:
+1. [salinan kepada jika ada]
+
+=== MEMO DALAMAN ===
+Kepada    | Pengerusi  : [pengerusi]
+          | Penyelaras : [penyelaras]
+          | Ahli       : [ahli 1]
+          |             : [ahli 2 dan seterusnya]
+Daripada  | Urus setia : [urus_setia]
+Tarikh               : [tarikh]
+Perkara              : [TAJUK DALAM HURUF BESAR]
+Ruj. Kami            : [rujukan]
+
+Tuan,
+
+Dengan segala hormatnya saya diarah merujuk kepada perkara di atas.
+
+2.  [isi kandungan]
+
+    Tarikh  : [tarikh_acara]
+    Masa    : [masa_acara]
+    Tempat  : [tempat_acara]
+
+3.  [perenggan penutup]
+
+Sekian, terima kasih
+
+"MALAYSIA MADANI"
+"BERKHIDMAT UNTUK NEGARA"
+
+Saya yang menjalankan amanah
+
+
+([NAMA PENANDATANGAN])
+[Jawatan]
+[Nama Pejabat]
 
 PENTING:
 - Jangan reka maklumat PERIBADI (nama, jawatan, alamat) — tanya pengguna
@@ -152,7 +229,7 @@ def _build_surat(f: dict) -> str:
             sk_lines = "\n\ns.k.:\n" + "\n".join(f"{i+1}. {item}" for i, item in enumerate(items))
 
     return f"""Ruj. Kami : {f.get('rujukan', '[PLACEHOLDER]')}
-Tarikh : {f.get('tarikh', '[PLACEHOLDER]')}
+Tarikh    : {f.get('tarikh', '[PLACEHOLDER]')}
 
 {f.get('penerima_nama', '[PLACEHOLDER]')}
 {f.get('penerima_jawatan', '[PLACEHOLDER]')}
@@ -180,22 +257,49 @@ Saya yang menjalankan amanah,
 
 
 def _build_memo(f: dict) -> str:
+    ahli_str = f.get('ahli', '[PLACEHOLDER]')
+    if ahli_str and ahli_str != '[PLACEHOLDER]':
+        ahli_list = [a.strip() for a in ahli_str.split(',') if a.strip()]
+    else:
+        ahli_list = ['[PLACEHOLDER]']
+
+    ahli_lines = f"          | Ahli       : {ahli_list[0]}\n"
+    for ahli in ahli_list[1:]:
+        ahli_lines += f"          |             : {ahli}\n"
+
     return f"""MEMO DALAMAN
 
-Rujukan: {f.get('rujukan', '[PLACEHOLDER]')}
-Tarikh: {f.get('tarikh', '[PLACEHOLDER]')}
+Kepada    | Pengerusi  : {f.get('pengerusi', '[PLACEHOLDER]')}
+          | Penyelaras : {f.get('penyelaras', '[PLACEHOLDER]')}
+{ahli_lines}Daripada  | Urus setia : {f.get('urus_setia', '[PLACEHOLDER]')}
+Tarikh               : {f.get('tarikh', '[PLACEHOLDER]')}
+Perkara              : {f.get('tajuk', '[PLACEHOLDER]').upper()}
+Ruj. Kami            : {f.get('rujukan', '[PLACEHOLDER]')}
 
-Kepada: {f.get('kepada', '[PLACEHOLDER]')}
-Daripada: {f.get('daripada', '[PLACEHOLDER]')}
+Tuan,
 
-PERKARA: {f.get('tajuk', '[PLACEHOLDER]')}
+Dengan segala hormatnya saya diarah merujuk kepada perkara di atas.
 
-{f.get('isi', '[PLACEHOLDER]')}
+2.  {f.get('isi', '[PLACEHOLDER]')}
 
-Sekian, harap maklum.
+    Tarikh  : {f.get('tarikh_acara', '[PLACEHOLDER]')}
+    Masa    : {f.get('masa_acara', '[PLACEHOLDER]')}
+    Tempat  : {f.get('tempat_acara', '[PLACEHOLDER]')}
+
+3.  Kehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.
+
+Sekian, terima kasih
+
+"MALAYSIA MADANI"
 
 "BERKHIDMAT UNTUK NEGARA"
-"MALAYSIA MADANI" """
+
+Saya yang menjalankan amanah
+
+
+({f.get('penandatangan_nama', '[PLACEHOLDER]').upper()})
+{f.get('penandatangan_jawatan', '[PLACEHOLDER]')}
+{f.get('nama_pejabat', '[PLACEHOLDER]')}"""
 
 
 def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm") -> str:
@@ -324,6 +428,7 @@ def get_document(session_id: str) -> str | None:
 
 
 def build_docx(session_id: str) -> bytes | None:
+    session = _sessions.get(session_id)
     doc_text = get_document(session_id)
     if not doc_text:
         return None
@@ -342,7 +447,6 @@ def build_docx(session_id: str) -> bytes | None:
     pf.space_before = Pt(0)
     pf.space_after = Pt(0)
     pf.line_spacing = 1.0
-    pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
     for section in doc.sections:
         section.top_margin = Cm(2.54)
@@ -360,9 +464,26 @@ def build_docx(session_id: str) -> bytes | None:
             lh_para.paragraph_format.space_after = Pt(6)
             run = lh_para.add_run()
             run.add_picture(str(lh_path), width=Cm(16))
-            doc.add_paragraph("").paragraph_format.space_after = Pt(0)
+            doc.add_paragraph("")
     except Exception:
         pass
+
+    doc_type = session.get("doc_type", "surat") if session else "surat"
+    fields = session.get("fields", {}) if session else {}
+
+    if doc_type == "memo":
+        _build_memo_docx(doc, fields)
+    else:
+        _build_surat_docx(doc, doc_text)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _build_surat_docx(doc, doc_text: str):
+    from docx.shared import Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
 
     lines = doc_text.split("\n")
     for line in lines:
@@ -374,16 +495,19 @@ def build_docx(session_id: str) -> bytes | None:
         para = doc.add_paragraph()
         para.paragraph_format.space_after = Pt(0)
         para.paragraph_format.space_before = Pt(0)
+        para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
         is_bold = False
         if stripped.startswith(("Ruj. Kami", "Tarikh")):
-            para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            para.alignment = WD_ALIGN_PARAGRAPH.LEFT
         elif stripped.startswith('"') and stripped.endswith('"'):
             is_bold = True
+            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
         elif stripped.startswith("s.k.:"):
             is_bold = True
         elif stripped == stripped.upper() and len(stripped) > 5 and stripped[0].isalpha():
             is_bold = True
+            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         run = para.add_run(stripped)
         run.font.size = Pt(11)
@@ -391,9 +515,95 @@ def build_docx(session_id: str) -> bytes | None:
         if is_bold:
             run.bold = True
 
-    buf = io.BytesIO()
-    doc.save(buf)
-    return buf.getvalue()
+
+def _build_memo_docx(doc, fields: dict):
+    from docx.shared import Pt, Cm, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+
+    def _p(text="", bold=False, indent_cm=0, center=False):
+        para = doc.add_paragraph()
+        para.paragraph_format.space_after = Pt(0)
+        para.paragraph_format.space_before = Pt(0)
+        if indent_cm:
+            para.paragraph_format.left_indent = Cm(indent_cm)
+        if center:
+            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        if text:
+            run = para.add_run(text)
+            run.font.size = Pt(11)
+            run.font.name = "Arial"
+            run.bold = bold
+        return para
+
+    # Title
+    _p("MEMO DALAMAN", bold=True, center=True)
+    doc.add_paragraph("")
+
+    # Header table
+    ahli_str = fields.get('ahli', '')
+    ahli_list = [a.strip() for a in ahli_str.split(',') if a.strip()] if ahli_str else ['']
+    num_ahli = max(1, len(ahli_list))
+    num_rows = 2 + num_ahli + 5  # pengerusi + penyelaras + ahli + urus_setia + tarikh + perkara + ruj. kami
+
+    table = doc.add_table(rows=num_rows, cols=3)
+    table.style = 'Table Grid'
+
+    def _cell(row, col, text, bold=False):
+        cell = table.cell(row, col)
+        cell.width = Cm([3, 3, 10][col])
+        para = cell.paragraphs[0]
+        para.paragraph_format.space_after = Pt(0)
+        run = para.add_run(text)
+        run.font.size = Pt(11)
+        run.font.name = "Arial"
+        run.bold = bold
+
+    r = 0
+    _cell(r, 0, "Kepada", bold=True); _cell(r, 1, "Pengerusi"); _cell(r, 2, f": {fields.get('pengerusi', '')}")
+    r += 1
+    _cell(r, 0, ""); _cell(r, 1, "Penyelaras"); _cell(r, 2, f": {fields.get('penyelaras', '')}")
+    r += 1
+    for i, ahli in enumerate(ahli_list):
+        _cell(r, 0, ""); _cell(r, 1, "Ahli" if i == 0 else ""); _cell(r, 2, f": {ahli}")
+        r += 1
+    _cell(r, 0, "Daripada", bold=True); _cell(r, 1, "Urus setia"); _cell(r, 2, f": {fields.get('urus_setia', '')}")
+    r += 1
+    _cell(r, 0, "Tarikh", bold=True); _cell(r, 1, ""); _cell(r, 2, f": {fields.get('tarikh', '')}")
+    r += 1
+    _cell(r, 0, "Perkara", bold=True); _cell(r, 1, ""); _cell(r, 2, f": {fields.get('tajuk', '').upper()}")
+    r += 1
+    _cell(r, 0, "Ruj. Kami", bold=True); _cell(r, 1, ""); _cell(r, 2, f": {fields.get('rujukan', '')}")
+
+    doc.add_paragraph("")
+    _p("Tuan,")
+    doc.add_paragraph("")
+    _p("Dengan segala hormatnya saya diarah merujuk kepada perkara di atas.")
+    doc.add_paragraph("")
+
+    isi = fields.get('isi', '')
+    _p(f"2.\t{isi}")
+    doc.add_paragraph("")
+
+    # Acara block (indented)
+    for label, key in [("Tarikh", "tarikh_acara"), ("Masa", "masa_acara"), ("Tempat", "tempat_acara")]:
+        _p(f"{label:<8}: {fields.get(key, '')}", indent_cm=1.5)
+
+    doc.add_paragraph("")
+    _p("3.\tKehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.")
+    doc.add_paragraph("")
+    _p("Sekian, terima kasih")
+    doc.add_paragraph("")
+    _p('"MALAYSIA MADANI"', bold=True)
+    doc.add_paragraph("")
+    _p('"BERKHIDMAT UNTUK NEGARA"', bold=True)
+    doc.add_paragraph("")
+    _p("Saya yang menjalankan amanah")
+    doc.add_paragraph("")
+    doc.add_paragraph("")
+    _p(f"({fields.get('penandatangan_nama', '').upper()})", bold=True)
+    _p(fields.get('penandatangan_jawatan', ''))
+    _p(fields.get('nama_pejabat', ''))
 
 
 def get_session_info(session_id: str) -> dict | None:
