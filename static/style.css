@@ -1134,20 +1134,24 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
     max-width: 1100px; width: 100%; margin: 0 auto;
 }
 .admin-stats-row {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+}
+@media (max-width: 700px) {
+    .admin-stats-row { grid-template-columns: repeat(2, 1fr); }
 }
 .admin-stat-card {
-    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
-    padding: 18px 20px; text-align: center;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 22px; text-align: center; transition: border-color 0.2s, transform 0.15s;
 }
+.admin-stat-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .admin-stat-value {
-    font-size: 2rem; font-weight: 700; line-height: 1;
+    font-size: 2.2rem; font-weight: 700; line-height: 1;
     background: linear-gradient(135deg, var(--cyan), var(--indigo));
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
 }
 .admin-stat-label {
-    font-size: 12px; color: var(--text-secondary); margin-top: 6px;
+    font-size: 12px; color: var(--text-secondary); margin-top: 8px; letter-spacing: 0.02em;
 }
 .admin-charts-row {
     display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
@@ -1156,11 +1160,15 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
     .admin-charts-row { grid-template-columns: 1fr; }
 }
 .admin-chart-card, .admin-table-card {
-    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
-    padding: 18px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px;
+}
+.admin-chart-wrap {
+    position: relative; height: 220px; width: 100%;
 }
 .admin-chart-title {
-    font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;
+    font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 14px;
+    display: flex; align-items: center; gap: 6px;
 }
 .admin-table {
     width: 100%; border-collapse: collapse; font-size: 13px;

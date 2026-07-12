@@ -1579,13 +1579,28 @@ async function loadAdminStats() {
         if (_adminAgentChart) _adminAgentChart.destroy();
         _adminAgentChart = new Chart(agentCtx, {
             type: 'bar',
-            data: { labels, datasets: [{ label: 'Sesi', data: counts, backgroundColor: agentColors }] },
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Sesi',
+                    data: counts,
+                    backgroundColor: agentColors.map(c => c + 'cc'),
+                    borderColor: agentColors,
+                    borderWidth: 2,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                }]
+            },
             options: {
+                indexAxis: 'y',
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#94a3b8' } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#94a3b8', padding: 10, cornerRadius: 8 },
+                },
                 scales: {
-                    x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-                    y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, beginAtZero: true },
+                    x: { ticks: { color: '#94a3b8', precision: 0 }, grid: { color: '#1e293b' }, beginAtZero: true, suggestedMax: Math.max(...counts, 5) },
+                    y: { ticks: { color: '#e2e8f0', font: { size: 12 } }, grid: { display: false } },
                 },
             },
         });
@@ -1600,16 +1615,20 @@ async function loadAdminStats() {
             data: {
                 labels: fbLabels,
                 datasets: [
-                    { label: '👍', data: fbUp, backgroundColor: '#22c55e' },
-                    { label: '👎', data: fbDown, backgroundColor: '#ef4444' },
+                    { label: '👍 Positif', data: fbUp, backgroundColor: '#22c55ecc', borderColor: '#22c55e', borderWidth: 2, borderRadius: 6, borderSkipped: false },
+                    { label: '👎 Negatif', data: fbDown, backgroundColor: '#ef4444cc', borderColor: '#ef4444', borderWidth: 2, borderRadius: 6, borderSkipped: false },
                 ],
             },
             options: {
+                indexAxis: 'y',
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { labels: { color: '#94a3b8' } }, tooltip: { backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#94a3b8' } },
+                plugins: {
+                    legend: { labels: { color: '#94a3b8', boxWidth: 12, boxHeight: 12, borderRadius: 4 } },
+                    tooltip: { backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#94a3b8', padding: 10, cornerRadius: 8 },
+                },
                 scales: {
-                    x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-                    y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, beginAtZero: true },
+                    x: { ticks: { color: '#94a3b8', precision: 0 }, grid: { color: '#1e293b' }, beginAtZero: true, suggestedMax: Math.max(...fbUp, ...fbDown, 5) },
+                    y: { ticks: { color: '#e2e8f0', font: { size: 12 } }, grid: { display: false } },
                 },
             },
         });
