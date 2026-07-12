@@ -438,6 +438,21 @@ async def list_agents():
     return JSONResponse(AGENT_LABELS)
 
 
+@app.get("/api/health")
+async def health_check():
+    """Semak kesihatan sistem dan status circuit breaker DeepSeek."""
+    from backend.deepseek_client import get_circuit_breaker_status
+    cb = get_circuit_breaker_status()
+    ok = cb["state"] != "OPEN"
+    return JSONResponse({
+        "status": "ok" if ok else "degraded",
+        "llm": {
+            "provider": "deepseek",
+            "circuit_breaker": cb,
+        },
+    }, status_code=200 if ok else 503)
+
+
 @app.post("/api/feedback")
 async def submit_feedback(req: FeedbackRequest):
     _feedback.append({
