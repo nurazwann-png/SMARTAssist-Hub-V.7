@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMARTAssist Hub</title>
+    <link rel="stylesheet" href="/static/style.css?v=11">
+    <script src="/static/chart.min.js"></script>
+</head>
+<body>
+    <!-- ═══ History Sidebar ═══ -->
+    <aside class="history-panel" id="historyPanel">
+        <div class="history-header">
+            <h3 data-i18n="history_title">Sejarah Sesi</h3>
+            <button class="history-close-btn" id="historyCloseBtn">&times;</button>
+        </div>
+        <div class="history-list" id="historyList">
+            <div class="history-empty" data-i18n="history_empty">Tiada sejarah sesi lagi.</div>
+        </div>
+    </aside>
+    <div class="history-overlay" id="historyOverlay"></div>
+
+    <!-- ═══ Welcome / Landing Page ═══ -->
+    <div class="landing-page" id="landingPage">
+        <canvas id="particleCanvas"></canvas>
+
+        <nav class="landing-nav">
+            <button class="nav-btn" id="historyBtn">&#9776;</button>
+
+            <div class="nav-right">
+                <button class="nav-settings-btn" id="adminBtn" title="Papan Pemuka Admin">&#128202;</button>
+                <button class="nav-settings-btn" id="lhSettingsBtn" title="Tetapan Kepala Surat">&#128196;</button>
+                <button class="lang-toggle" id="langToggle" title="Tukar Bahasa">
+                    <span class="lang-flag">🇲🇾</span>
+                    <span class="lang-code">BM</span>
+                </button>
+            </div>
+        </nav>
+
+        <div class="landing-hero">
+            <h1 class="hero-title"><span class="hero-gold">SMART</span>Assist Hub</h1>
+            <p class="hero-subtitle" data-i18n="hero_subtitle">Selamat Datang</p>
+            <div class="hero-line"></div>
+        </div>
+
+        <div class="agent-grid" id="agents">
+            <!-- Analisis Data — purple brain + neural + charts -->
+            <div class="agent-card" data-agent="data_analysis">
+                <div class="agent-card-icon">
+                <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <radialGradient id="bg-d" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#3b1f6e"/><stop offset="70%" stop-color="#1a0b3b"/><stop offset="100%" stop-color="#0a061a"/></radialGradient>
+                    <radialGradient id="inner-d" cx="50%" cy="40%" r="50%"><stop offset="0%" stop-color="#7c3aed" stop-opacity="0.35"/><stop offset="100%" stop-color="transparent"/></radialGradient>
+                    <filter id="glow-d"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                  </defs>
+                  <circle cx="40" cy="40" r="38" fill="url(#bg-d)"/>
+                  <circle cx="40" cy="40" r="38" fill="url(#inner-d)"/>
+                  <!-- outer glow ring -->
+                  <circle cx="40" cy="40" r="36.5" stroke="#9333ea" stroke-width="1" opacity="0.4" filter="url(#glow-d)"/>
+                  <circle cx="40" cy="40" r="37.5" stroke="#c084fc" stroke-width="1.5" opacity="0.85" filter="url(#glow-d)"/>
+                  <!-- inner ring -->
+                  <circle cx="40" cy="40" r="33" stroke="#7c3aed" stroke-width="0.6" stroke-dasharray="3 4" opacity="0.5"/>
+                  <!-- brain left lobe -->
+                  <path d="M28 36 C24 33 23 28 26 25 C27 22 30 21 33 22 C33 19 36 17 39 18 C39 17 40 17 40 18" stroke="#c084fc" stroke-width="1.8" stroke-linecap="round" fill="none" filter="url(#glow-d)"/>
+                  <path d="M28 36 C25 38 25 42 28 44 C27 47 29 50 32 49 C32 51 34 52 36 51 C37 53 40 52 40 50" stroke="#c084fc" stroke-width="1.8" stroke-linecap="round" fill="none" filter="url(#glow-d)"/>
+                  <!-- brain right lobe -->
+                  <path d="M52 36 C56 33 57 28 54 25 C53 22 50 21 47 22 C47 19 44 17 41 18 C41 17 40 17 40 18" stroke="#a78bfa" stroke-width="1.8" stroke-linecap="round" fill="none" filter="url(#glow-d)"/>
+                  <path d="M52 36 C55 38 55 42 52 44 C53 47 51 50 48 49 C48 51 46 52 44 51 C43 53 40 52 40 50" stroke="#a78bfa" stroke-width="1.8" stroke-linecap="round" fill="none" filter="url(#glow-d)"/>
+                  <!-- brain center divider -->
+                  <line x1="40" y1="18" x2="40" y2="50" stroke="#ddd6fe" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"/>
+                  <!-- neural dots -->
+                  <circle cx="33" cy="30" r="2" fill="#c084fc" filter="url(#glow-d)"/>
+                  <circle cx="47" cy="30" r="2" fill="#a78bfa" filter="url(#glow-d)"/>
+                  <circle cx="30" cy="40" r="1.5" fill="#c084fc" filter="url(#glow-d)"/>
+                  <circle cx="50" cy="40" r="1.5" fill="#a78bfa" filter="url(#glow-d)"/>
+                  <!-- connection lines from brain -->
+                  <line x1="33" y1="32" x2="22" y2="56" stroke="#7c3aed" stroke-width="0.8" opacity="0.5"/>
+                  <line x1="40" y1="50" x2="40" y2="58" stroke="#7c3aed" stroke-width="0.8" opacity="0.5"/>
+                  <line x1="47" y1="32" x2="58" y2="56" stroke="#7c3aed" stroke-width="0.8" opacity="0.5"/>
+                  <!-- bar charts at bottom -->
+                  <rect x="18" y="58" width="5" height="8" rx="1" fill="#7c3aed" opacity="0.7" filter="url(#glow-d)"/>
+                  <rect x="25" y="53" width="5" height="13" rx="1" fill="#9333ea" opacity="0.85" filter="url(#glow-d)"/>
+                  <rect x="32" y="55" width="5" height="11" rx="1" fill="#7c3aed" opacity="0.7" filter="url(#glow-d)"/>
+                  <rect x="39" y="50" width="5" height="16" rx="1" fill="#c084fc" filter="url(#glow-d)"/>
+                  <rect x="46" y="52" width="5" height="14" rx="1" fill="#9333ea" opacity="0.85" filter="url(#glow-d)"/>
+                  <rect x="53" y="57" width="5" height="9" rx="1" fill="#7c3aed" opacity="0.7" filter="url(#glow-d)"/>
+                </svg>
+                </div>
+                <div class="agent-card-name" data-i18n="agent_data_name">Analisis Data</div>
+                <div class="agent-card-desc" data-i18n="agent_data_desc">Analisis fail CSV/Excel, jana carta dan statistik</div>
+            </div>
+
+            <!-- Jana Laporan — green report doc + trend chart -->
+            <div class="agent-card" data-agent="report_generator">
+                <div class="agent-card-icon">
+                <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <radialGradient id="bg-r" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#0f3320"/><stop offset="70%" stop-color="#071a0f"/><stop offset="100%" stop-color="#020a04"/></radialGradient>
+                    <radialGradient id="inner-r" cx="50%" cy="40%" r="50%"><stop offset="0%" stop-color="#16a34a" stop-opacity="0.3"/><stop offset="100%" stop-color="transparent"/></radialGradient>
+                    <filter id="glow-r"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                  </defs>
+                  <circle cx="40" cy="40" r="38" fill="url(#bg-r)"/>
+                  <circle cx="40" cy="40" r="38" fill="url(#inner-r)"/>
+                  <circle cx="40" cy="40" r="36.5" stroke="#15803d" stroke-width="1" opacity="0.4" filter="url(#glow-r)"/>
+                  <circle cx="40" cy="40" r="37.5" stroke="#4ade80" stroke-width="1.5" opacity="0.85" filter="url(#glow-r)"/>
+                  <circle cx="40" cy="40" r="33" stroke="#16a34a" stroke-width="0.6" stroke-dasharray="3 4" opacity="0.5"/>
+                  <!-- document body -->
+                  <rect x="20" y="13" width="30" height="40" rx="2.5" fill="#0d2b18" stroke="#4ade80" stroke-width="1.5" opacity="0.9"/>
+                  <!-- dog-ear fold -->
+                  <path d="M44 13 L50 19 L44 19 Z" fill="#166534" stroke="#4ade80" stroke-width="1" stroke-linejoin="round"/>
+                  <!-- REPORT label bar -->
+                  <rect x="20" y="13" width="24" height="7" rx="2" fill="#166534" opacity="0.8"/>
+                  <text x="32" y="19" text-anchor="middle" font-size="5" font-family="Arial" font-weight="bold" fill="#86efac">REPORT</text>
+                  <!-- text lines -->
+                  <line x1="25" y1="27" x2="45" y2="27" stroke="#4ade80" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+                  <line x1="25" y1="31" x2="45" y2="31" stroke="#4ade80" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+                  <line x1="25" y1="35" x2="38" y2="35" stroke="#4ade80" stroke-width="1.2" stroke-linecap="round" opacity="0.4"/>
+                  <!-- trend chart inside doc -->
+                  <polyline points="24,47 29,43 34,45 40,38 46,40" stroke="#22c55e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#glow-r)"/>
+                  <polygon points="46,40 50,34 44,36" fill="#22c55e" filter="url(#glow-r)"/>
+                  <!-- floating mini chart outside doc -->
+                  <rect x="54" y="44" width="5" height="9" rx="1" fill="#16a34a" opacity="0.8" filter="url(#glow-r)"/>
+                  <rect x="61" y="39" width="5" height="14" rx="1" fill="#4ade80" opacity="0.9" filter="url(#glow-r)"/>
+                  <rect x="68" y="42" width="5" height="11" rx="1" fill="#16a34a" opacity="0.8" filter="url(#glow-r)"/>
+                </svg>
+                </div>
+                <div class="agent-card-name" data-i18n="agent_report_name">Jana Laporan</div>
+                <div class="agent-card-desc" data-i18n="agent_report_desc">Jana laporan satu muka surat format rasmi KPM</div>
+            </div>
+
+            <!-- Tulis Surat Rasmi — gold document + pen + signature -->
+            <div class="agent-card" data-agent="letter_generator">
+                <div class="agent-card-icon">
+                <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <radialGradient id="bg-l" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#3b2506"/><stop offset="70%" stop-color="#1c1003"/><stop offset="100%" stop-color="#0a0601"/></radialGradient>
+                    <radialGradient id="inner-l" cx="50%" cy="40%" r="50%"><stop offset="0%" stop-color="#d97706" stop-opacity="0.3"/><stop offset="100%" stop-color="transparent"/></radialGradient>
+                    <filter id="glow-l"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                  </defs>
+                  <circle cx="40" cy="40" r="38" fill="url(#bg-l)"/>
+                  <circle cx="40" cy="40" r="38" fill="url(#inner-l)"/>
+                  <circle cx="40" cy="40" r="36.5" stroke="#b45309" stroke-width="1" opacity="0.4" filter="url(#glow-l)"/>
+                  <circle cx="40" cy="40" r="37.5" stroke="#fbbf24" stroke-width="1.5" opacity="0.85" filter="url(#glow-l)"/>
+                  <circle cx="40" cy="40" r="33" stroke="#d97706" stroke-width="0.6" stroke-dasharray="3 4" opacity="0.5"/>
+                  <!-- document -->
+                  <rect x="18" y="12" width="32" height="42" rx="2.5" fill="#1c1003" stroke="#fbbf24" stroke-width="1.5" opacity="0.9"/>
+                  <!-- header bar (kepala surat) -->
+                  <rect x="18" y="12" width="32" height="9" rx="2" fill="#78350f" opacity="0.85"/>
+                  <line x1="22" y1="16" x2="46" y2="16" stroke="#fcd34d" stroke-width="1" opacity="0.7"/>
+                  <line x1="22" y1="19" x2="38" y2="19" stroke="#fcd34d" stroke-width="0.8" opacity="0.5"/>
+                  <!-- text lines -->
+                  <line x1="23" y1="27" x2="46" y2="27" stroke="#fbbf24" stroke-width="1.1" stroke-linecap="round" opacity="0.5"/>
+                  <line x1="23" y1="31" x2="46" y2="31" stroke="#fbbf24" stroke-width="1.1" stroke-linecap="round" opacity="0.5"/>
+                  <line x1="23" y1="35" x2="46" y2="35" stroke="#fbbf24" stroke-width="1.1" stroke-linecap="round" opacity="0.4"/>
+                  <line x1="23" y1="39" x2="36" y2="39" stroke="#fbbf24" stroke-width="1.1" stroke-linecap="round" opacity="0.35"/>
+                  <!-- signature line -->
+                  <line x1="23" y1="49" x2="40" y2="49" stroke="#f59e0b" stroke-width="0.9" opacity="0.6"/>
+                  <path d="M24 47 Q27 44 30 47 Q33 50 36 47" stroke="#fcd34d" stroke-width="1.2" fill="none" stroke-linecap="round" filter="url(#glow-l)"/>
+                  <!-- pen overlapping doc -->
+                  <rect x="43" y="26" width="7" height="28" rx="3" transform="rotate(-35 43 26)" fill="#92400e" stroke="#fbbf24" stroke-width="1.2"/>
+                  <polygon points="34,58 38,54 40,60" fill="#fbbf24" filter="url(#glow-l)"/>
+                  <rect x="43" y="26" width="7" height="7" rx="2" transform="rotate(-35 43 26)" fill="#fbbf24" opacity="0.9"/>
+                </svg>
+                </div>
+                <div class="agent-card-name" data-i18n="agent_letter_name">Tulis Surat Rasmi</div>
+                <div class="agent-card-desc" data-i18n="agent_letter_desc">Jana surat rasmi, memo dan surat siaran KPM</div>
+            </div>
+
+            <!-- Semak Dokumen — cyan doc + magnifier + tick -->
+            <div class="agent-card" data-agent="document_reviewer">
+                <div class="agent-card-icon">
+                <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <radialGradient id="bg-c" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#082d40"/><stop offset="70%" stop-color="#041620"/><stop offset="100%" stop-color="#01080f"/></radialGradient>
+                    <radialGradient id="inner-c" cx="50%" cy="40%" r="50%"><stop offset="0%" stop-color="#0891b2" stop-opacity="0.3"/><stop offset="100%" stop-color="transparent"/></radialGradient>
+                    <filter id="glow-c"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                  </defs>
+                  <circle cx="40" cy="40" r="38" fill="url(#bg-c)"/>
+                  <circle cx="40" cy="40" r="38" fill="url(#inner-c)"/>
+                  <circle cx="40" cy="40" r="36.5" stroke="#0e7490" stroke-width="1" opacity="0.4" filter="url(#glow-c)"/>
+                  <circle cx="40" cy="40" r="37.5" stroke="#22d3ee" stroke-width="1.5" opacity="0.85" filter="url(#glow-c)"/>
+                  <circle cx="40" cy="40" r="33" stroke="#0891b2" stroke-width="0.6" stroke-dasharray="3 4" opacity="0.5"/>
+                  <!-- document body -->
+                  <rect x="16" y="12" width="28" height="38" rx="2.5" fill="#041620" stroke="#22d3ee" stroke-width="1.5" opacity="0.85"/>
+                  <!-- doc fold corner -->
+                  <path d="M38 12 L44 18 L38 18 Z" fill="#0e4f63" stroke="#22d3ee" stroke-width="1" stroke-linejoin="round"/>
+                  <!-- text lines -->
+                  <line x1="21" y1="24" x2="38" y2="24" stroke="#22d3ee" stroke-width="1.2" stroke-linecap="round" opacity="0.6"/>
+                  <line x1="21" y1="29" x2="38" y2="29" stroke="#22d3ee" stroke-width="1.2" stroke-linecap="round" opacity="0.6"/>
+                  <line x1="21" y1="34" x2="32" y2="34" stroke="#22d3ee" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+                  <line x1="21" y1="39" x2="36" y2="39" stroke="#22d3ee" stroke-width="1.2" stroke-linecap="round" opacity="0.4"/>
+                  <!-- magnifying glass -->
+                  <circle cx="48" cy="48" r="12" fill="#041e2a" stroke="#06b6d4" stroke-width="2.2" filter="url(#glow-c)"/>
+                  <circle cx="48" cy="48" r="12" stroke="#22d3ee" stroke-width="0.8" opacity="0.4"/>
+                  <line x1="57" y1="57" x2="65" y2="65" stroke="#06b6d4" stroke-width="3.5" stroke-linecap="round" filter="url(#glow-c)"/>
+                  <!-- checkmark inside magnifier -->
+                  <path d="M42 48 L46 52 L55 43" stroke="#22d3ee" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow-c)"/>
+                </svg>
+                </div>
+                <div class="agent-card-name" data-i18n="agent_reviewer_name">Semak Dokumen</div>
+                <div class="agent-card-desc" data-i18n="agent_reviewer_desc">Semak tatabahasa, format dan pematuhan dokumen</div>
+            </div>
+
+            <!-- Sokongan KPM — red shield + book + robot face -->
+            <div class="agent-card" data-agent="kpm_support">
+                <div class="agent-card-icon">
+                <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <radialGradient id="bg-k" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#3b0a0a"/><stop offset="70%" stop-color="#1c0404"/><stop offset="100%" stop-color="#080101"/></radialGradient>
+                    <radialGradient id="inner-k" cx="50%" cy="40%" r="50%"><stop offset="0%" stop-color="#dc2626" stop-opacity="0.3"/><stop offset="100%" stop-color="transparent"/></radialGradient>
+                    <filter id="glow-k"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                  </defs>
+                  <circle cx="40" cy="40" r="38" fill="url(#bg-k)"/>
+                  <circle cx="40" cy="40" r="38" fill="url(#inner-k)"/>
+                  <circle cx="40" cy="40" r="36.5" stroke="#991b1b" stroke-width="1" opacity="0.4" filter="url(#glow-k)"/>
+                  <circle cx="40" cy="40" r="37.5" stroke="#f87171" stroke-width="1.5" opacity="0.85" filter="url(#glow-k)"/>
+                  <circle cx="40" cy="40" r="33" stroke="#dc2626" stroke-width="0.6" stroke-dasharray="3 4" opacity="0.5"/>
+                  <!-- shield fill -->
+                  <path d="M40 12 L58 20 V36 C58 50 40 60 40 60 C40 60 22 50 22 36 V20 Z" fill="#1c0404" stroke="#f87171" stroke-width="2" stroke-linejoin="round" filter="url(#glow-k)"/>
+                  <!-- shield inner line -->
+                  <path d="M40 16 L54 23 V36 C54 47 40 56 40 56 C40 56 26 47 26 36 V23 Z" fill="none" stroke="#fca5a5" stroke-width="0.8" stroke-linejoin="round" opacity="0.4"/>
+                  <!-- open book -->
+                  <path d="M30 30 C30 30 34 28 40 30 C46 28 50 30 50 30 V44 C50 44 46 42 40 44 C34 42 30 44 30 44 Z" fill="#3b0a0a" stroke="#fca5a5" stroke-width="1.4" stroke-linejoin="round"/>
+                  <line x1="40" y1="30" x2="40" y2="44" stroke="#fca5a5" stroke-width="1.2" opacity="0.8"/>
+                  <!-- book page lines left -->
+                  <line x1="32" y1="34" x2="38" y2="34" stroke="#fca5a5" stroke-width="0.8" opacity="0.6"/>
+                  <line x1="32" y1="37" x2="38" y2="37" stroke="#fca5a5" stroke-width="0.8" opacity="0.5"/>
+                  <line x1="32" y1="40" x2="38" y2="40" stroke="#fca5a5" stroke-width="0.8" opacity="0.4"/>
+                  <!-- book page lines right -->
+                  <line x1="42" y1="34" x2="48" y2="34" stroke="#fca5a5" stroke-width="0.8" opacity="0.6"/>
+                  <line x1="42" y1="37" x2="48" y2="37" stroke="#fca5a5" stroke-width="0.8" opacity="0.5"/>
+                  <line x1="42" y1="40" x2="48" y2="40" stroke="#fca5a5" stroke-width="0.8" opacity="0.4"/>
+                  <!-- KPM badge bottom -->
+                  <rect x="32" y="48" width="16" height="8" rx="2" fill="#7f1d1d" stroke="#f87171" stroke-width="1" filter="url(#glow-k)"/>
+                  <text x="40" y="55" text-anchor="middle" font-size="6" font-family="Arial" font-weight="bold" fill="#fca5a5">KPM</text>
+                </svg>
+                </div>
+                <div class="agent-card-name" data-i18n="agent_kpm_name">Sokongan KPM</div>
+                <div class="agent-card-desc" data-i18n="agent_kpm_desc">Bantuan sistem EMIS, APDM, DTP dan polisi KPM</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ═══ Agent Canvas (one per agent, created dynamically) ═══ -->
+    <div class="agent-canvas" id="agentCanvas" style="display:none;">
+        <div class="canvas-header">
+            <button class="back-btn" id="backBtn">&#8592; Kembali</button>
+            <div class="canvas-agent-info">
+                <span class="canvas-agent-icon" id="canvasAgentIcon"></span>
+                <span class="canvas-agent-name" id="canvasAgentName"></span>
+            </div>
+            <div class="canvas-actions">
+                <button class="canvas-action-btn" id="canvasHistoryBtn" title="Sejarah">&#128337;</button>
+                <button class="canvas-action-btn" id="canvasNewBtn" title="Sesi Baharu">&#43;</button>
+            </div>
+        </div>
+
+        <div class="canvas-messages" id="canvasMessages">
+            <div class="canvas-welcome" id="canvasWelcome">
+                <div class="canvas-welcome-icon" id="canvasWelcomeIcon"></div>
+                <h2 id="canvasWelcomeTitle"></h2>
+                <p id="canvasWelcomeDesc"></p>
+                <div class="canvas-quick-actions" id="canvasQuickActions"></div>
+            </div>
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+
+        <div id="fileIndicator" class="file-indicator" style="display:none;">
+            <span id="fileIndicatorText"></span>
+            <button id="fileRemoveBtn" class="file-remove-btn">&times;</button>
+        </div>
+        <div class="canvas-input-bar">
+            <div class="input-wrapper">
+                <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display:none;">
+                <button class="upload-btn" id="uploadBtn" title="Muat naik fail" style="display:none;">📎</button>
+                <textarea class="chat-input" id="chatInput" placeholder="Taip mesej anda di sini..." data-i18n-placeholder="input_placeholder" rows="1"></textarea>
+                <button class="send-btn" id="sendBtn">&#10148;</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Letterhead Settings Page ═══ -->
+    <div class="lh-page" id="lhPage" style="display:none;">
+        <div class="lh-page-header">
+            <button class="back-btn" id="lhBackBtn">&#8592; Kembali</button>
+            <div class="lh-page-title">
+                <span>&#128196;</span>
+                <span data-i18n="lh_title">Kepala Surat</span>
+            </div>
+            <div style="width:80px;"></div>
+        </div>
+
+        <div class="lh-page-body">
+            <!-- Tabs -->
+            <div class="lh-tabs">
+                <button class="lh-tab active" data-tab="letterhead" data-i18n="lh_tab_letter">Kepala Surat (Surat Rasmi)</button>
+                <button class="lh-tab" data-tab="logo" data-i18n="lh_tab_logo">Logo (Laporan)</button>
+            </div>
+
+            <!-- Tab: Kepala Surat -->
+            <div class="lh-tab-panel active" id="lhPanel-letterhead">
+                <div class="lh-upload-zone" id="lhDropZone-letterhead">
+                    <input type="file" id="lhFileInput-letterhead" accept=".png,.jpg,.jpeg,.gif,.bmp,.webp" multiple style="display:none;">
+                    <div class="lh-upload-icon">&#128196;</div>
+                    <div class="lh-upload-label" data-i18n="lh_upload_label">Klik atau seret fail imej ke sini</div>
+                    <div class="lh-upload-hint" data-i18n="lh_upload_hint">PNG, JPG, GIF, WEBP — maks 5 MB setiap fail</div>
+                    <button class="lh-upload-btn" data-trigger="letterhead" data-i18n="lh_upload_btn">Pilih Fail</button>
+                </div>
+                <div class="lh-active-notice" id="lhActiveNotice-letterhead" style="display:none;">
+                    <span class="lh-active-dot"></span>
+                    <span id="lhActiveLabel-letterhead"></span>
+                </div>
+                <div class="lh-grid" id="lhGrid-letterhead">
+                    <div class="lh-empty" data-i18n="lh_empty">Tiada kepala surat dimuat naik lagi.</div>
+                </div>
+            </div>
+
+            <!-- Tab: Logo -->
+            <div class="lh-tab-panel" id="lhPanel-logo">
+                <div class="lh-upload-zone" id="lhDropZone-logo">
+                    <input type="file" id="lhFileInput-logo" accept=".png,.jpg,.jpeg,.gif,.bmp,.webp" multiple style="display:none;">
+                    <div class="lh-upload-icon">&#127981;</div>
+                    <div class="lh-upload-label" data-i18n="lh_upload_label">Klik atau seret fail imej logo ke sini</div>
+                    <div class="lh-upload-hint" data-i18n="lh_upload_hint">PNG, JPG, GIF, WEBP — maks 5 MB setiap fail</div>
+                    <button class="lh-upload-btn" data-trigger="logo" data-i18n="lh_upload_btn">Pilih Fail</button>
+                </div>
+                <div class="lh-active-notice" id="lhActiveNotice-logo" style="display:none;">
+                    <span class="lh-active-dot"></span>
+                    <span id="lhActiveLabel-logo"></span>
+                </div>
+                <div class="lh-grid" id="lhGrid-logo">
+                    <div class="lh-empty" data-i18n="lh_empty">Tiada logo dimuat naik lagi.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Admin Dashboard Page ═══ -->
+    <div class="admin-page" id="adminPage" style="display:none;">
+        <div class="admin-header">
+            <button class="back-btn" id="adminBackBtn">&#8592; Kembali</button>
+            <div class="admin-title">&#128202; Papan Pemuka Admin</div>
+            <button class="admin-refresh-btn" id="adminRefreshBtn" title="Muat Semula">&#8635;</button>
+        </div>
+        <div class="admin-body">
+            <div class="admin-stats-row">
+                <div class="admin-stat-card">
+                    <div class="admin-stat-value" id="statTotalSessions">—</div>
+                    <div class="admin-stat-label">Jumlah Sesi</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="admin-stat-value" id="statTotalMessages">—</div>
+                    <div class="admin-stat-label">Jumlah Mesej</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="admin-stat-value" id="statFeedbackUp">—</div>
+                    <div class="admin-stat-label">👍 Maklum Balas Positif</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="admin-stat-value" id="statFeedbackDown">—</div>
+                    <div class="admin-stat-label">👎 Maklum Balas Negatif</div>
+                </div>
+            </div>
+            <div class="admin-charts-row">
+                <div class="admin-chart-card">
+                    <div class="admin-chart-title">Penggunaan Mengikut Ejen</div>
+                    <canvas id="adminAgentChart" height="220"></canvas>
+                </div>
+                <div class="admin-chart-card">
+                    <div class="admin-chart-title">Maklum Balas Mengikut Ejen</div>
+                    <canvas id="adminFeedbackChart" height="220"></canvas>
+                </div>
+            </div>
+            <div class="admin-table-card">
+                <div class="admin-chart-title">Sesi Terkini</div>
+                <table class="admin-table" id="adminRecentTable">
+                    <thead><tr><th>Sesi</th><th>Ejen</th><th>Tajuk</th><th>Mesej</th><th>Dikemaskini</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=13"></script>
+</body>
+</html>

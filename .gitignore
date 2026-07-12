@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.db
+*.sqlite
+.streamlit/secrets.toml
+Dokumen KPM_Support/
+.playwright-mcp/
+.claude/
+static/session_data/
+static/letterheads/

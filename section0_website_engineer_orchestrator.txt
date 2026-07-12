@@ -1,0 +1,68 @@
+================================================================================
+SMARTAssist Hub — Section 0: Website / Systems Engineer (Orchestrator Layer)
+================================================================================
+Run this in Claude Code first, before the agent-specific prompts. Scan the
+existing project first and show a plan before touching any files. Do not
+regenerate existing systems — modify incrementally.
+================================================================================
+
+Act as an experienced website and systems engineer responsible for the overall
+SMARTAssist Hub platform — a multi-agent AI system for PPD/KPM use, built with
+Streamlit as the frontend/orchestration layer.
+
+IMPORTANT ARCHITECTURE CHANGE:
+The LLM backend is moving from local Ollama (qwen2.5:7b) to the DeepSeek API
+for all agent calls and orchestrator intent classification. This means the
+platform is no longer fully offline — every LLM call now goes over the
+internet to DeepSeek's endpoint. Design accordingly: add basic error handling
+for network failures/timeouts, since this dependency did not exist before.
+
+DeepSeek API setup:
+1. Store the API key in a `.env` file as DEEPSEEK_API_KEY=your_key_here.
+   Never hardcode it in any source file. Confirm `.gitignore` excludes `.env`.
+2. Use the DeepSeek API via its OpenAI-compatible endpoint
+   (base_url: "https://api.deepseek.com", model: "deepseek-chat" — confirm
+   the current model name against DeepSeek's own docs before finalizing, as
+   this may change).
+3. Centralize the API client (base_url, key loading, model name) in a single
+   shared module that all agents and the orchestrator import — do not
+   duplicate client setup per agent.
+4. Add basic retry/timeout handling and a clear user-facing error message if
+   the DeepSeek API is unreachable (this replaces Ollama's "always available
+   locally" assumption).
+
+Your task in this section: refactor the Central Orchestrator's routing logic
+from the current keyword/intent-based Python routing into a LangGraph
+workflow, without changing any agent's external behaviour.
+
+Requirements:
+1. Model the orchestrator as a graph with three core elements:
+   - State: the shared data passed between steps — user query, detected
+     intent, conversation history, active agent, and agent output.
+   - Nodes: one node per agent (data_analysis, letter_generator,
+     report_generator, document_reviewer, kpm_support) plus an intent
+     classification node (now calling DeepSeek instead of local Ollama) and
+     a fallback/direct-answer node.
+   - Edges: conditional edges that route based on classified intent,
+     replacing the current keyword matching (including the previously
+     fixed "laporan" mis-routing case — verify this routing decision is
+     preserved explicitly as a named edge condition, not an accidental
+     string match).
+2. Preserve exact current behavior for all five agents — this is a routing
+   and backend-swap refactor only, not an agent rewrite.
+3. Add a lightweight SQLite-backed MCP server as the shared data access layer
+   for agents that read structured data (student/staff records, KPM policy
+   documents index). Agents should query through the MCP protocol instead of
+   ad-hoc file/DB access code duplicated per agent.
+4. Show the proposed LangGraph structure (nodes + edges) and the shared
+   DeepSeek client module as a plan before writing code. Wait for
+   confirmation before implementing.
+
+Deliverable: a plan first, then (on approval) the updated orchestrator
+module, the shared DeepSeek client module, and MCP server scaffold — without
+touching the five agent files themselves (those are handled in their own
+prompt files).
+
+================================================================================
+END OF SECTION 0
+================================================================================

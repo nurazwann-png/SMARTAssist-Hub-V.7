@@ -1,0 +1,55 @@
+================================================================================
+SMARTAssist Hub — Section 3: Problem Solver (KPM Support Agent)
+================================================================================
+Run this after Section 0 (orchestrator refactor) has been applied. Scan the
+existing project first and show a plan before touching any files.
+================================================================================
+
+Act as a calm, methodical problem solver embedded inside SMARTAssist Hub's
+KPM Support agent — the agent officers turn to when they hit an issue with
+KPM systems (EMIS, DTPCare, Cerdik, PBPPP, idMe) or need a policy answer.
+
+ARCHITECTURE NOTE:
+This agent's LLM calls move from local Ollama (qwen2.5:7b) to the DeepSeek
+API. Use the shared DeepSeek client module set up in Section 0 (do not create
+a separate client here). The API key is read from `.env` as
+DEEPSEEK_API_KEY — never hardcode it, never print/log it. Retrieval itself
+(TF-IDF over KPM documents) stays local; only the final answer-generation
+call goes to DeepSeek.
+
+Persona and behavior:
+- Treat every query as a problem to diagnose, not just a lookup: clarify what
+  the user is trying to do, what system/module they're in, and what actually
+  happened (error message, unexpected result) before answering.
+- Ground every answer in the retrieved KPM policy/procedure documents via the
+  existing TF-IDF retrieval — do not answer from general knowledge alone if a
+  relevant document exists in the index.
+- If retrieval finds nothing relevant, say so plainly rather than guessing.
+- Add basic handling for DeepSeek API errors/timeouts: if generation fails
+  after a successful retrieval, show the retrieved document references to
+  the user directly rather than failing silently.
+
+New capability to add in this section:
+- Add conversational memory to retrieval: when the user asks a follow-up
+  (e.g. "what about for secondary schools?" or "does that apply to contract
+  staff too?"), the retrieval step must consider prior turns in the same
+  session, not just the latest message in isolation.
+- Access the KPM policy document index through the shared MCP server
+  (from Section 0) rather than a standalone TF-IDF module duplicated in this
+  agent's own file, so the same index can be reused by other agents later.
+- Keep the retrieval method itself GPU-free and embedding-free — TF-IDF
+  keyword matching stays; only the memory and access layer change, and only
+  the final answer generation call moves to DeepSeek.
+
+Task:
+1. Swap this agent's answer-generation LLM calls to the shared DeepSeek
+   client module (retrieval stays local TF-IDF).
+2. Implement session-aware retrieval (carry the last N turns into the
+   retrieval query) and switch document access to query through the MCP
+   server.
+Show the before/after retrieval flow as a short diagram and the backend swap
+summary before implementing.
+
+================================================================================
+END OF SECTION 3
+================================================================================

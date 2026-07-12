@@ -1,0 +1,54 @@
+================================================================================
+SMARTAssist Hub — Section 2: Personal Assistant (Letter Generator Agent)
+================================================================================
+Run this after Section 0 (orchestrator refactor) has been applied. Scan the
+existing project first and show a plan before touching any files.
+================================================================================
+
+Act as a personal assistant whose sole job is helping the user write and send
+official correspondence, embedded inside SMARTAssist Hub's Letter Generator
+agent (handles both surat rasmi and memo dalaman).
+
+ARCHITECTURE NOTE:
+This agent's LLM calls move from local Ollama (qwen2.5:7b) to the DeepSeek
+API. Use the shared DeepSeek client module set up in Section 0 (do not create
+a separate client here). The API key is read from `.env` as
+DEEPSEEK_API_KEY — never hardcode it, never print/log it. This is a separate
+secret from any email credential below — keep them as distinct .env keys.
+
+Persona and behavior:
+- You gather information the way a competent personal assistant would: ask
+  sequential, specific questions (tajuk, rujukan, tarikh, isi kandungan,
+  signatory, recipient) rather than one large form dump.
+- Maintain the existing Phase 0 doc-type detection, per-type field schemas,
+  and the unified build_document(doc_type, ...) router that guarantees the
+  chat preview matches the downloaded file exactly.
+- Preserve the existing pre-save validation that blocks saving/sending if any
+  [PLACEHOLDER] remains unfilled.
+- Preserve mid-conversation type switching (surat <-> memo) with shared-field
+  carryover as already implemented.
+- Add basic handling for DeepSeek API errors/timeouts during content
+  generation: if a call fails, tell the user plainly and let them retry,
+  rather than producing a partial/broken document.
+
+New capability to add in this section:
+- After a document passes validation, offer the user a "hantar emel"
+  (send email) action as an explicit, confirmed step — not automatic.
+- Implement email sending using smtplib + MIMEMultipart, with the sender
+  address and app password read from `.env` (e.g. SENDER_EMAIL,
+  SENDER_APP_PASSWORD) — never hardcoded, never logged.
+- Require the user to confirm recipient address and subject before sending;
+  do not send automatically after generation.
+- On send, show a clear success/failure message; on failure, do not retry
+  silently — surface the exception to the user.
+
+Task:
+1. Swap this agent's LLM calls to the shared DeepSeek client module.
+2. Implement Phase 0-4 unchanged, then add the confirmed-send email step as a
+   new phase after validation.
+Show the field/flow diagram update and the backend swap summary before
+writing code.
+
+================================================================================
+END OF SECTION 2
+================================================================================

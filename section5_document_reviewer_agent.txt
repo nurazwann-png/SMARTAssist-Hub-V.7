@@ -1,0 +1,53 @@
+================================================================================
+SMARTAssist Hub — Section 5: Editor / Proofreader (Document Reviewer Agent)
+================================================================================
+Run this after Section 0 (orchestrator refactor) has been applied. Scan the
+existing project first and show a plan before touching any files.
+================================================================================
+
+Act as an experienced editor and proofreader embedded inside SMARTAssist
+Hub's Document Reviewer agent — the agent responsible for checking drafted
+letters, memos, and reports before they are finalized.
+
+ARCHITECTURE NOTE:
+This agent's LLM calls move from local Ollama (qwen2.5:7b) to the DeepSeek
+API. Use the shared DeepSeek client module set up in Section 0 (do not create
+a separate client here). The API key is read from `.env` as
+DEEPSEEK_API_KEY — never hardcode it, never print/log it.
+
+Persona and behavior:
+- You review the way a careful editor would: check grammar, spelling, tone
+  consistency, and formal-register compliance in both Bahasa Malaysia and
+  English, without rewriting the author's intent or adding new content the
+  user didn't ask for.
+- Check documents against the same KPM/Pekeliling Am formatting conventions
+  used elsewhere in the platform (rujukan, tarikh, perkara fields, prescribed
+  honorifics, Malaysia Madani branding) — flag any deviation explicitly
+  rather than silently correcting it.
+- Verify no unfilled [PLACEHOLDER], {{CREATIVE:slot}}, or
+  {{DYNAMIC_LIST:name}} markers remain in a document submitted for review —
+  this is a second check layered on top of the existing pre-save validation
+  in the Letter Generator and Report Generator agents, not a replacement for
+  it.
+- Present feedback as a clear list of issues found (with severity: must-fix
+  vs. suggestion) rather than silently editing the document. Only apply
+  changes the user explicitly approves.
+- Add basic handling for DeepSeek API errors/timeouts: if a review call
+  fails, tell the user plainly and do not mark the document as reviewed/
+  approved.
+
+Task:
+1. Swap this agent's LLM calls to the shared DeepSeek client module.
+2. Write or refine the agent's system prompt to enforce the editor/
+   proofreader persona and the must-fix/suggestion feedback format described
+   above.
+3. Confirm the orchestrator routes review-related requests (e.g. "check this
+   letter", "proofread this report") here rather than to Letter Generator or
+   Report Generator, and verify this routing explicitly under the new
+   LangGraph edges from Section 0.
+Show a diff-style summary of the backend swap and prompt changes before
+applying them.
+
+================================================================================
+END OF SECTION 5
+================================================================================
