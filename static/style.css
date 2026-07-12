@@ -278,17 +278,80 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
    ═══════════════════════════════════════ */
 .agent-canvas {
     position: fixed; inset: 0;
-    top: 0; left: 0; right: 0; bottom: 0;
     height: 100vh; height: 100dvh;
     background: var(--bg-primary);
-    display: flex; flex-direction: column;
+    display: flex; flex-direction: row;
     z-index: 100;
+}
+
+/* Sidebar */
+.canvas-sidebar {
+    width: 220px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    padding: 14px 10px 16px;
+    gap: 6px; overflow-y: auto;
+}
+.sidebar-back-btn {
+    width: 100%; text-align: left;
+    font-size: 13px; margin-bottom: 8px;
+}
+.sidebar-nav {
+    display: flex; flex-direction: column; gap: 4px;
+}
+.sidebar-tools {
+    margin-top: auto; padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 6px;
+}
+.sidebar-tools-title {
+    font-size: 10px; font-weight: 600; letter-spacing: 1px;
+    color: var(--text-secondary); text-transform: uppercase; padding: 0 4px;
+}
+.sidebar-tool-btn {
+    width: 100%; text-align: left;
+    padding: 7px 10px; border-radius: 10px; font-size: 12px;
+    color: var(--text-secondary); background: var(--glass);
+    border: 1px solid var(--border); transition: all 0.2s;
+}
+.sidebar-tool-btn:hover {
+    background: var(--glass-indigo); color: var(--text-primary);
+    border-color: var(--border-glow);
+}
+
+/* Main chat area */
+.canvas-main {
+    flex: 1; display: flex; flex-direction: column;
+    min-width: 0; overflow: hidden;
 }
 .canvas-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 20px; border-bottom: 1px solid var(--border);
     background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(99,102,241,0.06) 100%);
 }
+
+/* Agent Nav Buttons (sidebar) */
+.agent-nav-btn {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 8px 10px; border-radius: 10px;
+    font-size: 12px; font-weight: 500; color: var(--text-secondary);
+    background: transparent; border: 1px solid transparent;
+    transition: all 0.2s; cursor: pointer; text-align: left;
+}
+.agent-nav-btn:hover {
+    background: var(--glass-indigo); color: var(--text-primary);
+    border-color: var(--border-glow);
+}
+.agent-nav-btn.active {
+    background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.18));
+    color: var(--indigo); border-color: rgba(99,102,241,0.4);
+    font-weight: 600;
+}
+.agent-nav-icon { font-size: 15px; display: flex; align-items: center; flex-shrink: 0; }
+.agent-nav-icon svg { width: 16px; height: 16px; }
+.agent-nav-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .back-btn {
     font-size: 14px; color: var(--text-secondary);
     background: var(--glass); border: 1px solid var(--border);
@@ -1031,4 +1094,47 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
     padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.04);
     color: var(--text-primary); max-width: 200px; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════
+   REPORT IMAGE UPLOAD
+   ═══════════════════════════════════════ */
+.report-img-hint {
+    font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;
+    line-height: 1.6;
+}
+.report-img-grid {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;
+}
+.report-img-thumb {
+    position: relative; width: 130px; height: 78px;
+    border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+}
+.report-img-thumb img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.report-img-remove {
+    position: absolute; top: 4px; right: 4px;
+    background: rgba(0,0,0,0.65); color: #fff; border: none;
+    border-radius: 50%; width: 20px; height: 20px; font-size: 10px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: background 0.15s; line-height: 1;
+}
+.report-img-remove:hover { background: var(--red); }
+.report-img-label {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.55); color: #fff;
+    font-size: 10px; text-align: center; padding: 2px 0;
+}
+.report-img-add-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 18px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    background: var(--glass-indigo); border: 1px dashed var(--border-glow);
+    color: var(--indigo); cursor: pointer; transition: all 0.2s;
+}
+.report-img-add-btn:hover {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff; border-style: solid;
 }

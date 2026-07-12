@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMARTAssist Hub</title>
-    <link rel="stylesheet" href="/static/style.css?v=11">
+    <link rel="stylesheet" href="/static/style.css?v=12">
     <script src="/static/chart.min.js"></script>
 </head>
 <body>
@@ -29,7 +29,6 @@
 
             <div class="nav-right">
                 <button class="nav-settings-btn" id="adminBtn" title="Papan Pemuka Admin">&#128202;</button>
-                <button class="nav-settings-btn" id="lhSettingsBtn" title="Tetapan Kepala Surat">&#128196;</button>
                 <button class="lang-toggle" id="langToggle" title="Tukar Bahasa">
                     <span class="lang-flag">🇲🇾</span>
                     <span class="lang-code">BM</span>
@@ -244,17 +243,31 @@
 
     <!-- ═══ Agent Canvas (one per agent, created dynamically) ═══ -->
     <div class="agent-canvas" id="agentCanvas" style="display:none;">
-        <div class="canvas-header">
-            <button class="back-btn" id="backBtn">&#8592; Kembali</button>
-            <div class="canvas-agent-info">
-                <span class="canvas-agent-icon" id="canvasAgentIcon"></span>
-                <span class="canvas-agent-name" id="canvasAgentName"></span>
-            </div>
-            <div class="canvas-actions">
-                <button class="canvas-action-btn" id="canvasHistoryBtn" title="Sejarah">&#128337;</button>
-                <button class="canvas-action-btn" id="canvasNewBtn" title="Sesi Baharu">&#43;</button>
+
+        <!-- Left Sidebar -->
+        <div class="canvas-sidebar" id="canvasSidebar">
+            <button class="back-btn sidebar-back-btn" id="backBtn">&#8592; Kembali</button>
+            <div class="sidebar-nav" id="agentNavBar"></div>
+            <div class="sidebar-tools" id="sidebarTools" style="display:none;">
+                <div class="sidebar-tools-title">Tetapan</div>
+                <button class="sidebar-tool-btn" id="sidebarLhBtn" onclick="showLetterheadPage();">
+                    &#128196; Kepala Surat &amp; Logo
+                </button>
             </div>
         </div>
+
+        <!-- Main Chat Area -->
+        <div class="canvas-main" id="canvasMain">
+            <div class="canvas-header">
+                <div class="canvas-agent-info">
+                    <span class="canvas-agent-icon" id="canvasAgentIcon"></span>
+                    <span class="canvas-agent-name" id="canvasAgentName"></span>
+                </div>
+                <div class="canvas-actions">
+                    <button class="canvas-action-btn" id="canvasHistoryBtn" title="Sejarah">&#128337;</button>
+                    <button class="canvas-action-btn" id="canvasNewBtn" title="Sesi Baharu">&#43;</button>
+                </div>
+            </div>
 
         <div class="canvas-messages" id="canvasMessages">
             <div class="canvas-welcome" id="canvasWelcome">
@@ -282,7 +295,8 @@
                 <button class="send-btn" id="sendBtn">&#10148;</button>
             </div>
         </div>
-    </div>
+        </div><!-- end canvas-main -->
+    </div><!-- end agent-canvas -->
 
     <!-- ═══ Letterhead Settings Page ═══ -->
     <div class="lh-page" id="lhPage" style="display:none;">

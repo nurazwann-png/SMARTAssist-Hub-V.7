@@ -218,14 +218,23 @@ def clear_session_data(session_id: str):
         pass
 
 
-def handle(query: str, history: list[dict] | None = None, session_id: str = "default") -> str:
+def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm") -> str:
     if query == '__INTRO__':
+        if lang == "en":
+            return "Assalamualaikum and welcome! 👋 I am the Data Analysis Agent. Upload your CSV or Excel file using the 📎 button, then ask anything about the data. I can generate charts, summary statistics, detect missing values and much more. Which file would you like to analyse today?"
         return "Assalamualaikum dan selamat datang! 👋 Saya Analisis Data Agent. Muat naik fail CSV atau Excel anda menggunakan butang 📎, kemudian tanya apa sahaja tentang data tersebut. Saya boleh menjana carta, statistik ringkasan, mengesan data kosong dan banyak lagi. Fail apa yang ingin anda analisis hari ini?"
 
     context_note = _build_context_note(session_id)
     data_context = _build_data_context(session_id)
+    lang_note = "\n\nIMPORTANT: The user has selected English. You MUST respond entirely in English. All text fields in your JSON response must be in English." if lang == "en" else ""
 
     if not data_context and not history:
+        if lang == "en":
+            return json.dumps({
+                "response_type": "tanya",
+                "message": "Welcome to the Data Analysis Agent. Please upload your data file (CSV or Excel) using the 📎 button below, then ask questions about the data.",
+                "susulan": ["Upload a CSV file to analyse", "Upload an Excel file to analyse"],
+            }, ensure_ascii=False)
         return json.dumps({
             "response_type": "tanya",
             "message": (
@@ -240,7 +249,7 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
         }, ensure_ascii=False)
 
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT + data_context + context_note},
+        {"role": "system", "content": SYSTEM_PROMPT + data_context + context_note + lang_note},
     ]
     if history:
         for msg in history[-8:]:

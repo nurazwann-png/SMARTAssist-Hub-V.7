@@ -4,6 +4,7 @@ import json
 import os
 import re
 import io
+import pathlib
 from datetime import datetime
 from backend.deepseek_client import chat_completion
 
@@ -15,7 +16,8 @@ REPORT_FIELDS = [
     {"key": "hari", "label": "Hari", "example": "Khamis"},
     {"key": "masa", "label": "Masa Program", "example": "8.00 pagi - 5.00 petang"},
     {"key": "organisasi", "label": "Nama Organisasi", "example": "Pejabat Pendidikan Daerah Dalat"},
-    {"key": "pegawai", "label": "Pegawai Yang Terlibat", "example": "Ahmad bin Ali, Siti binti Hassan, Razak bin Omar"},
+    {"key": "pegawai_nama", "label": "Nama Pegawai Yang Terlibat", "example": "Ahmad bin Ali, Siti binti Hassan, Razak bin Omar"},
+    {"key": "pegawai_jawatan", "label": "Jawatan Pegawai Yang Terlibat", "example": "Pegawai Pendidikan Daerah, Penolong Pegawai Pendidikan, Guru Besar"},
     {"key": "objektif", "label": "Objektif Program", "example": "Meningkatkan kemahiran ICT guru besar"},
     {"key": "rumusan", "label": "Rumusan / Laporan Ringkas", "example": "Program berjalan lancar dengan 45 peserta"},
     {"key": "cadangan", "label": "Cadangan / Tindakan Susulan", "example": "Mengadakan bengkel susulan pada bulan hadapan"},
@@ -38,7 +40,7 @@ CARA KERJA:
 4. Jika maklumat tidak mencukupi untuk menjana rumusan/cadangan yang bermakna, tanya soalan spesifik (cth: "Berapa ramai peserta yang hadir?" atau "Apakah aktiviti utama yang dijalankan?")
 
 URUTAN SOALAN:
-nama_program → tarikh_program → hari → masa → organisasi → pegawai → objektif → (jana rumusan & cadangan automatik) → penyedia_nama → penyedia_jawatan → tarikh_disediakan → pengesah_nama → pengesah_jawatan
+nama_program → tarikh_program → hari → masa → organisasi → pegawai_nama → pegawai_jawatan → objektif → (jana rumusan & cadangan automatik) → penyedia_nama → penyedia_jawatan → tarikh_disediakan → pengesah_nama → pengesah_jawatan
 
 GAYA:
 - Formal, tiada hiasan, seperti pegawai kerajaan yang berpengalaman
@@ -67,7 +69,7 @@ PHASES:
 - Phase 3: Laporan disahkan dan sedia untuk dimuat turun
 
 FIELD KEYS WAJIB (guna key tepat ini dalam fields_collected):
-nama_program, tarikh_program, hari, masa, organisasi, pegawai, objektif, rumusan, cadangan, penyedia_nama, penyedia_jawatan, tarikh_disediakan, pengesah_nama, pengesah_jawatan
+nama_program, tarikh_program, hari, masa, organisasi, pegawai_nama, pegawai_jawatan, objektif, rumusan, cadangan, penyedia_nama, penyedia_jawatan, tarikh_disediakan, pengesah_nama, pengesah_jawatan
 
 PENTING:
 - Jangan reka maklumat peribadi — tanya pengguna
@@ -76,6 +78,62 @@ PENTING:
 - Pastikan JSON sah"""
 
 _sessions: dict[str, dict] = {}
+
+MAX_IMAGES = 4
+_IMAGES_DIR = pathlib.Path("static/report_images")
+_image_store: dict[str, list[dict]] = {}
+
+
+def _validate_landscape(image_bytes: bytes, filename: str) -> str | None:
+    try:
+        from PIL import Image as PILImage
+        with PILImage.open(io.BytesIO(image_bytes)) as img:
+            w, h = img.size
+            if w <= h:
+                return f"Gambar '{filename}' ({w}×{h}px) mesti landscape (lebar > tinggi)."
+    except Exception:
+        pass
+    return None
+
+
+def add_report_image(session_id: str, image_bytes: bytes, filename: str) -> dict:
+    _IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    err = _validate_landscape(image_bytes, filename)
+    if err:
+        return {"ok": False, "error": err}
+    images = _image_store.setdefault(session_id, [])
+    if len(images) >= MAX_IMAGES:
+        return {"ok": False, "error": f"Maksimum {MAX_IMAGES} gambar sahaja dibenarkan."}
+    safe_name = re.sub(r'[^\w\-_\.]', '_', f"{session_id}_{len(images)}_{filename}")
+    file_path = _IMAGES_DIR / safe_name
+    file_path.write_bytes(image_bytes)
+    images.append({"filename": filename, "path": str(file_path), "safe_name": safe_name})
+    return {"ok": True, "index": len(images) - 1, "count": len(images), "max": MAX_IMAGES}
+
+
+def remove_report_image(session_id: str, index: int) -> dict:
+    images = _image_store.get(session_id, [])
+    if 0 <= index < len(images):
+        img = images.pop(index)
+        try:
+            pathlib.Path(img["path"]).unlink(missing_ok=True)
+        except Exception:
+            pass
+        return {"ok": True, "count": len(images)}
+    return {"ok": False, "error": "Indeks tidak sah"}
+
+
+def get_report_images(session_id: str) -> list[dict]:
+    return _image_store.get(session_id, [])
+
+
+def clear_report_images(session_id: str):
+    images = _image_store.pop(session_id, [])
+    for img in images:
+        try:
+            pathlib.Path(img["path"]).unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 def _get_session(session_id: str) -> dict:
@@ -92,6 +150,41 @@ def _find_missing_fields(collected: dict) -> list[dict]:
     return [f for f in REPORT_FIELDS if f["key"] not in collected or not collected[f["key"]]]
 
 
+def _auto_generate_rumusan_cadangan(fields: dict) -> tuple[str, str]:
+    """Jana rumusan dan cadangan secara automatik berdasarkan maklumat program."""
+    prompt = f"""Anda adalah pegawai kerajaan. Tulis rumusan pelaksanaan dan cadangan tindakan susulan dalam Bahasa Malaysia rasmi berdasarkan maklumat berikut.
+
+Nama Program: {fields.get('nama_program', '')}
+Tarikh: {fields.get('tarikh_program', '')}
+Organisasi: {fields.get('organisasi', '')}
+Pegawai Terlibat: {fields.get('pegawai_nama', '')}
+Objektif: {fields.get('objektif', '')}
+
+Balas dalam format JSON tepat ini sahaja:
+{{"rumusan": "...", "cadangan": "..."}}
+
+Rumusan: 2-3 ayat padat tentang pelaksanaan program.
+Cadangan: 2-3 cadangan tindakan susulan yang konkrit.
+Bahasa Malaysia rasmi. Tiada placeholder."""
+    try:
+        raw = chat_completion(messages=[
+            {"role": "system", "content": "Balas dalam format JSON sahaja. Tiada markdown."},
+            {"role": "user", "content": prompt}
+        ], temperature=0.3, max_tokens=500)
+        data = _try_parse_json(raw)
+        if data and data.get("rumusan"):
+            return data.get("rumusan", ""), data.get("cadangan", "")
+    except Exception:
+        pass
+    # Fallback ringkas jika LLM gagal
+    nama = fields.get('nama_program', 'program')
+    org = fields.get('organisasi', 'organisasi')
+    obj = fields.get('objektif', '')
+    rumusan = f"Program {nama} telah dilaksanakan dengan jayanya oleh {org}. Semua objektif program telah dicapai dengan penglibatan penuh daripada semua peserta. {obj}."
+    cadangan = f"Program susulan perlu diadakan bagi memastikan kesinambungan pencapaian objektif. Pemantauan berterusan perlu dilakukan oleh {org}. Laporan program ini perlu dikemukakan kepada pihak atasan untuk tindakan selanjutnya."
+    return rumusan, cadangan
+
+
 def _has_placeholders(text: str) -> list[str]:
     patterns = [r'\[PLACEHOLDER\]', r'\{\{CREATIVE:[^}]+\}\}', r'\{\{DYNAMIC_LIST:[^}]+\}\}']
     found = []
@@ -101,12 +194,21 @@ def _has_placeholders(text: str) -> list[str]:
 
 
 def _build_report(f: dict) -> str:
-    pegawai = f.get("pegawai", "[PLACEHOLDER]")
-    if isinstance(pegawai, list):
-        pegawai_lines = "\n".join(f"{i+1}) {p.strip()}" for i, p in enumerate(pegawai))
+    def _split_field(val):
+        if isinstance(val, list):
+            return [x.strip() for x in val if str(x).strip()]
+        return [x.strip() for x in str(val).split(",") if x.strip()]
+
+    nama_list = _split_field(f.get("pegawai_nama", ""))
+    jawatan_list = _split_field(f.get("pegawai_jawatan", ""))
+    if nama_list:
+        rows = []
+        for i, nama in enumerate(nama_list):
+            jawatan = jawatan_list[i] if i < len(jawatan_list) else ""
+            rows.append(f"{i+1}) {nama}" + (f"\n   {jawatan}" if jawatan else ""))
+        pegawai_lines = "\n".join(rows)
     else:
-        items = [p.strip() for p in pegawai.split(",") if p.strip()]
-        pegawai_lines = "\n".join(f"{i+1}) {p}" for i, p in enumerate(items)) if items else "[PLACEHOLDER]"
+        pegawai_lines = "[PLACEHOLDER]"
 
     objektif = f.get("objektif", "[PLACEHOLDER]")
     if isinstance(objektif, list):
@@ -146,8 +248,10 @@ JAWATAN : {f.get('penyedia_jawatan', '[PLACEHOLDER]')}           JAWATAN : {f.ge
 TARIKH  : {f.get('tarikh_disediakan', '[PLACEHOLDER]')}"""
 
 
-def handle(query: str, history: list[dict] | None = None, session_id: str = "default") -> str:
+def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm") -> str:
     if query == '__INTRO__':
+        if lang == "en":
+            return "Assalamualaikum and welcome! 📋 I am the Report Generator. I am ready to help you generate a one-page report (One Page Report) in the official PPD/KPM format. Could you tell me the name of the programme or activity to be reported?"
         return "Assalamualaikum dan selamat datang! 📋 Saya Penjana Laporan. Saya sedia membantu tuan/puan menjana laporan satu muka surat (One Page Report) dalam format rasmi PPD/KPM. Boleh beritahu saya nama program atau aktiviti yang ingin dilaporkan?"
 
     session = _get_session(session_id)
@@ -172,7 +276,8 @@ Kembalikan HANYA laporan yang telah dikemaskini dalam format JSON:
         now = datetime.now()
         date_str = now.strftime("%#d %B %Y") if os.name == "nt" else now.strftime("%-d %B %Y")
         system_prompt = _SYSTEM_PROMPT_TEMPLATE.replace("{current_date}", date_str).replace("{current_year}", str(now.year))
-        patch_messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": patch_prompt}]
+        _patch_lang_note = "\n\nIMPORTANT: The user has selected English. Respond in English for all 'message' fields." if lang == "en" else ""
+        patch_messages = [{"role": "system", "content": system_prompt + _patch_lang_note}, {"role": "user", "content": patch_prompt}]
         try:
             raw = chat_completion(messages=patch_messages, temperature=0.2, max_tokens=3000)
             parsed = _try_parse_json(raw)
@@ -180,6 +285,10 @@ Kembalikan HANYA laporan yang telah dikemaskini dalam format JSON:
                 doc_text = parsed["document_preview"]
                 session["document"] = doc_text
                 parsed["ready_to_save"] = not bool(_has_placeholders(doc_text))
+                image_count = len(get_report_images(session_id))
+                parsed["awaiting_images"] = True
+                parsed["image_count"] = image_count
+                parsed["max_images"] = MAX_IMAGES
                 return json.dumps(parsed, ensure_ascii=False)
         except Exception:
             pass
@@ -195,9 +304,10 @@ Status sesi semasa:
     now = datetime.now()
     date_str = now.strftime("%#d %B %Y") if os.name == "nt" else now.strftime("%-d %B %Y")
     system_prompt = _SYSTEM_PROMPT_TEMPLATE.replace("{current_date}", date_str).replace("{current_year}", str(now.year))
+    lang_note = "\n\nIMPORTANT: The user has selected English. You MUST respond entirely in English. All 'message' and conversational text fields in your JSON must be in English. The generated report document content should remain in Malay as it is an official KPM document." if lang == "en" else ""
 
     messages = [
-        {"role": "system", "content": system_prompt + context_info},
+        {"role": "system", "content": system_prompt + context_info + lang_note},
     ]
     if history:
         for msg in history[-10:]:
@@ -227,6 +337,17 @@ Status sesi semasa:
     if parsed.get("phase") is not None:
         session["phase"] = parsed["phase"]
 
+    # Auto-jana rumusan/cadangan apabila field program utama sudah lengkap
+    _PROGRAM_KEYS = {"nama_program", "tarikh_program", "hari", "masa", "organisasi", "pegawai_nama", "pegawai_jawatan", "objektif"}
+    f = session["fields"]
+    program_complete = all(f.get(k) for k in _PROGRAM_KEYS)
+    if program_complete and (not f.get("rumusan") or not f.get("cadangan")):
+        rumusan, cadangan = _auto_generate_rumusan_cadangan(f)
+        if rumusan:
+            f["rumusan"] = rumusan
+        if cadangan:
+            f["cadangan"] = cadangan
+
     all_filled = not _find_missing_fields(session["fields"])
     if session["phase"] >= 2 or all_filled:
         if all_filled:
@@ -241,6 +362,16 @@ Status sesi semasa:
         else:
             parsed["ready_to_save"] = True
             session["document"] = doc_text
+            # Prompt for images
+            image_count = len(get_report_images(session_id))
+            parsed["awaiting_images"] = True
+            parsed["image_count"] = image_count
+            parsed["max_images"] = MAX_IMAGES
+            if image_count == 0:
+                parsed["message"] = (
+                    parsed.get("message", "Laporan telah siap!") +
+                    "\n\n📷 **Langkah Akhir:** Laporan anda telah siap! Sila muat naik sehingga 4 gambar landscape untuk dilampirkan dalam laporan. Gunakan butang '+ Tambah Gambar' di bawah, atau terus muat turun jika tiada gambar diperlukan."
+                )
 
     parsed["fields_status"] = {
         "collected": session["fields"],
@@ -456,13 +587,18 @@ def build_docx(session_id: str) -> bytes | None:
 
     # Row 6: PEGAWAI YANG TERLIBAT header + numbered list
     _add_full_row("PEGAWAI YANG TERLIBAT", bold=True)
-    pegawai = f.get("pegawai", "")
-    if isinstance(pegawai, list):
-        items = pegawai
-    else:
-        items = [p.strip() for p in pegawai.split(",") if p.strip()]
-    pegawai_text = "\n".join(f"{i+1}) {p}" for i, p in enumerate(items)) if items else ""
-    _add_full_row(pegawai_text, bold=False, center=False, min_height="800")
+    def _split_f(val):
+        if isinstance(val, list):
+            return [x.strip() for x in val if str(x).strip()]
+        return [x.strip() for x in str(val).split(",") if x.strip()]
+
+    nama_pg = _split_f(f.get("pegawai_nama", ""))
+    jawatan_pg = _split_f(f.get("pegawai_jawatan", ""))
+    pg_rows = []
+    for i, nm in enumerate(nama_pg):
+        jw = jawatan_pg[i] if i < len(jawatan_pg) else ""
+        pg_rows.append(f"{i+1}) {nm}" + (f"\n   {jw}" if jw else ""))
+    _add_full_row("\n".join(pg_rows), bold=False, center=False, min_height="800")
 
     # Row 7: OBJEKTIF header + numbered list
     _add_full_row("OBJEKTIF", bold=True)
@@ -513,6 +649,37 @@ def build_docx(session_id: str) -> bytes | None:
             if idx < len(row.cells):
                 row.cells[idx].width = width
 
+    # ── Lampiran Gambar ──
+    images = get_report_images(session_id)
+    if images:
+        spacer = doc.add_paragraph()
+        spacer.paragraph_format.space_before = Pt(10)
+        lh_p = doc.add_paragraph()
+        lh_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        lh_p.paragraph_format.space_after = Pt(8)
+        lr = lh_p.add_run("LAMPIRAN GAMBAR")
+        lr.font.name = "Arial"; lr.font.size = Pt(11); lr.bold = True
+        for pair_start in range(0, len(images), 2):
+            pair = images[pair_start:pair_start + 2]
+            img_tbl = doc.add_table(rows=1, cols=2)
+            img_tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+            img_tbl.autofit = False
+            for j, img_info in enumerate(pair):
+                cell = img_tbl.rows[0].cells[j]
+                cell.width = Cm(7.5)
+                para = cell.paragraphs[0]
+                para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                try:
+                    para.add_run().add_picture(img_info["path"], width=Cm(7))
+                except Exception:
+                    para.add_run(f"[Gambar {pair_start + j + 1}]")
+                cap = cell.add_paragraph()
+                cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                cr = cap.add_run(f"Gambar {pair_start + j + 1}")
+                cr.font.size = Pt(9); cr.font.name = "Arial"
+            if len(pair) == 1:
+                img_tbl.rows[0].cells[1].width = Cm(7.5)
+
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
@@ -562,6 +729,7 @@ def send_email(session_id: str, to_email: str, subject: str) -> dict:
 
 def clear_session(session_id: str):
     _sessions.pop(session_id, None)
+    clear_report_images(session_id)
 
 
 def _try_parse_json(text: str) -> dict | None:

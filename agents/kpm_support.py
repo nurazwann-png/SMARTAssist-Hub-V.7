@@ -100,8 +100,10 @@ def _format_doc_context(docs: list[dict]) -> str:
     return "\n\nDokumen rujukan:\n" + "\n\n".join(sections)
 
 
-def handle(query: str, history: list[dict] | None = None, session_id: str = "default") -> str:
+def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm") -> str:
     if query == '__INTRO__':
+        if lang == "en":
+            return "Assalamualaikum and greetings! 😊 I am the SMARTAssist Hub KPM Support Agent. I am here to help you with any issues related to KPM systems such as EMIS, APDM, DTPCare, SK@S and others. How may I assist you today?"
         return "Assalamualaikum dan salam sejahtera! 😊 Saya SMARTAssist Hub KPM Support Agent. Saya di sini untuk membantu tuan/puan dengan sebarang isu berkaitan sistem KPM seperti EMIS, APDM, DTPCare, SK@S dan lain-lain. Apa yang boleh saya bantu hari ini?"
 
     session = _get_session(session_id)
@@ -110,12 +112,11 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
     docs = _retrieve_docs(query, history)
     doc_context = _format_doc_context(docs)
 
-    prior_user_msgs = [m for m in (history or []) if m.get("role") == "user"]
-    is_first_message = len(prior_user_msgs) <= 1
-    session_context = "\n\nINI ADALAH PERMULAAN SESI BAHARU. Wajib mulakan dengan sapaan perkenalan." if is_first_message else "\n\nSesi sedang berjalan. JANGAN ulang sapaan perkenalan. Teruskan perbualan secara semula jadi dan rujuk konteks sebelumnya."
+    session_context = "\n\nSesi sedang berjalan. JANGAN ulang sapaan perkenalan. Terus jawab soalan pengguna secara langsung dan profesional."
+    lang_note = "\n\nIMPORTANT: The user has selected English. You MUST respond entirely in English. Do not use Malay." if lang == "en" else ""
 
     messages = [
-        {"role": "system", "content": _SYSTEM_PROMPT + session_context + doc_context},
+        {"role": "system", "content": _SYSTEM_PROMPT + session_context + lang_note + doc_context},
     ]
     if history:
         for msg in history[-8:]:

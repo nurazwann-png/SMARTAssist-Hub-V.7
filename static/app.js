@@ -251,6 +251,11 @@ function openAgent(agentKey, existingSessionId) {
     landingPage.style.display = 'none';
     agentCanvas.style.display = 'flex';
     chatInput.focus();
+    updateAgentNavBar(agentKey);
+    const sidebarTools = document.getElementById('sidebarTools');
+    if (sidebarTools) {
+        sidebarTools.style.display = (agentKey === 'letter_generator' || agentKey === 'report_generator') ? 'flex' : 'none';
+    }
 
     if (existingSessionId) {
         loadSessionMessages(existingSessionId);
@@ -260,6 +265,25 @@ function openAgent(agentKey, existingSessionId) {
     }
 }
 
+function updateAgentNavBar(activeKey) {
+    const navBar = document.getElementById('agentNavBar');
+    if (!navBar) return;
+    const agentKeys = ['data_analysis', 'report_generator', 'letter_generator', 'document_reviewer', 'kpm_support'];
+    navBar.innerHTML = agentKeys.map(key => {
+        const info = getAgentInfo(key);
+        const isActive = key === activeKey;
+        return `<button class="agent-nav-btn${isActive ? ' active' : ''}" onclick="switchAgent('${key}')" title="${info.name}">
+            <span class="agent-nav-icon">${info.icon}</span>
+            <span class="agent-nav-label">${info.name}</span>
+        </button>`;
+    }).join('');
+}
+
+function switchAgent(agentKey) {
+    if (agentKey === currentAgent) return;
+    openAgent(agentKey);
+}
+
 async function sendAgentIntro(agentKey) {
     const info = getAgentInfo(agentKey);
     typingIndicator.classList.add('active');
@@ -267,7 +291,7 @@ async function sendAgentIntro(agentKey) {
         const res = await fetch('/api/agent-chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: '__INTRO__', agent: agentKey, session_id: sessionId }),
+            body: JSON.stringify({ message: '__INTRO__', agent: agentKey, session_id: sessionId, lang: currentLang }),
         });
         const data = await res.json();
         typingIndicator.classList.remove('active');
@@ -433,6 +457,10 @@ function addMessage(content, role, agentIcon, agentName, structured) {
     msgDiv.innerHTML = html;
     canvasMessages.insertBefore(msgDiv, typingIndicator);
     canvasMessages.scrollTop = canvasMessages.scrollHeight;
+    // Load report images if panel exists
+    if (document.getElementById('reportImgGrid')) {
+        _refreshReportImages();
+    }
 
     if (structured && structured.chart) {
         renderChart(msgDiv, structured.chart);
@@ -632,6 +660,19 @@ function buildLetterHtml(data) {
         html += '</ul></div>';
     }
 
+    // Image upload panel for report generator
+    if (data.awaiting_images && currentAgent === 'report_generator') {
+        const imgCount = data.image_count || 0;
+        const maxImg = data.max_images || 4;
+        html += `<div class="da-section report-img-section" id="reportImgSection">
+            <div class="da-section-title">📷 Lampiran Gambar (<span id="reportImgCounter">${imgCount}</span>/${maxImg})</div>
+            <p class="report-img-hint">Muat naik sehingga ${maxImg} gambar <strong>landscape</strong> untuk dilampirkan dalam laporan. Langkah ini adalah <strong>yang terakhir</strong> sebelum laporan dimuat turun.</p>
+            <div class="report-img-grid" id="reportImgGrid"></div>
+            <button class="report-img-add-btn" id="reportImgAddBtn" onclick="triggerReportImageUpload()" ${imgCount >= maxImg ? 'style="display:none"' : ''}>+ Tambah Gambar</button>
+            <input type="file" id="reportImgInput" accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none" onchange="handleReportImageUpload(this)">
+        </div>`;
+    }
+
     if (data.ready_to_save) {
         html += '<div class="doc-actions">';
         html += `<button class="doc-action-btn download-btn" onclick="downloadDocument()">\u{1F4E5} Muat Turun (.docx)</button>`;
@@ -641,6 +682,74 @@ function buildLetterHtml(data) {
 
     html += '</div>';
     return html;
+}
+
+// ═══ Report image upload ═══
+
+async function triggerReportImageUpload() {
+    document.getElementById('reportImgInput')?.click();
+}
+
+async function handleReportImageUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = async () => {
+            if (img.naturalWidth <= img.naturalHeight) {
+                showToast('Gambar mesti landscape (lebar > tinggi). Sila pilih gambar landscape.', false);
+                input.value = '';
+                return;
+            }
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('session_id', sessionId);
+            try {
+                const res = await fetch('/api/report/upload-image', { method: 'POST', body: fd });
+                const result = await res.json();
+                if (result.ok) {
+                    showToast(`Gambar ${result.count}/${result.max} berjaya dimuat naik.`, true);
+                    await _refreshReportImages();
+                } else {
+                    showToast(result.error || 'Gagal muat naik gambar.', false);
+                }
+            } catch (_) { showToast('Gagal muat naik gambar.', false); }
+            input.value = '';
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+async function _refreshReportImages() {
+    try {
+        const res = await fetch(`/api/report/images?session_id=${encodeURIComponent(sessionId)}`);
+        const data = await res.json();
+        const images = data.images || [];
+        const grid = document.getElementById('reportImgGrid');
+        const counter = document.getElementById('reportImgCounter');
+        const addBtn = document.getElementById('reportImgAddBtn');
+        if (grid) {
+            grid.innerHTML = images.map((img, i) => `
+                <div class="report-img-thumb">
+                    <img src="${img.url}" alt="Gambar ${i + 1}">
+                    <button class="report-img-remove" onclick="removeReportImage(${i})" title="Buang gambar">✕</button>
+                    <div class="report-img-label">Gambar ${i + 1}</div>
+                </div>`).join('');
+        }
+        if (counter) counter.textContent = images.length;
+        if (addBtn) addBtn.style.display = images.length >= (data.max || 4) ? 'none' : 'inline-flex';
+    } catch (_) {}
+}
+
+async function removeReportImage(index) {
+    try {
+        const res = await fetch(`/api/report/image/${index}?session_id=${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+        const result = await res.json();
+        if (result.ok) await _refreshReportImages();
+        else showToast('Gagal membuang gambar.', false);
+    } catch (_) {}
 }
 
 // ═══ Document actions ═══
@@ -998,8 +1107,8 @@ async function sendMessage() {
     try {
         const endpoint = currentAgent ? '/api/agent-chat' : '/api/chat';
         const body = currentAgent
-            ? { message, session_id: sessionId, agent: currentAgent }
-            : { message, session_id: sessionId };
+            ? { message, session_id: sessionId, agent: currentAgent, lang: currentLang }
+            : { message, session_id: sessionId, lang: currentLang };
         const res = await fetch(endpoint, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -1049,16 +1158,31 @@ document.querySelectorAll('.agent-card').forEach(card => {
 
 let _lhActiveTab = 'letterhead';
 
+let _lhReturnToCanvas = false;
+
 function openLhPage() {
+    _lhReturnToCanvas = false;
     landingPage.style.display = 'none';
     agentCanvas.style.display = 'none';
     document.getElementById('lhPage').style.display = 'flex';
     loadLhList();
 }
 
+function showLetterheadPage() {
+    _lhReturnToCanvas = true;
+    agentCanvas.style.display = 'none';
+    landingPage.style.display = 'none';
+    document.getElementById('lhPage').style.display = 'flex';
+    loadLhList();
+}
+
 function closeLhPage() {
     document.getElementById('lhPage').style.display = 'none';
-    landingPage.style.display = '';
+    if (_lhReturnToCanvas) {
+        agentCanvas.style.display = 'flex';
+    } else {
+        landingPage.style.display = '';
+    }
 }
 
 function switchLhTab(tab) {
@@ -1209,7 +1333,7 @@ document.querySelectorAll('.lh-tab').forEach(tab => {
     tab.addEventListener('click', () => switchLhTab(tab.dataset.tab));
 });
 
-document.getElementById('lhSettingsBtn').addEventListener('click', openLhPage);
+document.getElementById('lhSettingsBtn')?.addEventListener('click', openLhPage);
 document.getElementById('lhBackBtn').addEventListener('click', closeLhPage);
 document.getElementById('adminBtn').addEventListener('click', openAdminPage);
 document.getElementById('adminBackBtn').addEventListener('click', closeAdminPage);

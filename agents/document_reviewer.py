@@ -146,8 +146,10 @@ def _check_placeholders(text: str) -> list[dict]:
     return issues
 
 
-def handle(query: str, history: list[dict] | None = None, session_id: str = "default") -> str:
+def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm") -> str:
     if query == '__INTRO__':
+        if lang == "en":
+            return "Assalamualaikum and welcome! 📝 I am the Document Review Agent. Upload your PDF or Word document using the 📎 button, or paste the document text directly here. I will check grammar, format, spelling and compliance with official KPM format. Which document would you like to review today?"
         return "Assalamualaikum dan selamat datang! 📝 Saya Semakan Dokumen Agent. Muat naik dokumen PDF atau Word tuan/puan menggunakan butang 📎, atau tampal teks dokumen terus ke sini. Saya akan menyemak tatabahasa, format, ejaan dan pematuhan format rasmi KPM. Dokumen apa yang ingin tuan/puan semak hari ini?"
 
     session = _get_session(session_id)
@@ -177,6 +179,9 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
     else:
         extra_instruction = ""
 
+    lang_note = "\n\nIMPORTANT: The user has selected English. You MUST respond entirely in English. All 'message', 'summary', 'issues', and other text fields in your JSON response must be in English." if lang == "en" else ""
+    system_content = _SYSTEM_PROMPT + lang_note
+
     if document:
         placeholder_issues = _check_placeholders(document)
 
@@ -186,7 +191,7 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
         ) + extra_instruction
 
         messages = [
-            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "system", "content": system_content},
         ]
         if history:
             for msg in history[-4:]:
@@ -213,7 +218,7 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
         return raw
     else:
         messages = [
-            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "system", "content": system_content},
         ]
         if history:
             for msg in history[-6:]:

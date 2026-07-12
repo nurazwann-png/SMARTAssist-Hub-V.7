@@ -23,6 +23,9 @@ from agents.report_generator import (
     build_docx as rg_build_docx,
     send_email as rg_send_email,
     get_session_info as rg_get_session,
+    add_report_image as rg_add_image,
+    remove_report_image as rg_remove_image,
+    get_report_images as rg_get_images,
 )
 
 app = FastAPI(title="SMARTAssist Hub", version="7.0")
@@ -73,6 +76,7 @@ class AgentChatRequest(BaseModel):
     message: str
     session_id: str = "default"
     agent: str = ""
+    lang: str = "bm"
 
 
 @app.post("/api/chat")
@@ -240,6 +244,40 @@ async def save_report(req: "SaveDocRequest"):
 async def send_report_email(req: "EmailRequest"):
     result = rg_send_email(req.session_id, req.to_email, req.subject)
     return JSONResponse(result)
+
+
+@app.post("/api/report/upload-image")
+async def report_upload_image(file: UploadFile = File(...), session_id: str = Form("default")):
+    contents = await file.read()
+    result = rg_add_image(session_id, contents, file.filename or "image.jpg")
+    return JSONResponse(result)
+
+
+@app.get("/api/report/images")
+async def report_get_images(session_id: str = "default"):
+    images = rg_get_images(session_id)
+    return JSONResponse({
+        "images": [
+            {"index": i, "filename": img["filename"], "url": f"/api/report/image-file/{img['safe_name']}"}
+            for i, img in enumerate(images)
+        ],
+        "count": len(images),
+        "max": 4,
+    })
+
+
+@app.delete("/api/report/image/{index}")
+async def report_delete_image(index: int, session_id: str = "default"):
+    result = rg_remove_image(session_id, index)
+    return JSONResponse(result)
+
+
+@app.get("/api/report/image-file/{safe_name}")
+async def report_image_file(safe_name: str):
+    p = _Path("static/report_images") / safe_name
+    if not p.exists():
+        return JSONResponse({"error": "Fail tidak ditemui."}, status_code=404)
+    return _FileResponse(str(p))
 
 
 class SaveDocRequest(BaseModel):
@@ -499,6 +537,8 @@ async def agent_chat(req: AgentChatRequest):
             kwargs = {"query": req.message, "history": history}
             if "session_id" in sig.parameters:
                 kwargs["session_id"] = req.session_id
+            if "lang" in sig.parameters:
+                kwargs["lang"] = req.lang
             output = module.handle(**kwargs)
 
             # JSON retry: if agent expects JSON but output fails to parse, try once more
@@ -507,7 +547,8 @@ async def agent_chat(req: AgentChatRequest):
                 try:
                     json.loads(output)
                 except (json.JSONDecodeError, ValueError):
-                    retry_kwargs = {**kwargs, "query": req.message + "\n\n[SISTEM: Balas HANYA dalam format JSON yang sah. Tiada teks lain di luar JSON.]"}
+                    sys_note = "[SYSTEM: Reply ONLY in valid JSON format. No text outside JSON.]" if req.lang == "en" else "[SISTEM: Balas HANYA dalam format JSON yang sah. Tiada teks lain di luar JSON.]"
+                    retry_kwargs = {**kwargs, "query": req.message + f"\n\n{sys_note}"}
                     try:
                         output = module.handle(**retry_kwargs)
                     except Exception:

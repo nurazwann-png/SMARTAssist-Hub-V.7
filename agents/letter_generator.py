@@ -198,8 +198,10 @@ Sekian, harap maklum.
 "MALAYSIA MADANI" """
 
 
-def handle(query: str, history: list[dict] | None = None, session_id: str = "default") -> str:
+def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm") -> str:
     if query == '__INTRO__':
+        if lang == "en":
+            return "Assalamualaikum and welcome! ✉️ I am the Official Letter Generator. I will help you prepare official letters, memos and circulars according to the correct KPM format. Could you tell me what type of letter you need and the basic information?"
         return "Assalamualaikum dan selamat datang! ✉️ Saya Penjana Surat Rasmi. Saya akan membantu tuan/puan menyediakan surat rasmi, memo dan surat siaran mengikut format KPM yang betul. Boleh beritahu saya apakah jenis surat yang perlu disediakan dan maklumat asasnya?"
 
     session = _get_session(session_id)
@@ -225,7 +227,8 @@ Kembalikan HANYA dokumen yang telah dikemaskini dalam format JSON:
         now = datetime.now()
         date_str = now.strftime("%#d %B %Y") if os.name == "nt" else now.strftime("%-d %B %Y")
         system_prompt = _SYSTEM_PROMPT_TEMPLATE.replace("{current_date}", date_str).replace("{current_year}", str(now.year))
-        patch_messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": patch_prompt}]
+        _patch_lang_note = "\n\nIMPORTANT: The user has selected English. You MUST respond entirely in English for all 'message' fields." if lang == "en" else ""
+        patch_messages = [{"role": "system", "content": system_prompt + _patch_lang_note}, {"role": "user", "content": patch_prompt}]
         try:
             raw = chat_completion(messages=patch_messages, temperature=0.2, max_tokens=3000)
             parsed = _try_parse_json(raw)
@@ -249,9 +252,10 @@ Status sesi semasa:
     now = datetime.now()
     date_str = now.strftime("%#d %B %Y") if os.name == "nt" else now.strftime("%-d %B %Y")
     system_prompt = _SYSTEM_PROMPT_TEMPLATE.replace("{current_date}", date_str).replace("{current_year}", str(now.year))
+    lang_note = "\n\nIMPORTANT: The user has selected English. You MUST respond entirely in English. All 'message' and text fields in your JSON response must be in English. The generated document content should remain in Malay as it is an official KPM document." if lang == "en" else ""
 
     messages = [
-        {"role": "system", "content": system_prompt + context_info},
+        {"role": "system", "content": system_prompt + context_info + lang_note},
     ]
     if history:
         for msg in history[-10:]:
