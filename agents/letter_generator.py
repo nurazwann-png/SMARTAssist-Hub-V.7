@@ -92,7 +92,9 @@ FORMAT OUTPUT — balas HANYA dalam JSON:
 PHASES:
 - Phase 0: Kenal pasti jenis dokumen (surat/memo). Jika pengguna minta tukar jenis, pindahkan field yang sama.
 - Phase 1: Kumpul maklumat secara berperingkat (satu field setiap giliran). JANGAN tanya "isi" — isi akan dijana automatik.
-- Phase 2: JANA ISI KANDUNGAN SECARA AUTOMATIK berdasarkan tajuk dan semua maklumat yang dikumpul. Tulis isi surat/memo dalam gaya rasmi KPM — bernombor perenggan (2., 3., 4. dst), bahasa formal, lengkap dan profesional. Simpan hasil dalam fields_collected dengan key "isi". Jika maklumat tidak mencukupi untuk menjana isi yang bermakna (cth: tajuk terlalu umum), tanya pengguna soalan spesifik untuk mendapat konteks tambahan (cth: "Boleh nyatakan tujuan utama dan jumlah yang dipohon?"). JANGAN minta pengguna tulis isi sendiri.
+- Phase 2: JANA ISI KANDUNGAN SECARA AUTOMATIK berdasarkan tajuk dan semua maklumat yang dikumpul. Simpan hasil dalam fields_collected dengan key "isi". Jika maklumat tidak mencukupi untuk menjana isi yang bermakna (cth: tajuk terlalu umum), tanya pengguna soalan spesifik untuk mendapat konteks tambahan (cth: "Boleh nyatakan tujuan utama dan jumlah yang dipohon?"). JANGAN minta pengguna tulis isi sendiri.
+  * Untuk SURAT: tulis isi dengan bernombor perenggan (2., 3., 4. dst), bahasa formal, lengkap dan profesional.
+  * Untuk MEMO: tulis SATU ayat pendahuluan SAHAJA untuk perenggan 2 — contoh: "Sukacita dimaklumkan bahawa mesyuarat akan diadakan seperti berikut:". JANGAN masukkan tarikh/masa/tempat dalam field 'isi' — ia akan dipaparkan secara berasingan dari field tarikh_acara, masa_acara, tempat_acara.
 - Phase 3: Tunjukkan pratonton dokumen lengkap — SEMAK tiada [PLACEHOLDER] kekal
 - Phase 4: Dokumen disahkan dan sedia untuk dimuat turun / dihantar emel
 
@@ -103,19 +105,16 @@ Untuk memo: rujukan, tarikh, pengerusi, penyelaras, ahli, urus_setia, tajuk, tar
 FORMAT TEMPLATE YANG MESTI DIIKUTI:
 
 === SURAT RASMI ===
-Ruj. Kami : [rujukan]
-Tarikh : [tarikh]
-
-[penerima_nama]
-[penerima_jawatan]
+[penerima_nama]                                 No. Rujukan : [rujukan]
+[penerima_jawatan]                              Tarikh      : [tarikh]
 [penerima_organisasi]
 [penerima_alamat]
 
-Tuan/Puan,
+[Panggilan Hormat — contoh: Tuan/Puan, atau Yang Berbahagia Dato',]
 
-[TAJUK SURAT DALAM HURUF BESAR]
+[TAJUK SURAT DALAM HURUF BESAR DAN TENGAH]
 
-Dengan hormatnya perkara di atas adalah dirujuk.
+    Dengan hormatnya perkara di atas adalah dirujuk.
 
 2.  [perenggan isi pertama]
 3.  [perenggan isi kedua jika ada]
@@ -220,6 +219,23 @@ def _build_document(doc_type: str, fields: dict) -> str:
     return _build_surat(fields)
 
 
+def _auto_panggilan(nama: str) -> str:
+    n = nama.upper()
+    if any(t in n for t in ["TAN SRI", "TUN "]):
+        return "Yang Amat Berbahagia"
+    if any(t in n for t in ["DATO'", "DATO ", "DATIN", "YBHG", "YBHg."]):
+        return "Yang Berbahagia"
+    if n.startswith("YB ") or " YB " in n:
+        return "Yang Berhormat"
+    if "PROF." in n or "PROFESOR" in n:
+        return "Yang Dihormati Prof."
+    if "DR." in n or " DR " in n:
+        return "Yang Dihormati Dr."
+    if any(t in n for t in ["PUAN", "CIK", "DATIN"]):
+        return "Puan"
+    return "Tuan/Puan"
+
+
 def _build_surat(f: dict) -> str:
     sk = f.get("salinan_kepada", "")
     sk_lines = ""
@@ -228,19 +244,33 @@ def _build_surat(f: dict) -> str:
         if items:
             sk_lines = "\n\ns.k.:\n" + "\n".join(f"{i+1}. {item}" for i, item in enumerate(items))
 
-    return f"""Ruj. Kami : {f.get('rujukan', '[PLACEHOLDER]')}
-Tarikh    : {f.get('tarikh', '[PLACEHOLDER]')}
+    # Two-column header: penerima (left) | Ruj.Kami + Tarikh (right)
+    LEFT_W = 48
+    penerima_rows = [
+        f.get('penerima_nama', '[PLACEHOLDER]'),
+        f.get('penerima_jawatan', '[PLACEHOLDER]'),
+        f.get('penerima_organisasi', '[PLACEHOLDER]'),
+        f.get('penerima_alamat', '[PLACEHOLDER]'),
+    ]
+    right_rows = [
+        f"No. Rujukan : {f.get('rujukan', '[PLACEHOLDER]')}",
+        f"Tarikh      : {f.get('tarikh', '[PLACEHOLDER]')}",
+    ]
+    header_lines = []
+    for i in range(max(len(penerima_rows), len(right_rows))):
+        left = penerima_rows[i] if i < len(penerima_rows) else ""
+        right = right_rows[i] if i < len(right_rows) else ""
+        header_lines.append(f"{left:<{LEFT_W}}{right}".rstrip())
 
-{f.get('penerima_nama', '[PLACEHOLDER]')}
-{f.get('penerima_jawatan', '[PLACEHOLDER]')}
-{f.get('penerima_organisasi', '[PLACEHOLDER]')}
-{f.get('penerima_alamat', '[PLACEHOLDER]')}
+    panggilan = _auto_panggilan(f.get('penerima_nama', ''))
 
-Tuan/Puan,
+    return "\n".join(header_lines) + f"""
+
+{panggilan},
 
 {f.get('tajuk', '[PLACEHOLDER]').upper()}
 
-Dengan hormatnya perkara di atas adalah dirujuk.
+    Dengan hormatnya perkara di atas adalah dirujuk.
 
 {f.get('isi', '[PLACEHOLDER]')}
 
@@ -263,18 +293,19 @@ def _build_memo(f: dict) -> str:
     else:
         ahli_list = ['[PLACEHOLDER]']
 
-    ahli_lines = f"          | Ahli       : {ahli_list[0]}\n"
+    # Col1=9chars, Col2=12chars — ensures all colons align at same position
+    ahli_lines = f"          | {'Ahli':<12}: {ahli_list[0]}\n"
     for ahli in ahli_list[1:]:
-        ahli_lines += f"          |             : {ahli}\n"
+        ahli_lines += f"          | {'':12}: {ahli}\n"
 
     return f"""MEMO DALAMAN
 
-Kepada    | Pengerusi  : {f.get('pengerusi', '[PLACEHOLDER]')}
-          | Penyelaras : {f.get('penyelaras', '[PLACEHOLDER]')}
-{ahli_lines}Daripada  | Urus setia : {f.get('urus_setia', '[PLACEHOLDER]')}
-Tarikh               : {f.get('tarikh', '[PLACEHOLDER]')}
-Perkara              : {f.get('tajuk', '[PLACEHOLDER]').upper()}
-Ruj. Kami            : {f.get('rujukan', '[PLACEHOLDER]')}
+{'Kepada':<10}| {'Pengerusi':<12}: {f.get('pengerusi', '[PLACEHOLDER]')}
+{'':10}| {'Penyelaras':<12}: {f.get('penyelaras', '[PLACEHOLDER]')}
+{ahli_lines}{'Daripada':<10}| {'Urus setia':<12}: {f.get('urus_setia', '[PLACEHOLDER]')}
+{'Tarikh':<10}| {'':12}: {f.get('tarikh', '[PLACEHOLDER]')}
+{'Perkara':<10}| {'':12}: {f.get('tajuk', '[PLACEHOLDER]').upper()}
+{'Ruj. Kami':<10}| {'':12}: {f.get('rujukan', '[PLACEHOLDER]')}
 
 Tuan,
 
@@ -282,9 +313,9 @@ Dengan segala hormatnya saya diarah merujuk kepada perkara di atas.
 
 2.  {f.get('isi', '[PLACEHOLDER]')}
 
-    Tarikh  : {f.get('tarikh_acara', '[PLACEHOLDER]')}
-    Masa    : {f.get('masa_acara', '[PLACEHOLDER]')}
-    Tempat  : {f.get('tempat_acara', '[PLACEHOLDER]')}
+    {'Tarikh':<8}: {f.get('tarikh_acara', '[PLACEHOLDER]')}
+    {'Masa':<8}: {f.get('masa_acara', '[PLACEHOLDER]')}
+    {'Tempat':<8}: {f.get('tempat_acara', '[PLACEHOLDER]')}
 
 3.  Kehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.
 
@@ -474,46 +505,143 @@ def build_docx(session_id: str) -> bytes | None:
     if doc_type == "memo":
         _build_memo_docx(doc, fields)
     else:
-        _build_surat_docx(doc, doc_text)
+        _build_surat_docx(doc, doc_text, fields)
 
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
 
 
-def _build_surat_docx(doc, doc_text: str):
-    from docx.shared import Pt
+def _build_surat_docx(doc, doc_text: str, fields: dict = None):
+    from docx.shared import Pt, Cm
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
 
-    lines = doc_text.split("\n")
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            doc.add_paragraph("")
-            continue
+    def _no_border(tbl):
+        tbl_pr = tbl._tbl.get_or_add_tblPr()
+        tbl_borders = OxmlElement('w:tblBorders')
+        for edge in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
+            b = OxmlElement(f'w:{edge}')
+            b.set(qn('w:val'), 'none')
+            tbl_borders.append(b)
+        tbl_pr.append(tbl_borders)
 
-        para = doc.add_paragraph()
-        para.paragraph_format.space_after = Pt(0)
-        para.paragraph_format.space_before = Pt(0)
-        para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    if fields:
+        # Two-column header table: penerima (left) | Ruj.Kami + Tarikh (right)
+        tbl = doc.add_table(rows=1, cols=2)
+        _no_border(tbl)
+        tbl.columns[0].width = Cm(10)
+        tbl.columns[1].width = Cm(7)
 
-        is_bold = False
-        if stripped.startswith(("Ruj. Kami", "Tarikh")):
-            para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        elif stripped.startswith('"') and stripped.endswith('"'):
-            is_bold = True
-            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        elif stripped.startswith("s.k.:"):
-            is_bold = True
-        elif stripped == stripped.upper() and len(stripped) > 5 and stripped[0].isalpha():
-            is_bold = True
-            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        row = tbl.rows[0]
+        # Penerima cell
+        left_cell = row.cells[0]
+        left_cell.width = Cm(10)
+        left_cell._tc.clear_content()
+        for line in [
+            fields.get('penerima_nama', ''),
+            fields.get('penerima_jawatan', ''),
+            fields.get('penerima_organisasi', ''),
+            fields.get('penerima_alamat', ''),
+        ]:
+            p = left_cell.add_paragraph(line)
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.space_before = Pt(0)
 
-        run = para.add_run(stripped)
-        run.font.size = Pt(11)
-        run.font.name = "Arial"
-        if is_bold:
-            run.bold = True
+        # Ruj/Tarikh cell
+        right_cell = row.cells[1]
+        right_cell.width = Cm(7)
+        right_cell._tc.clear_content()
+        for line in [
+            f"No. Rujukan : {fields.get('rujukan', '')}",
+            f"Tarikh      : {fields.get('tarikh', '')}",
+        ]:
+            p = right_cell.add_paragraph(line)
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.space_before = Pt(0)
+
+        doc.add_paragraph("")
+
+        panggilan = _auto_panggilan(fields.get('penerima_nama', ''))
+        doc.add_paragraph(f"{panggilan},").paragraph_format.space_after = Pt(0)
+        doc.add_paragraph("")
+
+        tajuk_para = doc.add_paragraph()
+        tajuk_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        tajuk_run = tajuk_para.add_run(fields.get('tajuk', '').upper())
+        tajuk_run.bold = True
+        tajuk_run.font.size = Pt(11)
+        doc.add_paragraph("")
+
+        # Body from doc_text: skip the header lines, start from "Dengan hormatnya"
+        lines = doc_text.split("\n")
+        body_started = False
+        for line in lines:
+            stripped = line.strip()
+            if not body_started:
+                if "Dengan hormatnya" in stripped or "Dengan hormat" in stripped:
+                    body_started = True
+                else:
+                    continue
+
+            if not stripped:
+                doc.add_paragraph("")
+                continue
+
+            para = doc.add_paragraph()
+            para.paragraph_format.space_after = Pt(0)
+            para.paragraph_format.space_before = Pt(0)
+
+            is_bold = False
+            if stripped.startswith('"') and stripped.endswith('"'):
+                is_bold = True
+                para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            elif stripped.startswith("s.k.:"):
+                is_bold = True
+                para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            elif stripped == stripped.upper() and len(stripped) > 5 and stripped[0].isalpha():
+                is_bold = True
+                para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            else:
+                para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+
+            # Indent opening paragraph
+            if stripped.startswith("Dengan hormatnya"):
+                para.paragraph_format.first_line_indent = Cm(1.27)
+
+            run = para.add_run(stripped)
+            run.font.size = Pt(11)
+            run.font.name = "Arial"
+            if is_bold:
+                run.bold = True
+    else:
+        # Fallback: plain line-by-line rendering
+        lines = doc_text.split("\n")
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                doc.add_paragraph("")
+                continue
+            para = doc.add_paragraph()
+            para.paragraph_format.space_after = Pt(0)
+            para.paragraph_format.space_before = Pt(0)
+            para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            is_bold = False
+            if stripped.startswith('"') and stripped.endswith('"'):
+                is_bold = True
+                para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            elif stripped.startswith("s.k.:"):
+                is_bold = True
+            elif stripped == stripped.upper() and len(stripped) > 5 and stripped[0].isalpha():
+                is_bold = True
+                para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = para.add_run(stripped)
+            run.font.size = Pt(11)
+            run.font.name = "Arial"
+            if is_bold:
+                run.bold = True
 
 
 def _build_memo_docx(doc, fields: dict):
