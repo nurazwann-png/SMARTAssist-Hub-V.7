@@ -306,7 +306,10 @@ async function sendFarewell() {
     const msgs = canvasMessages.querySelectorAll('.message');
     if (msgs.length === 0) return;
     const info = getAgentInfo(currentAgent);
-    addMessage(`Terima kasih kerana menggunakan khidmat SMARTAssist Hub ${info.name}. Semoga hari tuan/puan menyenangkan! 😊`, 'assistant', info.icon, info.name);
+    const farewellMsg = currentLang === 'en'
+        ? `Thank you for using SMARTAssist Hub ${info.name}. Have a great day! 😊`
+        : `Terima kasih kerana menggunakan khidmat SMARTAssist Hub ${info.name}. Semoga hari tuan/puan menyenangkan! 😊`;
+    addMessage(farewellMsg, 'assistant', info.icon, info.name);
     await new Promise(r => setTimeout(r, 2500));
 }
 
