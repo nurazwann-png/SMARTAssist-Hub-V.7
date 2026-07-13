@@ -975,11 +975,12 @@ function recolorChart(wrapper, expanded) {
     const txtColor   = expanded ? '#1e293b' : '#94a3b8';
     const titleColor = expanded ? '#0f172a' : '#f1f5f9';
     const gridColor  = expanded ? '#e2e8f0' : '#334155';
-    chartInstance.canvas.style.background = 'transparent';
+    chartInstance.canvas.style.background = expanded ? '#ffffff' : 'transparent';
     chartInstance.options.plugins.title.color = titleColor;
     chartInstance.options.plugins.title.font = { size: expanded ? 18 : 14, weight: 'bold' };
     chartInstance.options.plugins.legend.labels.color = txtColor;
     chartInstance.options.plugins.legend.labels.font = { size: expanded ? 14 : 12 };
+    chartInstance.options.layout = { padding: { top: expanded ? 16 : 4, bottom: expanded ? 70 : 8, left: expanded ? 8 : 0, right: expanded ? 16 : 0 } };
     if (chartInstance.options.scales.x) {
         chartInstance.options.scales.x.ticks.color = txtColor;
         chartInstance.options.scales.x.ticks.font = { size: expanded ? 12 : 11 };
