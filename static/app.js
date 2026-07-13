@@ -407,7 +407,7 @@ async function refreshHistory() {
             historyList.innerHTML = '<div class="history-empty">Tiada sejarah sesi lagi.</div>';
             return;
         }
-        historyList.innerHTML = sessions.map(s => {
+        const buildItem = s => {
             const info = s.agent ? getAgentInfo(s.agent) : { icon: '\u{1F4AC}', name: s.agent };
             const time = new Date(s.updated).toLocaleString('ms-MY', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
             return `<div class="history-item" onclick="loadSession('${escapeAttr(s.session_id)}', '${escapeAttr(s.agent)}')">
@@ -418,7 +418,22 @@ async function refreshHistory() {
                 </div>
                 <button class="history-item-delete" onclick="event.stopPropagation(); deleteSession('${escapeAttr(s.session_id)}')" title="Padam">&times;</button>
             </div>`;
-        }).join('');
+        };
+        const recent = sessions.slice(0, 10);
+        const older  = sessions.slice(10);
+        let html = recent.map(buildItem).join('');
+        if (older.length > 0) {
+            html += `
+            <div class="history-older-toggle" onclick="this.classList.toggle('open')">
+                <span class="history-older-icon">🗂️</span>
+                <span class="history-older-label">Sesi Lama <span class="history-older-count">${older.length}</span></span>
+                <span class="history-older-chevron">›</span>
+            </div>
+            <div class="history-older-list">
+                ${older.map(buildItem).join('')}
+            </div>`;
+        }
+        historyList.innerHTML = html;
     } catch (_) {
         historyList.innerHTML = '<div class="history-empty">Gagal memuatkan sejarah.</div>';
     }

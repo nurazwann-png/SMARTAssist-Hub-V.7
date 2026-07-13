@@ -273,6 +273,34 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 .history-item:hover .history-item-delete { opacity: 1; }
 .history-item-delete:hover { color: var(--red); }
 
+/* Collapsible older sessions */
+.history-older-toggle {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; margin: 8px 0 0;
+    border-radius: 10px; cursor: pointer;
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    transition: background 0.2s;
+}
+.history-older-toggle:hover { background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3); }
+.history-older-icon { font-size: 15px; flex-shrink: 0; }
+.history-older-label { flex: 1; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.history-older-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; height: 18px; padding: 0 5px;
+    background: rgba(99,102,241,0.18); color: var(--indigo);
+    border-radius: 20px; font-size: 11px; font-weight: 700; margin-left: 4px;
+}
+.history-older-chevron {
+    font-size: 18px; color: var(--text-secondary);
+    transition: transform 0.25s; line-height: 1; transform: rotate(90deg);
+}
+.history-older-toggle.open .history-older-chevron { transform: rotate(270deg); }
+.history-older-list {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+.history-older-toggle.open + .history-older-list { max-height: 2000px; }
+
 /* ═══════════════════════════════════════
    AGENT CANVAS
    ═══════════════════════════════════════ */
