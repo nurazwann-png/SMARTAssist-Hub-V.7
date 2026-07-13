@@ -545,6 +545,23 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 }
 .ff-submit-btn:hover { background: #4f46e5; }
 .ff-submit-btn:disabled { background: #a5b4fc; cursor: not-allowed; }
+.ff-ahli-list { display: flex; flex-direction: column; gap: 6px; }
+.ff-ahli-row { display: flex; gap: 6px; align-items: center; }
+.ff-ahli-row .ff-ahli-nama { flex: 2; }
+.ff-ahli-row .ff-ahli-jawatan { flex: 2; }
+.ff-ahli-remove {
+    flex: 0 0 auto; width: 28px; height: 28px; border: none; border-radius: 6px;
+    background: #ef4444; color: #fff; font-size: 13px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: background 0.15s;
+}
+.ff-ahli-remove:hover { background: #dc2626; }
+.ff-ahli-remove:disabled { background: #9ca3af; cursor: not-allowed; }
+.ff-ahli-add {
+    align-self: flex-start; margin-top: 2px; padding: 5px 12px; border: 1.5px dashed #6366f1;
+    border-radius: 7px; background: transparent; color: #6366f1; font-size: 12px;
+    cursor: pointer; transition: background 0.15s;
+}
+.ff-ahli-add:hover { background: rgba(99,102,241,0.08); }
 @media (prefers-color-scheme: dark) {
     .ff-input { background: #1e293b; color: #f1f5f9; border-color: #334155; }
     .ff-input:focus { border-color: #818cf8; background: #0f172a; }

@@ -739,7 +739,7 @@ const _FIELD_DEFS = {
     'Perkara / Tajuk Memo (huruf besar)':     { type: 'text',     ph: 'TAJUK MEMO (HURUF BESAR)' },
     'Nama Pengerusi dan Jawatan':             { type: 'text',     ph: 'cth: Pn. Zainab bt. Ahmad, Pengetua' },
     'Nama Penyelaras dan Jawatan':            { type: 'text',     ph: 'cth: En. Farid bin Ismail, GPK HEM' },
-    'Nama Ahli-Ahli (pisahkan dengan koma)':  { type: 'textarea', ph: 'cth: Ahmad bin Ali, Siti binti Rahman...' },
+    'Nama Ahli-Ahli (pisahkan dengan koma)':  { type: 'ahli-list', ph: '' },
     'Nama Urus Setia dan Jawatan':            { type: 'text',     ph: 'cth: En. Farid bin Ismail, Guru' },
     'Masa Acara':                             { type: 'text',     ph: 'cth: 8.00 pagi' },
     'Tempat Acara':                           { type: 'text',     ph: 'cth: Bilik Mesyuarat Utama' },
@@ -783,7 +783,16 @@ function _buildMissingFieldsForm(missingLabels) {
         const iid = `${fid}_${label.replace(/\W/g,'_')}`;
         html += `<div class="ff-field">
             <label class="ff-label" for="${iid}">${escapeHtml(label)}</label>`;
-        if (def.type === 'textarea') {
+        if (def.type === 'ahli-list') {
+            html += `<div class="ff-ahli-list" id="${iid}" data-label="${escapeAttr(label)}">
+                <div class="ff-ahli-row">
+                    <input class="ff-input ff-ahli-nama" type="text" placeholder="Nama ahli">
+                    <input class="ff-input ff-ahli-jawatan" type="text" placeholder="Jawatan">
+                    <button type="button" class="ff-ahli-remove" onclick="_removeAhliRow(this)" title="Buang">✕</button>
+                </div>
+            </div>
+            <button type="button" class="ff-ahli-add" onclick="_addAhliRow('${iid}')">＋ Tambah Ahli</button>`;
+        } else if (def.type === 'textarea') {
             html += `<textarea class="ff-input" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}" rows="2"></textarea>`;
         } else if (def.type === 'date') {
             html += `<input class="ff-input ff-date" type="date" id="${iid}" data-label="${escapeAttr(label)}" data-is-date="1" onchange="_onDateChange(this,'${fid}')">`;
@@ -807,16 +816,43 @@ function _onDateChange(input, fid) {
     if (hariEl && !hariEl.value) hariEl.value = day;
 }
 
+function _addAhliRow(listId) {
+    const list = document.getElementById(listId);
+    if (!list) return;
+    const row = document.createElement('div');
+    row.className = 'ff-ahli-row';
+    row.innerHTML = `<input class="ff-input ff-ahli-nama" type="text" placeholder="Nama ahli">
+        <input class="ff-input ff-ahli-jawatan" type="text" placeholder="Jawatan">
+        <button type="button" class="ff-ahli-remove" onclick="_removeAhliRow(this)" title="Buang">✕</button>`;
+    list.appendChild(row);
+}
+
+function _removeAhliRow(btn) {
+    const list = btn.closest('.ff-ahli-list');
+    if (!list) return;
+    if (list.querySelectorAll('.ff-ahli-row').length <= 1) return;
+    btn.closest('.ff-ahli-row').remove();
+}
+
 function _submitFieldsForm(fid) {
     const form = document.getElementById(fid);
     if (!form) return;
-    const inputs = form.querySelectorAll('[data-label]');
     const parts = [];
-    inputs.forEach(el => {
-        let val = el.value.trim();
-        if (!val) return;
-        if (el.dataset.isDate) val = _formatDateMS(val);
-        parts.push(`${el.dataset.label}: ${val}`);
+    form.querySelectorAll('[data-label]').forEach(el => {
+        if (el.classList.contains('ff-ahli-list')) {
+            const entries = [];
+            el.querySelectorAll('.ff-ahli-row').forEach(row => {
+                const nama = row.querySelector('.ff-ahli-nama').value.trim();
+                const jawatan = row.querySelector('.ff-ahli-jawatan').value.trim();
+                if (nama) entries.push(jawatan ? `${nama} (${jawatan})` : nama);
+            });
+            if (entries.length) parts.push(`${el.dataset.label}: ${entries.join(', ')}`);
+        } else {
+            let val = el.value.trim();
+            if (!val) return;
+            if (el.dataset.isDate) val = _formatDateMS(val);
+            parts.push(`${el.dataset.label}: ${val}`);
+        }
     });
     if (parts.length === 0) { showToast('Sila isi sekurang-kurangnya satu medan.', false); return; }
     form.querySelectorAll('input,textarea,button').forEach(el => el.disabled = true);
