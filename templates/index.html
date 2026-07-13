@@ -244,57 +244,86 @@
     <!-- ═══ Agent Canvas (one per agent, created dynamically) ═══ -->
     <div class="agent-canvas" id="agentCanvas" style="display:none;">
 
-        <!-- Left Sidebar -->
-        <div class="canvas-sidebar" id="canvasSidebar">
-            <button class="back-btn sidebar-back-btn" id="backBtn">&#8592; Kembali</button>
-            <div class="sidebar-nav" id="agentNavBar"></div>
-            <div class="sidebar-tools" id="sidebarTools" style="display:none;">
-                <div class="sidebar-tools-title">Tetapan</div>
-                <button class="sidebar-tool-btn" id="sidebarLhBtn" onclick="showLetterheadPage();">
-                    &#128196; Kepala Surat &amp; Logo
-                </button>
-            </div>
-        </div>
+        <!-- Left Sidebar (emptied) -->
+        <div class="canvas-sidebar" id="canvasSidebar" style="display:none;"></div>
 
         <!-- Main Chat Area -->
         <div class="canvas-main" id="canvasMain">
             <div class="canvas-header">
-                <div class="canvas-agent-info">
-                    <span class="canvas-agent-icon" id="canvasAgentIcon"></span>
-                    <span class="canvas-agent-name" id="canvasAgentName"></span>
+                <div class="canvas-header-top">
+                    <div class="canvas-header-left">
+                        <button class="back-btn" id="backBtn">&#8592; Kembali</button>
+                        <div class="canvas-agent-info">
+                            <span class="canvas-agent-icon" id="canvasAgentIcon"></span>
+                            <span class="canvas-agent-name" id="canvasAgentName"></span>
+                        </div>
+                    </div>
+                    <div class="canvas-actions">
+                        <button class="canvas-action-btn" id="canvasHistoryBtn" title="Sejarah">&#128337;</button>
+                        <button class="canvas-action-btn" id="canvasNewBtn" title="Sesi Baharu">&#43;</button>
+                    </div>
                 </div>
-                <div class="canvas-actions">
-                    <button class="canvas-action-btn" id="canvasHistoryBtn" title="Sejarah">&#128337;</button>
-                    <button class="canvas-action-btn" id="canvasNewBtn" title="Sesi Baharu">&#43;</button>
+                <div class="canvas-header-nav">
+                    <div class="canvas-nav-agents" id="agentNavBar"></div>
+                    <div class="canvas-nav-tools" id="sidebarTools" style="display:none;">
+                        <button class="canvas-nav-tool-btn" id="sidebarLhBtn" onclick="showLetterheadPage();">
+                            &#128196; Kepala Surat &amp; Logo
+                        </button>
+                    </div>
                 </div>
             </div>
 
-        <div class="canvas-messages" id="canvasMessages">
-            <div class="canvas-welcome" id="canvasWelcome">
-                <div class="canvas-welcome-icon" id="canvasWelcomeIcon"></div>
-                <h2 id="canvasWelcomeTitle"></h2>
-                <p id="canvasWelcomeDesc"></p>
-                <div class="canvas-quick-actions" id="canvasQuickActions"></div>
-            </div>
-            <div class="typing-indicator" id="typingIndicator">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
-        </div>
+        <div class="canvas-body">
 
-        <div id="fileIndicator" class="file-indicator" style="display:none;">
-            <span id="fileIndicatorText"></span>
-            <button id="fileRemoveBtn" class="file-remove-btn">&times;</button>
-        </div>
-        <div class="canvas-input-bar">
-            <div class="input-wrapper">
-                <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display:none;">
-                <button class="upload-btn" id="uploadBtn" title="Muat naik fail" style="display:none;">📎</button>
-                <textarea class="chat-input" id="chatInput" placeholder="Taip mesej anda di sini..." data-i18n-placeholder="input_placeholder" rows="1"></textarea>
-                <button class="send-btn" id="sendBtn">&#10148;</button>
+            <!-- LEFT: Chat Panel -->
+            <div class="chat-panel" id="chatPanel">
+                <div class="canvas-messages" id="canvasMessages">
+                    <div class="canvas-welcome" id="canvasWelcome">
+                        <div class="canvas-welcome-icon" id="canvasWelcomeIcon"></div>
+                        <h2 id="canvasWelcomeTitle"></h2>
+                        <p id="canvasWelcomeDesc"></p>
+                        <div class="canvas-quick-actions" id="canvasQuickActions"></div>
+                    </div>
+                    <div class="typing-indicator" id="typingIndicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+                <div id="fileIndicator" class="file-indicator" style="display:none;">
+                    <span id="fileIndicatorText"></span>
+                    <button id="fileRemoveBtn" class="file-remove-btn">&times;</button>
+                </div>
+                <div class="canvas-input-bar">
+                    <div class="input-wrapper">
+                        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display:none;">
+                        <button class="upload-btn" id="uploadBtn" title="Muat naik fail" style="display:none;">📎</button>
+                        <textarea class="chat-input" id="chatInput" placeholder="Taip mesej anda di sini..." data-i18n-placeholder="input_placeholder" rows="1"></textarea>
+                        <button class="send-btn" id="sendBtn">&#10148;</button>
+                    </div>
+                </div>
             </div>
-        </div>
+
+            <!-- RESIZE HANDLE -->
+            <div class="resize-handle" id="resizeHandle">
+                <div class="resize-grip"></div>
+            </div>
+
+            <!-- RIGHT: Work Panel -->
+            <div class="work-panel" id="workPanel">
+                <div class="work-panel-header">
+                    <span class="work-panel-icon" id="workPanelIcon">&#128196;</span>
+                    <span class="work-panel-title" id="workPanelTitle">Ruang Kerja</span>
+                </div>
+                <div class="work-panel-content" id="workPanelContent">
+                    <div class="work-panel-empty" id="workPanelEmpty">
+                        <div class="work-panel-empty-icon">&#10022;</div>
+                        <p>Borang dan pratonton dokumen yang dijana ejen akan dipaparkan di sini.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- end canvas-body -->
         </div><!-- end canvas-main -->
     </div><!-- end agent-canvas -->
 
@@ -400,6 +429,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=26"></script>
+    <script src="/static/app.js?v=29"></script>
 </body>
 </html>

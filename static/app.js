@@ -216,6 +216,14 @@ initParticles();
 function openAgent(agentKey, existingSessionId) {
     currentAgent = agentKey;
     _activeLetterMsgDiv = null;
+    _activeWorkItem = null;
+    _activeChatBubble = null;
+    const _wpContent = document.getElementById('workPanelContent');
+    const _wpEmpty = document.getElementById('workPanelEmpty');
+    if (_wpContent && _wpEmpty) {
+        _wpContent.querySelectorAll('.work-item').forEach(el => el.remove());
+        _wpEmpty.style.display = '';
+    }
     lastActiveAgent = agentKey;
     sessionId = existingSessionId || 'sess_' + agentKey + '_' + Date.now();
 
@@ -251,6 +259,12 @@ function openAgent(agentKey, existingSessionId) {
 
     landingPage.style.display = 'none';
     agentCanvas.style.display = 'flex';
+    // Toggle work panel visibility — hidden for agents that only use chat
+    const canvasBody = document.getElementById('chatPanel')?.closest('.canvas-body');
+    if (canvasBody) {
+        if (agentKey === 'kpm_support') canvasBody.classList.add('no-work-panel');
+        else canvasBody.classList.remove('no-work-panel');
+    }
     chatInput.focus();
     updateAgentNavBar(agentKey);
     const sidebarTools = document.getElementById('sidebarTools');
@@ -431,36 +445,7 @@ async function deleteSession(sid) {
 function addMessage(content, role, agentIcon, agentName, structured) {
     if (canvasWelcome) canvasWelcome.style.display = 'none';
 
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `message ${role}`;
-
-    let html = '';
-    if (role === 'assistant' && agentName) {
-        html += `<div class="agent-tag">${agentIcon} ${agentName}</div>`;
-    }
-
-    if (structured && structured.response_type) {
-        lastStructuredData = structured;
-        html += buildStructuredHtml(structured);
-    } else if (structured && structured.issues !== undefined) {
-        html += buildReviewHtml(structured);
-    } else if (structured && structured.phase !== undefined) {
-        html += buildLetterHtml(structured);
-    } else {
-        html += `<div class="message-bubble">${escapeHtml(content)}</div>`;
-    }
-
-    if (role === 'assistant') {
-        const idx = _msgIndex++;
-        html += `<div class="msg-feedback">
-            <button class="feedback-btn" id="fb-up-${idx}" onclick="submitFeedback(${idx}, 'up')" title="Berguna">👍</button>
-            <button class="feedback-btn" id="fb-down-${idx}" onclick="submitFeedback(${idx}, 'down')" title="Tidak berguna">👎</button>
-        </div>`;
-    }
-
-    msgDiv.innerHTML = html;
-
-    // === In-place fix intercept — update pratonton dalam mesej asal, tambah butang Undo ===
+    // ═══ In-place fix intercepts ═══
     if (structured && structured.corrected_document && _pendingFixBtn) {
         const previewSection = _pendingFixMsgDiv?.querySelector('.review-doc-preview-section');
         const previewEl = _pendingFixMsgDiv?.querySelector('#reviewDocPreview');
@@ -522,29 +507,107 @@ function addMessage(content, role, agentIcon, agentName, structured) {
         setTimeout(() => (existingPreviewHtml || existingPreview)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
         return;
     }
-    // === Tamat in-place intercept ===
+    // ═══ End fix intercepts ═══
 
-    // In-place update for all letter/report agent responses after the first
-    if (structured && structured.phase !== undefined && _activeLetterMsgDiv) {
-        _activeLetterMsgDiv.innerHTML = msgDiv.innerHTML;
-        // Re-attach chart if any
-        if (structured.chart) renderChart(_activeLetterMsgDiv, structured.chart);
-        setTimeout(() => _activeLetterMsgDiv.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+    // === Structured content → work panel ===
+    const isWorkContent = structured && (
+        structured.response_type !== undefined ||
+        structured.issues !== undefined ||
+        structured.phase !== undefined
+    );
+
+    if (isWorkContent) {
+        const hasMissing = !!(structured.fields_status?.missing?.length);
+        let workHtml;
+
+        if (structured.response_type) {
+            lastStructuredData = structured;
+            workHtml = buildStructuredHtml(structured);
+        } else if (structured.issues !== undefined) {
+            workHtml = buildReviewHtml(structured);
+        } else {
+            workHtml = buildLetterHtml(structured);
+        }
+
+        // In-place update for letter/report
+        if (structured.phase !== undefined && _activeWorkItem) {
+            _activeWorkItem.innerHTML = workHtml;
+            if (structured.chart) renderChart(_activeWorkItem, structured.chart);
+            if (document.getElementById('reportImgGrid')) _refreshReportImages();
+            if (!hasMissing && structured.message && _activeChatBubble) {
+                const bbl = _activeChatBubble.querySelector('.message-bubble');
+                if (bbl) bbl.innerHTML = escapeHtml(structured.message);
+            }
+            return;
+        }
+
+        // Create work panel item
+        const workItem = document.createElement('div');
+        workItem.className = 'work-item';
+        workItem.innerHTML = workHtml;
+
+        const wpContent = document.getElementById('workPanelContent');
+        const wpEmpty = document.getElementById('workPanelEmpty');
+
+        if (structured.phase !== undefined) {
+            const prev = wpContent?.querySelector('.work-item[data-letter]');
+            if (prev) prev.replaceWith(workItem);
+            else { if (wpEmpty) wpEmpty.style.display = 'none'; wpContent?.appendChild(workItem); }
+            workItem.dataset.letter = '1';
+            _activeWorkItem = workItem;
+        } else {
+            if (wpEmpty) wpEmpty.style.display = 'none';
+            wpContent?.appendChild(workItem);
+        }
+
+        if (structured.chart) renderChart(workItem, structured.chart);
+        if (document.getElementById('reportImgGrid')) _refreshReportImages();
+
+        // Add agent text to chat panel
+        const chatText = hasMissing ? '' : (structured.message || content || '');
+        const chatDiv = document.createElement('div');
+        chatDiv.className = `message ${role}`;
+        let chatHtml = '';
+        if (role === 'assistant' && agentName) {
+            chatHtml += `<div class="agent-tag">${agentIcon} ${agentName}</div>`;
+        }
+        if (chatText) {
+            chatHtml += `<div class="message-bubble">${escapeHtml(chatText)}</div>`;
+        }
+        if (role === 'assistant') {
+            const idx = _msgIndex++;
+            chatHtml += `<div class="msg-feedback">
+                <button class="feedback-btn" id="fb-up-${idx}" onclick="submitFeedback(${idx}, 'up')" title="Berguna">👍</button>
+                <button class="feedback-btn" id="fb-down-${idx}" onclick="submitFeedback(${idx}, 'down')" title="Tidak berguna">👎</button>
+            </div>`;
+        }
+        chatDiv.innerHTML = chatHtml;
+        if (chatHtml.trim()) {
+            canvasMessages.insertBefore(chatDiv, typingIndicator);
+            canvasMessages.scrollTop = canvasMessages.scrollHeight;
+        }
+        if (structured.phase !== undefined) _activeChatBubble = chatDiv;
         return;
     }
 
+    // === Plain text → chat panel only ===
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${role}`;
+    let html = '';
+    if (role === 'assistant' && agentName) {
+        html += `<div class="agent-tag">${agentIcon} ${agentName}</div>`;
+    }
+    html += `<div class="message-bubble">${escapeHtml(content)}</div>`;
+    if (role === 'assistant') {
+        const idx = _msgIndex++;
+        html += `<div class="msg-feedback">
+            <button class="feedback-btn" id="fb-up-${idx}" onclick="submitFeedback(${idx}, 'up')" title="Berguna">👍</button>
+            <button class="feedback-btn" id="fb-down-${idx}" onclick="submitFeedback(${idx}, 'down')" title="Tidak berguna">👎</button>
+        </div>`;
+    }
+    msgDiv.innerHTML = html;
     canvasMessages.insertBefore(msgDiv, typingIndicator);
     canvasMessages.scrollTop = canvasMessages.scrollHeight;
-    // Track active letter/report message div for in-place updates
-    if (structured && structured.phase !== undefined) {
-        _activeLetterMsgDiv = msgDiv;
-    }
-    if (document.getElementById('reportImgGrid')) {
-        _refreshReportImages();
-    }
-    if (structured && structured.chart) {
-        renderChart(msgDiv, structured.chart);
-    }
 }
 
 async function submitFeedback(idx, type) {
@@ -750,10 +813,15 @@ const _FIELD_DEFS = {
     'Nama Program':                           { type: 'text',     ph: 'cth: Program Latihan Guru 2026' },
     'Hari':                                   { type: 'text',     ph: 'auto-isi apabila tarikh dipilih' },
     'Masa Program':                           { type: 'text',     ph: 'cth: 8.00 pagi' },
+    'Masa Acara':                             { type: 'text',     ph: 'cth: 8.00 pagi' },
     'Nama Organisasi':                        { type: 'text',     ph: 'cth: Pejabat Pendidikan Daerah Dalat' },
     'Nama Pegawai Yang Terlibat':             { type: 'pegawai-list', ph: '' },
     'Jawatan Pegawai Yang Terlibat':          { type: '_skip', ph: '' },
-    'Objektif Program':                       { type: 'textarea', ph: 'Nyatakan objektif program...' },
+    'Objektif Program':                       { type: 'textarea', ph: 'Nyatakan objektif program...', rows: 3 },
+    'Isi Kandungan':                          { type: 'textarea', ph: 'Isi kandungan surat...', rows: 4 },
+    'Isi Kandungan Utama':                    { type: 'textarea', ph: 'Isi kandungan surat...', rows: 4 },
+    'Rumusan / Laporan Ringkas':              { type: 'textarea', ph: 'Rumusan program (pilihan — boleh dijana automatik)...', rows: 3 },
+    'Cadangan / Tindakan Susulan':            { type: 'textarea', ph: 'Cadangan (pilihan — boleh dijana automatik)...', rows: 3 },
     'Nama Penyedia Laporan':                  { type: 'text',     ph: 'cth: Ahmad bin Ali' },
     'Jawatan Penyedia':                       { type: 'text',     ph: 'cth: Penolong PPD' },
     'Nama Pengesah Laporan':                  { type: 'text',     ph: 'cth: Encik Zulkifli bin Hamid' },
@@ -784,7 +852,7 @@ function _buildMissingFieldsForm(missingLabels) {
         if (isWide) {
             let widget = '';
             if (def.type === 'textarea') {
-                widget = `<textarea class="ff-input" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}" rows="2"></textarea>`;
+                widget = `<textarea class="ff-input" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}" rows="${def.rows || 2}"></textarea>`;
             } else {
                 const addLabel = def.type === 'pegawai-list' ? '＋ Tambah Pegawai' : '＋ Tambah Ahli';
                 const namaPh  = def.type === 'pegawai-list' ? 'Nama pegawai' : 'Nama ahli';
@@ -1033,7 +1101,9 @@ let _pendingLetterMsgDiv = null;
 let _suppressUserMsg = false;
 let _undoReviewState = null;
 let _undoLetterState = null;
-let _activeLetterMsgDiv = null; // tracks the active letter/report message for in-place updates
+let _activeLetterMsgDiv = null;
+let _activeWorkItem = null;
+let _activeChatBubble = null;
 
 function fixReviewIssue(btn) {
     const prompt = btn.dataset.prompt;
@@ -1042,7 +1112,7 @@ function fixReviewIssue(btn) {
     btn.disabled = true;
     btn.classList.add('fix-processing');
     _pendingFixBtn = btn;
-    _pendingFixMsgDiv = btn.closest('.message');
+    _pendingFixMsgDiv = btn.closest('.work-item') || btn.closest('.message');
     _suppressUserMsg = true;
     const input = document.getElementById('chatInput');
     if (!input) return;
@@ -1059,7 +1129,7 @@ function fixLetterIssue(btn) {
     btn.disabled = true;
     btn.classList.add('fix-processing');
     _pendingLetterFixBtn = btn;
-    _pendingLetterMsgDiv = btn.closest('.message');
+    _pendingLetterMsgDiv = btn.closest('.work-item') || btn.closest('.message');
     _suppressUserMsg = true;
     const input = document.getElementById('chatInput');
     if (!input) return;
@@ -1611,6 +1681,33 @@ chatInput.addEventListener('input', () => {
 
 document.getElementById('backBtn').addEventListener('click', goHome);
 document.getElementById('canvasNewBtn').addEventListener('click', newSession);
+
+// ═══ Resize handle drag ═══
+(function() {
+    const handle = document.getElementById('resizeHandle');
+    const chatPanel = document.getElementById('chatPanel');
+    if (!handle || !chatPanel) return;
+    let dragging = false, startX = 0, startW = 0;
+    handle.addEventListener('mousedown', e => {
+        dragging = true; startX = e.clientX; startW = chatPanel.offsetWidth;
+        handle.classList.add('resizing');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+        if (!dragging) return;
+        const newW = Math.min(Math.max(startW + (e.clientX - startX), 240), window.innerWidth * 0.6);
+        chatPanel.style.width = newW + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        handle.classList.remove('resizing');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    });
+})();
 document.getElementById('canvasHistoryBtn').addEventListener('click', toggleHistory);
 document.getElementById('historyBtn').addEventListener('click', toggleHistory);
 document.getElementById('historyCloseBtn').addEventListener('click', toggleHistory);
