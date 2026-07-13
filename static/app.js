@@ -721,6 +721,115 @@ function buildReviewHtml(data) {
     return html;
 }
 
+// ═══ Inline fields form (replaces "BELUM DIISI" list) ═══
+
+const _FIELD_DEFS = {
+    'Nombor Rujukan':                         { type: 'text',     ph: 'cth: KPM.600-1/1/3 (JPN)' },
+    'Nombor Rujukan (Ruj. Kami)':             { type: 'text',     ph: 'cth: KPM.600-1/1/3 (JPN)' },
+    'Tarikh':                                 { type: 'date',     ph: '' },
+    'Tarikh Memo':                            { type: 'date',     ph: '' },
+    'Tarikh Acara':                           { type: 'date',     ph: '' },
+    'Tarikh Program':                         { type: 'date',     ph: '' },
+    'Tarikh Disediakan':                      { type: 'date',     ph: '' },
+    'Nama Penerima':                          { type: 'text',     ph: 'cth: Encik Ahmad bin Ali' },
+    'Jawatan Penerima':                       { type: 'text',     ph: 'cth: Pengetua' },
+    'Nama Organisasi Penerima':               { type: 'text',     ph: 'cth: SMK Taman Maju' },
+    'Alamat Penerima':                        { type: 'textarea', ph: 'Alamat penuh penerima...' },
+    'Perkara / Tajuk Surat':                  { type: 'text',     ph: 'Tajuk surat...' },
+    'Perkara / Tajuk Memo (huruf besar)':     { type: 'text',     ph: 'TAJUK MEMO (HURUF BESAR)' },
+    'Nama Pengerusi dan Jawatan':             { type: 'text',     ph: 'cth: Pn. Zainab bt. Ahmad, Pengetua' },
+    'Nama Penyelaras dan Jawatan':            { type: 'text',     ph: 'cth: En. Farid bin Ismail, GPK HEM' },
+    'Nama Ahli-Ahli (pisahkan dengan koma)':  { type: 'textarea', ph: 'cth: Ahmad bin Ali, Siti binti Rahman...' },
+    'Nama Urus Setia dan Jawatan':            { type: 'text',     ph: 'cth: En. Farid bin Ismail, Guru' },
+    'Masa Acara':                             { type: 'text',     ph: 'cth: 8.00 pagi' },
+    'Tempat Acara':                           { type: 'text',     ph: 'cth: Bilik Mesyuarat Utama' },
+    'Nama Penandatangan':                     { type: 'text',     ph: 'cth: Encik Ahmad bin Ali' },
+    'Jawatan Penandatangan':                  { type: 'text',     ph: 'cth: Pengetua' },
+    'Nama Pejabat':                           { type: 'text',     ph: 'cth: Jabatan Pendidikan Negeri' },
+    'Salinan Kepada (s.k.)':                  { type: 'text',     ph: 'Nama dan jawatan (pilihan)' },
+    'Nama Program':                           { type: 'text',     ph: 'cth: Program Latihan Guru 2026' },
+    'Hari':                                   { type: 'text',     ph: 'auto-isi apabila tarikh dipilih' },
+    'Masa Program':                           { type: 'text',     ph: 'cth: 8.00 pagi' },
+    'Nama Organisasi':                        { type: 'text',     ph: 'cth: Pejabat Pendidikan Daerah Dalat' },
+    'Nama Pegawai Yang Terlibat':             { type: 'textarea', ph: 'cth: Ahmad bin Ali, Pen PPD\nSiti binti Rahman, Pen PPD' },
+    'Jawatan Pegawai Yang Terlibat':          { type: 'text',     ph: 'cth: Penolong PPD' },
+    'Objektif Program':                       { type: 'textarea', ph: 'Nyatakan objektif program...' },
+    'Nama Penyedia Laporan':                  { type: 'text',     ph: 'cth: Ahmad bin Ali' },
+    'Jawatan Penyedia':                       { type: 'text',     ph: 'cth: Penolong PPD' },
+    'Nama Pengesah Laporan':                  { type: 'text',     ph: 'cth: Encik Zulkifli bin Hamid' },
+    'Jawatan Pengesah':                       { type: 'text',     ph: 'cth: Pegawai Pendidikan Daerah' },
+};
+
+const _MS_DAYS   = ['Ahad','Isnin','Selasa','Rabu','Khamis','Jumaat','Sabtu'];
+const _MS_MONTHS = ['Januari','Februari','Mac','April','Mei','Jun','Julai','Ogos','September','Oktober','November','Disember'];
+
+function _formatDateMS(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    return `${d} ${_MS_MONTHS[m - 1]} ${y} (${_MS_DAYS[dt.getDay()]})`;
+}
+
+let _formCounter = 0;
+
+function _buildMissingFieldsForm(missingLabels) {
+    if (!missingLabels || missingLabels.length === 0) return '';
+    const fid = 'ff_' + (++_formCounter);
+    let html = `<div class="da-section fields-form-section">
+        <div class="da-section-title">\u{1F4DD} Sila Isikan Maklumat</div>
+        <form class="fields-form" id="${fid}" onsubmit="event.preventDefault();_submitFieldsForm('${fid}')">`;
+    missingLabels.forEach(label => {
+        const def = _FIELD_DEFS[label] || { type: 'text', ph: '' };
+        const iid = `${fid}_${label.replace(/\W/g,'_')}`;
+        html += `<div class="ff-field">
+            <label class="ff-label" for="${iid}">${escapeHtml(label)}</label>`;
+        if (def.type === 'textarea') {
+            html += `<textarea class="ff-input" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}" rows="2"></textarea>`;
+        } else if (def.type === 'date') {
+            html += `<input class="ff-input ff-date" type="date" id="${iid}" data-label="${escapeAttr(label)}" data-is-date="1" onchange="_onDateChange(this,'${fid}')">`;
+        } else {
+            html += `<input class="ff-input" type="text" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}">`;
+        }
+        html += `</div>`;
+    });
+    html += `<button type="submit" class="ff-submit-btn">\u{1F4E4} Hantar Maklumat</button>
+        </form></div>`;
+    return html;
+}
+
+function _onDateChange(input, fid) {
+    if (!input.value) return;
+    const [y, m, d] = input.value.split('-').map(Number);
+    const day = _MS_DAYS[new Date(y, m - 1, d).getDay()];
+    const form = document.getElementById(fid);
+    if (!form) return;
+    const hariEl = Array.from(form.querySelectorAll('[data-label]')).find(e => e.dataset.label === 'Hari');
+    if (hariEl && !hariEl.value) hariEl.value = day;
+}
+
+function _submitFieldsForm(fid) {
+    const form = document.getElementById(fid);
+    if (!form) return;
+    const inputs = form.querySelectorAll('[data-label]');
+    const parts = [];
+    inputs.forEach(el => {
+        let val = el.value.trim();
+        if (!val) return;
+        if (el.dataset.isDate) val = _formatDateMS(val);
+        parts.push(`${el.dataset.label}: ${val}`);
+    });
+    if (parts.length === 0) { showToast('Sila isi sekurang-kurangnya satu medan.', false); return; }
+    form.querySelectorAll('input,textarea,button').forEach(el => el.disabled = true);
+    form.querySelector('.ff-submit-btn').textContent = '⏳ Menghantar...';
+    _suppressUserMsg = true;
+    const inp = document.getElementById('chatInput');
+    inp.value = parts.join('. ');
+    inp.dispatchEvent(new Event('input'));
+    document.getElementById('sendBtn').click();
+}
+
+// ═══════════════════════════════════════════════════
+
 function buildLetterHtml(data) {
     let html = '<div class="message-bubble structured-response">';
 
@@ -729,9 +838,7 @@ function buildLetterHtml(data) {
     // Maklumat terkumpul disembunyikan — bekerja di belakang tabir
 
     if (data.fields_status && data.fields_status.missing && data.fields_status.missing.length > 0) {
-        html += '<div class="da-section"><div class="da-section-title">\u{1F4DD} Belum Diisi</div><ul>';
-        data.fields_status.missing.forEach(m => { html += `<li>${escapeHtml(m)}</li>`; });
-        html += '</ul></div>';
+        html += _buildMissingFieldsForm(data.fields_status.missing);
     }
 
     if (data.document_preview) {

@@ -524,6 +524,33 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
     margin-left: 8px; transition: background 0.15s;
 }
 .undo-fix-btn:hover { background: #b91c1c; }
+
+/* ── Inline missing-fields form ── */
+.fields-form-section { padding: 10px 0 4px; }
+.fields-form { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.ff-field { display: flex; flex-direction: column; gap: 4px; }
+.ff-label { font-size: 12px; font-weight: 600; color: var(--text-secondary, #64748b); }
+.ff-input {
+    padding: 7px 10px; border-radius: 7px; border: 1.5px solid #d1d5db;
+    font-size: 13px; background: #f9fafb; color: #111827;
+    resize: vertical; transition: border-color 0.15s;
+}
+.ff-input:focus { outline: none; border-color: #6366f1; background: #fff; }
+.ff-input:disabled { background: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
+.ff-date { cursor: pointer; }
+.ff-submit-btn {
+    margin-top: 4px; padding: 9px 18px; border: none; border-radius: 8px;
+    background: #6366f1; color: #fff; font-size: 13px; font-weight: 600;
+    cursor: pointer; align-self: flex-start; transition: background 0.15s;
+}
+.ff-submit-btn:hover { background: #4f46e5; }
+.ff-submit-btn:disabled { background: #a5b4fc; cursor: not-allowed; }
+@media (prefers-color-scheme: dark) {
+    .ff-input { background: #1e293b; color: #f1f5f9; border-color: #334155; }
+    .ff-input:focus { border-color: #818cf8; background: #0f172a; }
+    .ff-input:disabled { background: #1e293b; color: #475569; }
+    .ff-label { color: #94a3b8; }
+}
 .review-all-good {
     padding: 10px 14px; font-size: 13px; color: #065f46;
     background: rgba(16,185,129,0.08);
