@@ -459,49 +459,23 @@ function addMessage(content, role, agentIcon, agentName, structured) {
 
     msgDiv.innerHTML = html;
 
-    // === Fix response intercept — update preview in-place, no new message ===
-    // Semakan Dokumen fix
+    // Mark Betulkan button as done when fix response arrives
     if (structured && structured.corrected_document && _pendingFixBtn) {
-        const previewSection = _pendingFixMsgDiv?.querySelector('.review-doc-preview-section');
-        const previewEl = _pendingFixMsgDiv?.querySelector('#reviewDocPreview');
-        if (previewSection && previewEl) {
-            previewEl.textContent = structured.corrected_document;
-            previewSection.style.display = '';
-            saveDocumentEdits(structured.corrected_document);
-            setTimeout(() => previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
-        }
         _pendingFixBtn.textContent = '✅ Berjaya Dibetulkan';
         _pendingFixBtn.classList.remove('fix-processing');
         _pendingFixBtn.classList.add('fix-done');
         _pendingFixBtn.disabled = true;
         _pendingFixBtn = null;
         _pendingFixMsgDiv = null;
-        return;
     }
-    // Letter/Report fix
     if (structured && structured.document_preview && _pendingLetterFixBtn) {
-        const existingPreview = _pendingLetterMsgDiv?.querySelector('#docPreview');
-        const existingPreviewHtml = _pendingLetterMsgDiv?.querySelector('#docPreviewHtml');
-        if (existingPreview) existingPreview.textContent = structured.document_preview;
-        if (existingPreviewHtml && structured.document_html) existingPreviewHtml.innerHTML = structured.document_html;
-        if (structured.auto_review) {
-            const reviewPanel = _pendingLetterMsgDiv?.querySelector('.auto-review-panel');
-            if (reviewPanel) {
-                const tmp = document.createElement('div');
-                tmp.innerHTML = renderAutoReviewPanel(structured.auto_review);
-                reviewPanel.replaceWith(tmp.firstElementChild);
-            }
-        }
         _pendingLetterFixBtn.textContent = '✅ Berjaya Dibetulkan';
         _pendingLetterFixBtn.classList.remove('fix-processing');
         _pendingLetterFixBtn.classList.add('fix-done');
         _pendingLetterFixBtn.disabled = true;
         _pendingLetterFixBtn = null;
-        if (existingPreview) setTimeout(() => existingPreview.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
         _pendingLetterMsgDiv = null;
-        return;
     }
-    // === End fix response intercept ===
 
     canvasMessages.insertBefore(msgDiv, typingIndicator);
     canvasMessages.scrollTop = canvasMessages.scrollHeight;
