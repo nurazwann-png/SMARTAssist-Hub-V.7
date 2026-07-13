@@ -215,6 +215,7 @@ initParticles();
 
 function openAgent(agentKey, existingSessionId) {
     currentAgent = agentKey;
+    _activeLetterMsgDiv = null;
     lastActiveAgent = agentKey;
     sessionId = existingSessionId || 'sess_' + agentKey + '_' + Date.now();
 
@@ -523,8 +524,21 @@ function addMessage(content, role, agentIcon, agentName, structured) {
     }
     // === Tamat in-place intercept ===
 
+    // In-place update for all letter/report agent responses after the first
+    if (structured && structured.phase !== undefined && _activeLetterMsgDiv) {
+        _activeLetterMsgDiv.innerHTML = msgDiv.innerHTML;
+        // Re-attach chart if any
+        if (structured.chart) renderChart(_activeLetterMsgDiv, structured.chart);
+        setTimeout(() => _activeLetterMsgDiv.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+        return;
+    }
+
     canvasMessages.insertBefore(msgDiv, typingIndicator);
     canvasMessages.scrollTop = canvasMessages.scrollHeight;
+    // Track active letter/report message div for in-place updates
+    if (structured && structured.phase !== undefined) {
+        _activeLetterMsgDiv = msgDiv;
+    }
     if (document.getElementById('reportImgGrid')) {
         _refreshReportImages();
     }
@@ -851,6 +865,7 @@ let _pendingLetterMsgDiv = null;
 let _suppressUserMsg = false;
 let _undoReviewState = null;
 let _undoLetterState = null;
+let _activeLetterMsgDiv = null; // tracks the active letter/report message for in-place updates
 
 function fixReviewIssue(btn) {
     const prompt = btn.dataset.prompt;
