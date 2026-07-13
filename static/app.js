@@ -956,7 +956,8 @@ function renderChart(container, chartConfig) {
 
 function toggleChartSize(btn) {
     const wrapper = btn.closest('.da-chart-wrapper');
-    const container = wrapper.querySelector('.da-chart-container');
+    // container may have been moved to body — use stored ref or find it
+    const container = wrapper._expandedContainer || wrapper.querySelector('.da-chart-container');
     const expanded = !wrapper.classList.contains('expanded');
     wrapper.classList.toggle('expanded', expanded);
 
@@ -964,7 +965,8 @@ function toggleChartSize(btn) {
     if (!overlay) { overlay = document.createElement('div'); overlay.className = 'chart-overlay'; document.body.appendChild(overlay); }
 
     if (expanded) {
-        // Move container to body to escape any stacking context issues
+        // Store reference before moving
+        wrapper._expandedContainer = container;
         wrapper._placeholder = document.createComment('chart-placeholder');
         container.before(wrapper._placeholder);
         document.body.appendChild(container);
@@ -976,13 +978,32 @@ function toggleChartSize(btn) {
             padding:28px 32px; border:1px solid #cbd5e1;
             box-shadow:0 24px 64px rgba(0,0,0,0.7);
         `;
+        const closeBtn = document.createElement('button');
+        closeBtn.id = 'chartCloseBtn';
+        closeBtn.innerHTML = '✕';
+        closeBtn.style.cssText = `
+            position:absolute; top:12px; right:14px;
+            background:#f1f5f9; border:1px solid #cbd5e1;
+            border-radius:50%; width:32px; height:32px;
+            font-size:16px; cursor:pointer; color:#475569;
+            display:flex; align-items:center; justify-content:center;
+            z-index:1002; line-height:1;
+        `;
+        closeBtn.onmouseover = () => { closeBtn.style.background = '#e2e8f0'; closeBtn.style.color = '#0f172a'; };
+        closeBtn.onmouseout  = () => { closeBtn.style.background = '#f1f5f9'; closeBtn.style.color = '#475569'; };
+        closeBtn.onclick = (e) => { e.stopPropagation(); toggleChartSize(btn); };
+        container.appendChild(closeBtn);
+
         overlay.classList.add('active');
         const collapse = () => { toggleChartSize(btn); overlay.removeEventListener('click', collapse); };
         overlay.addEventListener('click', collapse);
     } else {
-        // Return container to original position
+        // Return container to original position using stored reference
         container.style.cssText = '';
+        const closeBtn = document.getElementById('chartCloseBtn');
+        if (closeBtn) closeBtn.remove();
         if (wrapper._placeholder) { wrapper._placeholder.replaceWith(container); wrapper._placeholder = null; }
+        wrapper._expandedContainer = null;
         overlay.classList.remove('active');
     }
     recolorChart(wrapper, expanded);
