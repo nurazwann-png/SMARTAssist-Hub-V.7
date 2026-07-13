@@ -635,13 +635,7 @@ function buildLetterHtml(data) {
 
     html += `<div class="da-message">${escapeHtml(data.message || '')}</div>`;
 
-    if (data.fields_status && data.fields_status.collected && Object.keys(data.fields_status.collected).length > 0) {
-        html += '<div class="da-section"><div class="da-section-title">\u{2705} Maklumat Terkumpul</div><ul>';
-        for (const [k, v] of Object.entries(data.fields_status.collected)) {
-            html += `<li><strong>${escapeHtml(k)}:</strong> ${escapeHtml(String(v))}</li>`;
-        }
-        html += '</ul></div>';
-    }
+    // Maklumat terkumpul disembunyikan — bekerja di belakang tabir
 
     if (data.fields_status && data.fields_status.missing && data.fields_status.missing.length > 0) {
         html += '<div class="da-section"><div class="da-section-title">\u{1F4DD} Belum Diisi</div><ul>';
@@ -727,13 +721,7 @@ function renderAutoReviewPanel(review) {
             html += '</div>';
         }
 
-        if (skipped.length > 0) {
-            html += `<div class="review-issues-group review-skipped-group"><div class="review-group-label skipped-label">⏭ Diskip (berkaitan template/input pengguna)</div>`;
-            skipped.forEach(reason => {
-                html += `<div class="review-issue skipped-issue"><span class="issue-text">${escapeHtml(reason)}</span></div>`;
-            });
-            html += '</div>';
-        }
+        // Senarai diskip disembunyikan — bekerja di belakang tabir
 
         if (needsInfo) {
             html += `<div class="review-needs-info">
@@ -753,11 +741,15 @@ function renderAutoReviewPanel(review) {
     // Show remaining mandatory issues (not auto-fixable)
     if (mandatory.length > 0) {
         html += `<div class="review-issues-group"><div class="review-group-label mandatory-label">⚠️ Masih Perlu Perhatian (${mandatory.length})</div>`;
-        mandatory.forEach(issue => {
+        mandatory.forEach((issue, idx) => {
+            const fixPrompt = issue.suggestion
+                ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
+                : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`;
             html += `<div class="review-issue mandatory-issue">
                 <span class="issue-location">${escapeHtml(issue.location || '')}</span>
                 <span class="issue-text">${escapeHtml(issue.issue || '')}</span>
                 ${issue.suggestion ? `<span class="issue-suggestion">💡 ${escapeHtml(issue.suggestion)}</span>` : ''}
+                <button class="issue-fix-btn" onclick="fixIssue(${JSON.stringify(fixPrompt)})">🔧 Betulkan</button>
             </div>`;
         });
         html += '</div>';
@@ -773,6 +765,14 @@ function replyNeedsInfo(question) {
         input.focus();
         input.placeholder = question;
     }
+}
+
+function fixIssue(prompt) {
+    const input = document.getElementById('messageInput');
+    if (!input) return;
+    input.value = prompt;
+    input.focus();
+    document.getElementById('sendBtn')?.click();
 }
 
 // ═══ Report image upload ═══

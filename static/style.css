@@ -507,6 +507,13 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 .issue-location { font-size: 10px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; }
 .issue-text { color: var(--text-primary); }
 .issue-suggestion { color: #059669; font-style: italic; }
+.issue-fix-btn {
+    align-self: flex-end; margin-top: 6px;
+    padding: 4px 12px; font-size: 12px; font-weight: 600;
+    background: #1e40af; color: #fff; border: none; border-radius: 6px;
+    cursor: pointer; transition: background 0.15s;
+}
+.issue-fix-btn:hover { background: #1d4ed8; }
 .review-all-good {
     padding: 10px 14px; font-size: 13px; color: #065f46;
     background: rgba(16,185,129,0.08);
