@@ -63,7 +63,6 @@ FORMAT OUTPUT — balas HANYA dalam JSON:
 }}
 
 PHASES:
-- Phase 0: Pengenalan — sahkan pengguna mahu buat One Page Report
 - Phase 1: Kumpul maklumat secara berperingkat. JANGAN tanya rumusan dan cadangan.
 - Phase 2: Jana rumusan dan cadangan secara automatik, tunjukkan pratonton laporan lengkap. Selepas itu tanya penyedia_nama, penyedia_jawatan, tarikh_disediakan, pengesah_nama, pengesah_jawatan jika belum ada.
 - Phase 3: Laporan disahkan dan sedia untuk dimuat turun
@@ -148,7 +147,7 @@ def _get_session(session_id: str) -> dict:
     from backend.session_store import get_store
     data = get_store().get_all(session_id, _NS)
     if not data or "phase" not in data:
-        default = {"phase": 0, "fields": {}, "document": None}
+        default = {"phase": 1, "fields": {}, "document": None}
         get_store().set_all(session_id, _NS, default)
         return default
     return data
