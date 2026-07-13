@@ -383,11 +383,6 @@ Status sesi semasa:
             parsed["awaiting_images"] = True
             parsed["image_count"] = image_count
             parsed["max_images"] = MAX_IMAGES
-            if image_count == 0:
-                parsed["message"] = (
-                    parsed.get("message", "Laporan telah siap!") +
-                    "\n\n📷 **Langkah Akhir:** Laporan anda telah siap! Sila muat naik sehingga 4 gambar landscape untuk dilampirkan dalam laporan. Gunakan butang '+ Tambah Gambar' di bawah, atau terus muat turun jika tiada gambar diperlukan."
-                )
 
     parsed["fields_status"] = {
         "collected": session["fields"],

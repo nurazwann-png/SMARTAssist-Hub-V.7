@@ -763,7 +763,7 @@ function buildLetterHtml(data) {
         const maxImg = data.max_images || 4;
         html += `<div class="da-section report-img-section" id="reportImgSection">
             <div class="da-section-title">📷 Lampiran Gambar (<span id="reportImgCounter">${imgCount}</span>/${maxImg})</div>
-            <p class="report-img-hint">Muat naik sehingga ${maxImg} gambar <strong>landscape</strong> untuk dilampirkan dalam laporan. Langkah ini adalah <strong>yang terakhir</strong> sebelum laporan dimuat turun.</p>
+            <p class="report-img-hint">📷 <strong>Langkah Akhir:</strong> Laporan anda telah siap! Sila muat naik sehingga ${maxImg} gambar <strong>landscape</strong> untuk dilampirkan dalam laporan. Gunakan butang '+ Tambah Gambar' di bawah, atau terus muat turun jika tiada gambar diperlukan.</p>
             <div class="report-img-grid" id="reportImgGrid"></div>
             <button class="report-img-add-btn" id="reportImgAddBtn" onclick="triggerReportImageUpload()" ${imgCount >= maxImg ? 'style="display:none"' : ''}>+ Tambah Gambar</button>
             <input type="file" id="reportImgInput" accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none" onchange="handleReportImageUpload(this)">
