@@ -560,8 +560,8 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
     position: fixed; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     width: 92vw; height: 82vh; z-index: 1001;
-    background: var(--bg-card); border-radius: 16px;
-    padding: 28px 32px; border: 1px solid var(--border);
+    background: #ffffff; border-radius: 16px;
+    padding: 28px 32px; border: 1px solid #cbd5e1;
     box-shadow: 0 24px 64px rgba(0,0,0,0.7);
 }
 .chart-overlay {

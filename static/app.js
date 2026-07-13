@@ -972,9 +972,9 @@ function recolorChart(wrapper, expanded) {
     if (!canvasEl) return;
     const chartInstance = Chart.getChart(canvasEl);
     if (!chartInstance) return;
-    const txtColor = '#94a3b8';
-    const titleColor = '#f1f5f9';
-    const gridColor = '#334155';
+    const txtColor   = expanded ? '#1e293b' : '#94a3b8';
+    const titleColor = expanded ? '#0f172a' : '#f1f5f9';
+    const gridColor  = expanded ? '#e2e8f0' : '#334155';
     chartInstance.canvas.style.background = 'transparent';
     chartInstance.options.plugins.title.color = titleColor;
     chartInstance.options.plugins.title.font = { size: expanded ? 18 : 14, weight: 'bold' };
