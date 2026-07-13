@@ -185,8 +185,14 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
         else:
             document = None
 
-    if document and "betulkan" in query.lower() or document and "perbaiki" in query.lower():
-        extra_instruction = "\n\nPengguna minta dokumen ini DIBETULKAN. Sila isi 'corrected_document' dengan versi yang telah diperbaiki."
+    fix_keywords = ["betulkan", "perbaiki", "fix", "baiki", "correct"]
+    if document and any(kw in query.lower() for kw in fix_keywords):
+        extra_instruction = (
+            f"\n\nARahan PEMBETULAN daripada pengguna: {query}\n\n"
+            "WAJIB: Buat pembetulan yang diminta di atas pada dokumen. "
+            "Isi 'corrected_document' dengan DOKUMEN PENUH yang telah diperbetulkan mengikut arahan tersebut. "
+            "Jangan ubah bahagian lain dokumen yang tidak berkaitan dengan isu yang diminta."
+        )
     else:
         extra_instruction = ""
 

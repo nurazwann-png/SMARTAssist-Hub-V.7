@@ -459,23 +459,69 @@ function addMessage(content, role, agentIcon, agentName, structured) {
 
     msgDiv.innerHTML = html;
 
-    // Mark Betulkan button as done when fix response arrives
+    // === In-place fix intercept — update pratonton dalam mesej asal, tambah butang Undo ===
     if (structured && structured.corrected_document && _pendingFixBtn) {
+        const previewSection = _pendingFixMsgDiv?.querySelector('.review-doc-preview-section');
+        const previewEl = _pendingFixMsgDiv?.querySelector('#reviewDocPreview');
+        if (previewSection && previewEl) {
+            _undoReviewState = { msgDiv: _pendingFixMsgDiv, content: previewEl.textContent };
+            previewEl.textContent = structured.corrected_document;
+            previewSection.style.display = '';
+            saveDocumentEdits(structured.corrected_document);
+            const docActions = previewSection.querySelector('.doc-actions');
+            if (docActions && !docActions.querySelector('.undo-fix-btn')) {
+                const undoBtn = document.createElement('button');
+                undoBtn.className = 'doc-action-btn undo-fix-btn';
+                undoBtn.textContent = '↩️ Batal Pembetulan';
+                undoBtn.onclick = undoReviewFix;
+                docActions.appendChild(undoBtn);
+            }
+            setTimeout(() => previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+        }
         _pendingFixBtn.textContent = '✅ Berjaya Dibetulkan';
         _pendingFixBtn.classList.remove('fix-processing');
         _pendingFixBtn.classList.add('fix-done');
         _pendingFixBtn.disabled = true;
         _pendingFixBtn = null;
         _pendingFixMsgDiv = null;
+        return;
     }
     if (structured && structured.document_preview && _pendingLetterFixBtn) {
+        const existingPreview = _pendingLetterMsgDiv?.querySelector('#docPreview');
+        const existingPreviewHtml = _pendingLetterMsgDiv?.querySelector('#docPreviewHtml');
+        const previewSection = _pendingLetterMsgDiv?.querySelector('.doc-preview-section');
+        _undoLetterState = {
+            msgDiv: _pendingLetterMsgDiv,
+            content: existingPreview?.textContent || '',
+            htmlContent: existingPreviewHtml?.innerHTML || ''
+        };
+        if (existingPreview) existingPreview.textContent = structured.document_preview;
+        if (existingPreviewHtml && structured.document_html) existingPreviewHtml.innerHTML = structured.document_html;
+        if (previewSection && !previewSection.querySelector('.undo-fix-btn')) {
+            const undoBtn = document.createElement('button');
+            undoBtn.className = 'doc-action-btn undo-fix-btn';
+            undoBtn.textContent = '↩️ Batal Pembetulan';
+            undoBtn.onclick = undoLetterFix;
+            previewSection.appendChild(undoBtn);
+        }
+        if (structured.auto_review) {
+            const reviewPanel = _pendingLetterMsgDiv?.querySelector('.auto-review-panel');
+            if (reviewPanel) {
+                const tmp = document.createElement('div');
+                tmp.innerHTML = renderAutoReviewPanel(structured.auto_review);
+                reviewPanel.replaceWith(tmp.firstElementChild);
+            }
+        }
         _pendingLetterFixBtn.textContent = '✅ Berjaya Dibetulkan';
         _pendingLetterFixBtn.classList.remove('fix-processing');
         _pendingLetterFixBtn.classList.add('fix-done');
         _pendingLetterFixBtn.disabled = true;
         _pendingLetterFixBtn = null;
         _pendingLetterMsgDiv = null;
+        setTimeout(() => (existingPreviewHtml || existingPreview)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+        return;
     }
+    // === Tamat in-place intercept ===
 
     canvasMessages.insertBefore(msgDiv, typingIndicator);
     canvasMessages.scrollTop = canvasMessages.scrollHeight;
@@ -803,6 +849,8 @@ let _pendingFixMsgDiv = null;
 let _pendingLetterFixBtn = null;
 let _pendingLetterMsgDiv = null;
 let _suppressUserMsg = false;
+let _undoReviewState = null;
+let _undoLetterState = null;
 
 function fixReviewIssue(btn) {
     const prompt = btn.dataset.prompt;
@@ -836,6 +884,29 @@ function fixLetterIssue(btn) {
     input.dispatchEvent(new Event('input'));
     input.focus();
     document.getElementById('sendBtn')?.click();
+}
+
+function undoReviewFix() {
+    if (!_undoReviewState) return;
+    const { msgDiv, content } = _undoReviewState;
+    const previewEl = msgDiv.querySelector('#reviewDocPreview');
+    if (previewEl) previewEl.textContent = content;
+    saveDocumentEdits(content);
+    msgDiv.querySelector('.undo-fix-btn')?.remove();
+    _undoReviewState = null;
+    showToast('Pembetulan telah dibatalkan.', true);
+}
+
+function undoLetterFix() {
+    if (!_undoLetterState) return;
+    const { msgDiv, content, htmlContent } = _undoLetterState;
+    const previewEl = msgDiv.querySelector('#docPreview');
+    const previewHtmlEl = msgDiv.querySelector('#docPreviewHtml');
+    if (previewEl) previewEl.textContent = content;
+    if (previewHtmlEl && htmlContent) previewHtmlEl.innerHTML = htmlContent;
+    msgDiv.querySelector('.undo-fix-btn')?.remove();
+    _undoLetterState = null;
+    showToast('Pembetulan telah dibatalkan.', true);
 }
 
 // ═══ Report image upload ═══
