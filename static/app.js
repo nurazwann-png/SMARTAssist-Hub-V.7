@@ -967,28 +967,30 @@ function toggleChartSize(btn) {
     recolorChart(wrapper, expanded);
 }
 
-function recolorChart(wrapper, light) {
+function recolorChart(wrapper, expanded) {
     const canvasEl = wrapper.querySelector('canvas');
     if (!canvasEl) return;
     const chartInstance = Chart.getChart(canvasEl);
     if (!chartInstance) return;
-    const txtColor = light ? '#1e293b' : '#94a3b8';
-    const titleColor = light ? '#0f172a' : '#f1f5f9';
-    const gridColor = light ? '#e2e8f0' : '#334155';
-    const bgColor = light ? '#ffffff' : 'transparent';
-    chartInstance.canvas.style.background = bgColor;
+    const txtColor = '#94a3b8';
+    const titleColor = '#f1f5f9';
+    const gridColor = '#334155';
+    chartInstance.canvas.style.background = 'transparent';
     chartInstance.options.plugins.title.color = titleColor;
-    chartInstance.options.plugins.title.font = { size: light ? 18 : 14, weight: 'bold' };
+    chartInstance.options.plugins.title.font = { size: expanded ? 18 : 14, weight: 'bold' };
     chartInstance.options.plugins.legend.labels.color = txtColor;
-    chartInstance.options.plugins.legend.labels.font = { size: light ? 14 : 12 };
+    chartInstance.options.plugins.legend.labels.font = { size: expanded ? 14 : 12 };
     if (chartInstance.options.scales.x) {
         chartInstance.options.scales.x.ticks.color = txtColor;
-        chartInstance.options.scales.x.ticks.font = { size: light ? 13 : 11 };
+        chartInstance.options.scales.x.ticks.font = { size: expanded ? 12 : 11 };
+        chartInstance.options.scales.x.ticks.maxRotation = expanded ? 60 : 45;
+        chartInstance.options.scales.x.ticks.autoSkip = !expanded;
+        chartInstance.options.scales.x.ticks.autoSkipPadding = expanded ? 4 : 10;
         chartInstance.options.scales.x.grid.color = gridColor;
     }
     if (chartInstance.options.scales.y) {
         chartInstance.options.scales.y.ticks.color = txtColor;
-        chartInstance.options.scales.y.ticks.font = { size: light ? 13 : 11 };
+        chartInstance.options.scales.y.ticks.font = { size: expanded ? 13 : 11 };
         chartInstance.options.scales.y.grid.color = gridColor;
     }
     chartInstance.update();
