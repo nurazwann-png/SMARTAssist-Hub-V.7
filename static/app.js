@@ -1006,11 +1006,12 @@ function toggleChartSize(btn) {
         wrapper._expandedContainer = null;
         overlay.classList.remove('active');
     }
-    recolorChart(wrapper, expanded);
+    // Pass the container directly since it may have moved to body
+    recolorChart(container, expanded);
 }
 
-function recolorChart(wrapper, expanded) {
-    const canvasEl = wrapper.querySelector('canvas');
+function recolorChart(container, expanded) {
+    const canvasEl = container.querySelector('canvas');
     if (!canvasEl) return;
     const chartInstance = Chart.getChart(canvasEl);
     if (!chartInstance) return;
