@@ -1,5 +1,25 @@
 import json
 import uvicorn
+
+
+def _parse_agent_json(text: str):
+    """Parse JSON from agent output, stripping markdown code fences if present."""
+    t = text.strip()
+    if t.startswith("```"):
+        lines = t.split("\n")
+        lines = lines[1:] if lines[0].startswith("```") else lines
+        end = next((i for i, l in enumerate(lines) if l.strip() == "```"), len(lines))
+        t = "\n".join(lines[:end])
+    try:
+        return json.loads(t)
+    except (json.JSONDecodeError, ValueError):
+        s, e = text.find("{"), text.rfind("}")
+        if s != -1 and e > s:
+            try:
+                return json.loads(text[s:e + 1])
+            except (json.JSONDecodeError, ValueError):
+                pass
+    return None
 from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, Form
@@ -102,10 +122,7 @@ async def chat(req: ChatRequest):
 
     structured = None
     if agent in ("data_analysis", "letter_generator", "report_generator", "document_reviewer"):
-        try:
-            structured = json.loads(output)
-        except (json.JSONDecodeError, ValueError):
-            pass
+        structured = _parse_agent_json(output)
 
     return JSONResponse({
         "response": output,
@@ -575,10 +592,7 @@ async def agent_chat(req: AgentChatRequest):
 
     structured = None
     if agent in ("data_analysis", "letter_generator", "report_generator", "document_reviewer"):
-        try:
-            structured = json.loads(output)
-        except (json.JSONDecodeError, ValueError):
-            pass
+        structured = _parse_agent_json(output)
 
     # Auto-review + auto-improve: when a document agent produces a ready document
     _DOC_AGENTS = {
