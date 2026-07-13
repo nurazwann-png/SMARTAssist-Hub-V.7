@@ -511,9 +511,13 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
     align-self: flex-end; margin-top: 6px;
     padding: 4px 12px; font-size: 12px; font-weight: 600;
     background: #1e40af; color: #fff; border: none; border-radius: 6px;
-    cursor: pointer; transition: background 0.15s;
+    cursor: pointer; transition: background 0.15s, opacity 0.15s;
 }
-.issue-fix-btn:hover { background: #1d4ed8; }
+.issue-fix-btn:hover:not(:disabled) { background: #1d4ed8; }
+.issue-fix-btn--cadangan { background: #0f766e; }
+.issue-fix-btn--cadangan:hover:not(:disabled) { background: #0d9488; }
+.issue-fix-btn.fix-processing { background: #64748b; cursor: not-allowed; opacity: 0.8; }
+.issue-fix-btn.fix-done { background: #16a34a; cursor: default; opacity: 1; }
 .review-all-good {
     padding: 10px 14px; font-size: 13px; color: #065f46;
     background: rgba(16,185,129,0.08);

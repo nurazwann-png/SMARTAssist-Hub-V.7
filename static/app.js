@@ -458,13 +458,56 @@ function addMessage(content, role, agentIcon, agentName, structured) {
     }
 
     msgDiv.innerHTML = html;
+
+    // === Fix response intercept — update preview in-place, no new message ===
+    // Semakan Dokumen fix
+    if (structured && structured.corrected_document && _pendingFixBtn) {
+        const previewSection = _pendingFixMsgDiv?.querySelector('.review-doc-preview-section');
+        const previewEl = _pendingFixMsgDiv?.querySelector('#reviewDocPreview');
+        if (previewSection && previewEl) {
+            previewEl.textContent = structured.corrected_document;
+            previewSection.style.display = '';
+            saveDocumentEdits(structured.corrected_document);
+            setTimeout(() => previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+        }
+        _pendingFixBtn.textContent = '✅ Berjaya Dibetulkan';
+        _pendingFixBtn.classList.remove('fix-processing');
+        _pendingFixBtn.classList.add('fix-done');
+        _pendingFixBtn.disabled = true;
+        _pendingFixBtn = null;
+        _pendingFixMsgDiv = null;
+        return;
+    }
+    // Letter/Report fix
+    if (structured && structured.document_preview && _pendingLetterFixBtn) {
+        const existingPreview = _pendingLetterMsgDiv?.querySelector('#docPreview');
+        const existingPreviewHtml = _pendingLetterMsgDiv?.querySelector('#docPreviewHtml');
+        if (existingPreview) existingPreview.textContent = structured.document_preview;
+        if (existingPreviewHtml && structured.document_html) existingPreviewHtml.innerHTML = structured.document_html;
+        if (structured.auto_review) {
+            const reviewPanel = _pendingLetterMsgDiv?.querySelector('.auto-review-panel');
+            if (reviewPanel) {
+                const tmp = document.createElement('div');
+                tmp.innerHTML = renderAutoReviewPanel(structured.auto_review);
+                reviewPanel.replaceWith(tmp.firstElementChild);
+            }
+        }
+        _pendingLetterFixBtn.textContent = '✅ Berjaya Dibetulkan';
+        _pendingLetterFixBtn.classList.remove('fix-processing');
+        _pendingLetterFixBtn.classList.add('fix-done');
+        _pendingLetterFixBtn.disabled = true;
+        _pendingLetterFixBtn = null;
+        if (existingPreview) setTimeout(() => existingPreview.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+        _pendingLetterMsgDiv = null;
+        return;
+    }
+    // === End fix response intercept ===
+
     canvasMessages.insertBefore(msgDiv, typingIndicator);
     canvasMessages.scrollTop = canvasMessages.scrollHeight;
-    // Load report images if panel exists
     if (document.getElementById('reportImgGrid')) {
         _refreshReportImages();
     }
-
     if (structured && structured.chart) {
         renderChart(msgDiv, structured.chart);
     }
@@ -586,16 +629,22 @@ function buildReviewHtml(data) {
     if (data.issues && data.issues.length > 0) {
         const mustFix = data.issues.filter(i => i.severity === 'WAJIB_BETULKAN');
         const suggestions = data.issues.filter(i => i.severity !== 'WAJIB_BETULKAN');
+        const _reviewMsgId = 'rev_' + Date.now();
 
         if (mustFix.length > 0) {
             html += '<div class="da-section"><div class="da-section-title">\u{1F6A8} Wajib Betulkan (' + mustFix.length + ')</div>';
             html += '<div class="review-issues">';
             mustFix.forEach((issue, idx) => {
+                const btnId = `${_reviewMsgId}_mf${idx}`;
+                const fixPrompt = issue.suggestion
+                    ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
+                    : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`;
                 html += `<div class="review-issue must-fix">`;
                 html += `<div class="issue-header"><span class="issue-num">${idx + 1}</span><span class="issue-cat">${escapeHtml(issue.category || '')}</span></div>`;
                 html += `<div class="issue-location">${escapeHtml(issue.location || '')}</div>`;
                 html += `<div class="issue-desc">${escapeHtml(issue.issue || '')}</div>`;
                 if (issue.suggestion) html += `<div class="issue-suggestion">\u{1F4A1} ${escapeHtml(issue.suggestion)}</div>`;
+                html += `<button class="issue-fix-btn" id="${btnId}" data-prompt="${escapeAttr(fixPrompt)}" onclick="fixReviewIssue(this)">🔧 Betulkan</button>`;
                 html += '</div>';
             });
             html += '</div></div>';
@@ -605,11 +654,16 @@ function buildReviewHtml(data) {
             html += '<div class="da-section"><div class="da-section-title">\u{1F4A1} Cadangan (' + suggestions.length + ')</div>';
             html += '<div class="review-issues">';
             suggestions.forEach((issue, idx) => {
+                const btnId = `${_reviewMsgId}_cd${idx}`;
+                const fixPrompt = issue.suggestion
+                    ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
+                    : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`;
                 html += `<div class="review-issue suggestion">`;
                 html += `<div class="issue-header"><span class="issue-num">${idx + 1}</span><span class="issue-cat">${escapeHtml(issue.category || '')}</span></div>`;
                 html += `<div class="issue-location">${escapeHtml(issue.location || '')}</div>`;
                 html += `<div class="issue-desc">${escapeHtml(issue.issue || '')}</div>`;
                 if (issue.suggestion) html += `<div class="issue-suggestion">\u{1F4A1} ${escapeHtml(issue.suggestion)}</div>`;
+                html += `<button class="issue-fix-btn issue-fix-btn--cadangan" id="${btnId}" data-prompt="${escapeAttr(fixPrompt)}" onclick="fixReviewIssue(this)">🔧 Betulkan</button>`;
                 html += '</div>';
             });
             html += '</div></div>';
@@ -619,12 +673,15 @@ function buildReviewHtml(data) {
         html += '<p style="font-size:13px;color:var(--text-secondary)">Dokumen ini dalam keadaan baik.</p></div>';
     }
 
-    if (data.corrected_document) {
-        html += '<div class="da-section doc-preview-section">';
-        html += '<div class="da-section-title">\u{1F4C4} Dokumen Diperbetulkan</div>';
-        html += `<pre class="doc-preview">${escapeHtml(data.corrected_document)}</pre>`;
-        html += '</div>';
-    }
+    html += `<div class="da-section doc-preview-section review-doc-preview-section" style="${data.corrected_document ? '' : 'display:none'}">`;
+    html += `<div class="da-section-title">\u{1F4C4} Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span></div>`;
+    html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview">${data.corrected_document ? escapeHtml(data.corrected_document) : ''}</pre>`;
+    const remindMsgRev = currentLang === 'en'
+        ? '⚠️ Please review the corrected document carefully before downloading. Ensure all information is accurate and complete.'
+        : '⚠️ Sila semak semula dokumen yang telah diperbetulkan sebelum dimuat turun. Pastikan semua maklumat adalah tepat dan lengkap.';
+    html += `<div class="doc-review-reminder">${remindMsgRev}</div>`;
+    html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">\u{1F4E5} Muat Turun (.docx)</button></div>`;
+    html += '</div>';
 
     html += '</div>';
     return html;
@@ -749,7 +806,7 @@ function renderAutoReviewPanel(review) {
                 <span class="issue-location">${escapeHtml(issue.location || '')}</span>
                 <span class="issue-text">${escapeHtml(issue.issue || '')}</span>
                 ${issue.suggestion ? `<span class="issue-suggestion">💡 ${escapeHtml(issue.suggestion)}</span>` : ''}
-                <button class="issue-fix-btn" onclick="fixIssue(${JSON.stringify(fixPrompt)})">🔧 Betulkan</button>
+                <button class="issue-fix-btn" data-prompt="${escapeAttr(fixPrompt)}" onclick="fixLetterIssue(this)">🔧 Betulkan</button>
             </div>`;
         });
         html += '</div>';
@@ -760,14 +817,42 @@ function renderAutoReviewPanel(review) {
 }
 
 function replyNeedsInfo(question) {
-    const input = document.getElementById('messageInput');
+    const input = document.getElementById('chatInput');
     if (input) {
         input.focus();
         input.placeholder = question;
     }
 }
 
-function fixIssue(prompt) {
+let _pendingFixBtn = null;
+let _pendingFixMsgDiv = null;
+let _pendingLetterFixBtn = null;
+let _pendingLetterMsgDiv = null;
+
+function fixReviewIssue(btn) {
+    const prompt = btn.dataset.prompt;
+    if (!prompt) return;
+    btn.textContent = '⏳ Sedang diproses...';
+    btn.disabled = true;
+    btn.classList.add('fix-processing');
+    _pendingFixBtn = btn;
+    _pendingFixMsgDiv = btn.closest('.message');
+    const input = document.getElementById('chatInput');
+    if (!input) return;
+    input.value = prompt;
+    input.dispatchEvent(new Event('input'));
+    input.focus();
+    document.getElementById('sendBtn')?.click();
+}
+
+function fixLetterIssue(btn) {
+    const prompt = btn.dataset.prompt;
+    if (!prompt) return;
+    btn.textContent = '⏳ Sedang diproses...';
+    btn.disabled = true;
+    btn.classList.add('fix-processing');
+    _pendingLetterFixBtn = btn;
+    _pendingLetterMsgDiv = btn.closest('.message');
     const input = document.getElementById('chatInput');
     if (!input) return;
     input.value = prompt;
@@ -844,6 +929,23 @@ async function removeReportImage(index) {
 }
 
 // ═══ Document actions ═══
+
+async function downloadReviewDocument() {
+    const preview = document.getElementById('reviewDocPreview');
+    if (preview) await saveDocumentEdits(preview.innerText);
+    try {
+        const res = await fetch(`/api/document/download?session_id=${encodeURIComponent(sessionId)}`);
+        if (!res.ok) throw new Error('Gagal memuat turun dokumen.');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const cd = res.headers.get('Content-Disposition') || '';
+        const match = cd.match(/filename="?([^"]+)"?/);
+        a.download = match ? match[1] : 'dokumen_diperbetulkan.docx';
+        a.click(); URL.revokeObjectURL(url);
+    } catch (err) { alert(err.message); }
+}
 
 async function downloadDocument() {
     const preview = document.getElementById('docPreview');
