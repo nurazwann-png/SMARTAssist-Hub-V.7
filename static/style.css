@@ -526,48 +526,55 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 .undo-fix-btn:hover { background: #b91c1c; }
 
 /* ── Inline missing-fields form ── */
-.fields-form-section { padding: 10px 0 4px; }
-.fields-form { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
-.ff-field { display: flex; flex-direction: column; gap: 4px; }
-.ff-label { font-size: 12px; font-weight: 600; color: var(--text-secondary, #64748b); }
-.ff-input {
-    padding: 7px 10px; border-radius: 7px; border: 1.5px solid #d1d5db;
-    font-size: 13px; background: #f9fafb; color: #111827;
-    resize: vertical; transition: border-color 0.15s;
+.fields-form-section { padding: 6px 0 2px; }
+.fields-form { margin-top: 6px; }
+.ff-table { width: 100%; border-collapse: collapse; }
+.ff-table tr { border-bottom: 1px solid rgba(255,255,255,0.06); }
+.ff-table tr:last-child { border-bottom: none; }
+.ff-table td { padding: 4px 4px; vertical-align: middle; }
+.ff-table td:first-child {
+    width: 38%; font-size: 11.5px; font-weight: 600;
+    color: var(--text-secondary, #94a3b8); padding-right: 8px;
+    white-space: normal; line-height: 1.3;
 }
-.ff-input:focus { outline: none; border-color: #6366f1; background: #fff; }
-.ff-input:disabled { background: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
+.ff-table td:last-child { width: 62%; }
+.ff-table .ff-span td:first-child { width: 100%; }
+.ff-table .ff-span td { padding-top: 6px; }
+.ff-input {
+    width: 100%; padding: 5px 8px; border-radius: 6px; border: 1.5px solid #334155;
+    font-size: 12px; background: #1e293b; color: #f1f5f9;
+    box-sizing: border-box; resize: vertical; transition: border-color 0.15s;
+}
+.ff-input:focus { outline: none; border-color: #6366f1; background: #0f172a; }
+.ff-input:disabled { opacity: 0.5; cursor: not-allowed; }
 .ff-date { cursor: pointer; }
+textarea.ff-input { min-height: 52px; }
+.ff-submit-row td { padding-top: 8px !important; }
 .ff-submit-btn {
-    margin-top: 4px; padding: 9px 18px; border: none; border-radius: 8px;
-    background: #6366f1; color: #fff; font-size: 13px; font-weight: 600;
-    cursor: pointer; align-self: flex-start; transition: background 0.15s;
+    padding: 7px 16px; border: none; border-radius: 7px;
+    background: #6366f1; color: #fff; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s;
 }
 .ff-submit-btn:hover { background: #4f46e5; }
-.ff-submit-btn:disabled { background: #a5b4fc; cursor: not-allowed; }
-.ff-ahli-list { display: flex; flex-direction: column; gap: 6px; }
-.ff-ahli-row { display: flex; gap: 6px; align-items: center; }
-.ff-ahli-row .ff-ahli-nama { flex: 2; }
-.ff-ahli-row .ff-ahli-jawatan { flex: 2; }
+.ff-submit-btn:disabled { background: #4338ca; opacity: 0.6; cursor: not-allowed; }
+/* Multi-row (ahli / pegawai) */
+.ff-ahli-list { display: flex; flex-direction: column; gap: 4px; }
+.ff-ahli-row { display: flex; gap: 4px; align-items: center; }
+.ff-ahli-row .ff-ahli-nama,
+.ff-ahli-row .ff-ahli-jawatan { flex: 1; min-width: 0; }
 .ff-ahli-remove {
-    flex: 0 0 auto; width: 28px; height: 28px; border: none; border-radius: 6px;
-    background: #ef4444; color: #fff; font-size: 13px; cursor: pointer;
+    flex: 0 0 22px; height: 22px; border: none; border-radius: 5px;
+    background: #ef4444; color: #fff; font-size: 11px; cursor: pointer;
     display: flex; align-items: center; justify-content: center; transition: background 0.15s;
 }
 .ff-ahli-remove:hover { background: #dc2626; }
-.ff-ahli-remove:disabled { background: #9ca3af; cursor: not-allowed; }
+.ff-ahli-remove:disabled { background: #475569; cursor: not-allowed; }
 .ff-ahli-add {
-    align-self: flex-start; margin-top: 2px; padding: 5px 12px; border: 1.5px dashed #6366f1;
-    border-radius: 7px; background: transparent; color: #6366f1; font-size: 12px;
-    cursor: pointer; transition: background 0.15s;
+    align-self: flex-start; margin-top: 3px; padding: 3px 10px;
+    border: 1.5px dashed #6366f1; border-radius: 6px; background: transparent;
+    color: #818cf8; font-size: 11px; cursor: pointer; transition: background 0.15s;
 }
-.ff-ahli-add:hover { background: rgba(99,102,241,0.08); }
-@media (prefers-color-scheme: dark) {
-    .ff-input { background: #1e293b; color: #f1f5f9; border-color: #334155; }
-    .ff-input:focus { border-color: #818cf8; background: #0f172a; }
-    .ff-input:disabled { background: #1e293b; color: #475569; }
-    .ff-label { color: #94a3b8; }
-}
+.ff-ahli-add:hover { background: rgba(99,102,241,0.1); }
 .review-all-good {
     padding: 10px 14px; font-size: 13px; color: #065f46;
     background: rgba(16,185,129,0.08);

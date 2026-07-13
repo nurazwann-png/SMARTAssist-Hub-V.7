@@ -751,8 +751,8 @@ const _FIELD_DEFS = {
     'Hari':                                   { type: 'text',     ph: 'auto-isi apabila tarikh dipilih' },
     'Masa Program':                           { type: 'text',     ph: 'cth: 8.00 pagi' },
     'Nama Organisasi':                        { type: 'text',     ph: 'cth: Pejabat Pendidikan Daerah Dalat' },
-    'Nama Pegawai Yang Terlibat':             { type: 'textarea', ph: 'cth: Ahmad bin Ali, Pen PPD\nSiti binti Rahman, Pen PPD' },
-    'Jawatan Pegawai Yang Terlibat':          { type: 'text',     ph: 'cth: Penolong PPD' },
+    'Nama Pegawai Yang Terlibat':             { type: 'pegawai-list', ph: '' },
+    'Jawatan Pegawai Yang Terlibat':          { type: '_skip', ph: '' },
     'Objektif Program':                       { type: 'textarea', ph: 'Nyatakan objektif program...' },
     'Nama Penyedia Laporan':                  { type: 'text',     ph: 'cth: Ahmad bin Ali' },
     'Jawatan Penyedia':                       { type: 'text',     ph: 'cth: Penolong PPD' },
@@ -775,35 +775,48 @@ let _formCounter = 0;
 function _buildMissingFieldsForm(missingLabels) {
     if (!missingLabels || missingLabels.length === 0) return '';
     const fid = 'ff_' + (++_formCounter);
-    let html = `<div class="da-section fields-form-section">
-        <div class="da-section-title">\u{1F4DD} Sila Isikan Maklumat</div>
-        <form class="fields-form" id="${fid}" onsubmit="event.preventDefault();_submitFieldsForm('${fid}')">`;
+    let rows = '';
     missingLabels.forEach(label => {
         const def = _FIELD_DEFS[label] || { type: 'text', ph: '' };
+        if (def.type === '_skip') return;
         const iid = `${fid}_${label.replace(/\W/g,'_')}`;
-        html += `<div class="ff-field">
-            <label class="ff-label" for="${iid}">${escapeHtml(label)}</label>`;
-        if (def.type === 'ahli-list') {
-            html += `<div class="ff-ahli-list" id="${iid}" data-label="${escapeAttr(label)}">
-                <div class="ff-ahli-row">
-                    <input class="ff-input ff-ahli-nama" type="text" placeholder="Nama ahli">
-                    <input class="ff-input ff-ahli-jawatan" type="text" placeholder="Jawatan">
-                    <button type="button" class="ff-ahli-remove" onclick="_removeAhliRow(this)" title="Buang">✕</button>
+        const isWide = def.type === 'textarea' || def.type === 'ahli-list' || def.type === 'pegawai-list';
+        if (isWide) {
+            let widget = '';
+            if (def.type === 'textarea') {
+                widget = `<textarea class="ff-input" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}" rows="2"></textarea>`;
+            } else {
+                const addLabel = def.type === 'pegawai-list' ? '＋ Tambah Pegawai' : '＋ Tambah Ahli';
+                const namaPh  = def.type === 'pegawai-list' ? 'Nama pegawai' : 'Nama ahli';
+                const extraAttr = def.type === 'pegawai-list' ? ' data-type="pegawai-list"' : '';
+                widget = `<div class="ff-ahli-list" id="${iid}" data-label="${escapeAttr(label)}"${extraAttr}>
+                    <div class="ff-ahli-row">
+                        <input class="ff-input ff-ahli-nama" type="text" placeholder="${namaPh}">
+                        <input class="ff-input ff-ahli-jawatan" type="text" placeholder="Jawatan">
+                        <button type="button" class="ff-ahli-remove" onclick="_removeAhliRow(this)" title="Buang">✕</button>
+                    </div>
                 </div>
-            </div>
-            <button type="button" class="ff-ahli-add" onclick="_addAhliRow('${iid}')">＋ Tambah Ahli</button>`;
-        } else if (def.type === 'textarea') {
-            html += `<textarea class="ff-input" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}" rows="2"></textarea>`;
-        } else if (def.type === 'date') {
-            html += `<input class="ff-input ff-date" type="date" id="${iid}" data-label="${escapeAttr(label)}" data-is-date="1" onchange="_onDateChange(this,'${fid}')">`;
+                <button type="button" class="ff-ahli-add" onclick="_addAhliRow('${iid}')">${addLabel}</button>`;
+            }
+            rows += `<tr class="ff-span"><td colspan="2"><label class="ff-label" for="${iid}">${escapeHtml(label)}</label>${widget}</td></tr>`;
         } else {
-            html += `<input class="ff-input" type="text" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}">`;
+            let input = '';
+            if (def.type === 'date') {
+                input = `<input class="ff-input ff-date" type="date" id="${iid}" data-label="${escapeAttr(label)}" data-is-date="1" onchange="_onDateChange(this,'${fid}')">`;
+            } else {
+                input = `<input class="ff-input" type="text" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}">`;
+            }
+            rows += `<tr><td><label class="ff-label" for="${iid}">${escapeHtml(label)}</label></td><td>${input}</td></tr>`;
         }
-        html += `</div>`;
     });
-    html += `<button type="submit" class="ff-submit-btn">\u{1F4E4} Hantar Maklumat</button>
+    return `<div class="da-section fields-form-section">
+        <div class="da-section-title">\u{1F4DD} Sila Isikan Maklumat</div>
+        <form class="fields-form" id="${fid}" onsubmit="event.preventDefault();_submitFieldsForm('${fid}')">
+        <table class="ff-table"><tbody>${rows}</tbody></table>
+        <table class="ff-table"><tbody><tr class="ff-submit-row"><td colspan="2">
+            <button type="submit" class="ff-submit-btn">\u{1F4E4} Hantar Maklumat</button>
+        </td></tr></tbody></table>
         </form></div>`;
-    return html;
 }
 
 function _onDateChange(input, fid) {
@@ -840,13 +853,22 @@ function _submitFieldsForm(fid) {
     const parts = [];
     form.querySelectorAll('[data-label]').forEach(el => {
         if (el.classList.contains('ff-ahli-list')) {
-            const entries = [];
+            const isPegawai = el.dataset.type === 'pegawai-list';
+            const names = [], jawatans = [];
             el.querySelectorAll('.ff-ahli-row').forEach(row => {
                 const nama = row.querySelector('.ff-ahli-nama').value.trim();
                 const jawatan = row.querySelector('.ff-ahli-jawatan').value.trim();
-                if (nama) entries.push(jawatan ? `${nama} (${jawatan})` : nama);
+                if (nama) { names.push(nama); jawatans.push(jawatan || nama); }
             });
-            if (entries.length) parts.push(`${el.dataset.label}: ${entries.join(', ')}`);
+            if (isPegawai) {
+                if (names.length) {
+                    parts.push(`${el.dataset.label}: ${names.join(', ')}`);
+                    parts.push(`Jawatan Pegawai Yang Terlibat: ${jawatans.join(', ')}`);
+                }
+            } else {
+                const entries = names.map((n, i) => jawatans[i] ? `${n} (${jawatans[i]})` : n);
+                if (entries.length) parts.push(`${el.dataset.label}: ${entries.join(', ')}`);
+            }
         } else {
             let val = el.value.trim();
             if (!val) return;
