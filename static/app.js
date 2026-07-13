@@ -889,13 +889,16 @@ function _submitFieldsForm(fid) {
 // ═══════════════════════════════════════════════════
 
 function buildLetterHtml(data) {
-    let html = '<div class="message-bubble structured-response">';
+    const hasMissingFields = data.fields_status && data.fields_status.missing && data.fields_status.missing.length > 0;
+    let html = `<div class="message-bubble structured-response${hasMissingFields ? ' has-form' : ''}">`;
 
-    html += `<div class="da-message">${escapeHtml(data.message || '')}</div>`;
+    if (!hasMissingFields) {
+        html += `<div class="da-message">${escapeHtml(data.message || '')}</div>`;
+    }
 
     // Maklumat terkumpul disembunyikan — bekerja di belakang tabir
 
-    if (data.fields_status && data.fields_status.missing && data.fields_status.missing.length > 0) {
+    if (hasMissingFields) {
         html += _buildMissingFieldsForm(data.fields_status.missing);
     }
 

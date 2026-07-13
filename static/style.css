@@ -427,7 +427,8 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 }
 
 /* Structured response */
-.structured-response { max-width: 90%; padding: 0; overflow: hidden; }
+.structured-response { max-width: 90%; padding: 0; overflow: hidden; white-space: normal; }
+.structured-response.has-form { max-width: 100%; width: 100%; }
 .da-message { padding: 14px 16px; font-size: 14px; line-height: 1.7; }
 .da-section {
     padding: 12px 16px; border-top: 1px solid var(--border);
@@ -526,7 +527,9 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 .undo-fix-btn:hover { background: #b91c1c; }
 
 /* ── Inline missing-fields form ── */
-.fields-form-section { padding: 6px 0 2px; }
+.fields-form-section { padding: 6px 0 2px; border-top: none !important; }
+.has-form .fields-form-section { padding: 10px 16px 12px; }
+.has-form .da-section-title { margin-bottom: 10px; }
 .fields-form { margin-top: 6px; }
 .ff-table { width: 100%; border-collapse: collapse; }
 .ff-table tr { border-bottom: 1px solid rgba(255,255,255,0.06); }
