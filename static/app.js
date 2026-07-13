@@ -956,14 +956,35 @@ function renderChart(container, chartConfig) {
 
 function toggleChartSize(btn) {
     const wrapper = btn.closest('.da-chart-wrapper');
-    wrapper.classList.toggle('expanded');
-    const expanded = wrapper.classList.contains('expanded');
+    const container = wrapper.querySelector('.da-chart-container');
+    const expanded = !wrapper.classList.contains('expanded');
+    wrapper.classList.toggle('expanded', expanded);
+
     let overlay = document.querySelector('.chart-overlay');
+    if (!overlay) { overlay = document.createElement('div'); overlay.className = 'chart-overlay'; document.body.appendChild(overlay); }
+
     if (expanded) {
-        if (!overlay) { overlay = document.createElement('div'); overlay.className = 'chart-overlay'; document.body.appendChild(overlay); }
+        // Move container to body to escape any stacking context issues
+        wrapper._placeholder = document.createComment('chart-placeholder');
+        container.before(wrapper._placeholder);
+        document.body.appendChild(container);
+        container.style.cssText = `
+            position:fixed; top:50vh; left:50vw;
+            transform:translate(-50%,-50%);
+            width:92vw; height:82vh; z-index:1001;
+            background:#ffffff; border-radius:16px;
+            padding:28px 32px; border:1px solid #cbd5e1;
+            box-shadow:0 24px 64px rgba(0,0,0,0.7);
+        `;
         overlay.classList.add('active');
-        overlay.onclick = () => { wrapper.classList.remove('expanded'); overlay.classList.remove('active'); recolorChart(wrapper, false); };
-    } else if (overlay) { overlay.classList.remove('active'); }
+        const collapse = () => { toggleChartSize(btn); overlay.removeEventListener('click', collapse); };
+        overlay.addEventListener('click', collapse);
+    } else {
+        // Return container to original position
+        container.style.cssText = '';
+        if (wrapper._placeholder) { wrapper._placeholder.replaceWith(container); wrapper._placeholder = null; }
+        overlay.classList.remove('active');
+    }
     recolorChart(wrapper, expanded);
 }
 
