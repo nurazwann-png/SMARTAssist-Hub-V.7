@@ -828,6 +828,7 @@ let _pendingFixBtn = null;
 let _pendingFixMsgDiv = null;
 let _pendingLetterFixBtn = null;
 let _pendingLetterMsgDiv = null;
+let _suppressUserMsg = false;
 
 function fixReviewIssue(btn) {
     const prompt = btn.dataset.prompt;
@@ -837,6 +838,7 @@ function fixReviewIssue(btn) {
     btn.classList.add('fix-processing');
     _pendingFixBtn = btn;
     _pendingFixMsgDiv = btn.closest('.message');
+    _suppressUserMsg = true;
     const input = document.getElementById('chatInput');
     if (!input) return;
     input.value = prompt;
@@ -853,6 +855,7 @@ function fixLetterIssue(btn) {
     btn.classList.add('fix-processing');
     _pendingLetterFixBtn = btn;
     _pendingLetterMsgDiv = btn.closest('.message');
+    _suppressUserMsg = true;
     const input = document.getElementById('chatInput');
     if (!input) return;
     input.value = prompt;
@@ -1340,7 +1343,8 @@ async function sendMessage() {
     if (!message || isProcessing) return;
     chatInput.value = '';
     chatInput.style.height = 'auto';
-    addMessage(message, 'user');
+    if (!_suppressUserMsg) addMessage(message, 'user');
+    _suppressUserMsg = false;
     setProcessing(true);
 
     try {
