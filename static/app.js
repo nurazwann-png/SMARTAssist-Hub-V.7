@@ -768,9 +768,10 @@ function replyNeedsInfo(question) {
 }
 
 function fixIssue(prompt) {
-    const input = document.getElementById('messageInput');
+    const input = document.getElementById('chatInput');
     if (!input) return;
     input.value = prompt;
+    input.dispatchEvent(new Event('input'));
     input.focus();
     document.getElementById('sendBtn')?.click();
 }
