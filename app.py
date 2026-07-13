@@ -20,6 +20,31 @@ def _parse_agent_json(text: str):
             except (json.JSONDecodeError, ValueError):
                 pass
     return None
+
+
+def _shorten_doc_message(structured, lang="ms"):
+    """Replace the long dumped document in `message` with a short notice.
+
+    The LLM sometimes embeds the whole document in the `message` field, which
+    then renders in full above the preview. Since the full document already
+    appears in the pratonton (document_preview / corrected_document), keep the
+    message area to a short notification. Applies to all three document agents.
+    """
+    if not structured:
+        return
+    en = (lang == "en")
+    if structured.get("document_preview"):
+        structured["message"] = (
+            "✅ Document ready. Please review the preview below."
+            if en else
+            "✅ Dokumen telah dijana. Sila semak pratonton di bawah."
+        )
+    elif structured.get("corrected_document"):
+        structured["message"] = (
+            "✅ Document corrected. Please review the preview below."
+            if en else
+            "✅ Dokumen telah diperbetulkan. Sila semak pratonton di bawah."
+        )
 from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, Form
@@ -123,6 +148,7 @@ async def chat(req: ChatRequest):
     structured = None
     if agent in ("data_analysis", "letter_generator", "report_generator", "document_reviewer"):
         structured = _parse_agent_json(output)
+        _shorten_doc_message(structured, getattr(req, "lang", "ms"))
 
     return JSONResponse({
         "response": output,
@@ -655,6 +681,8 @@ async def agent_chat(req: AgentChatRequest):
                 output = json.dumps(structured, ensure_ascii=False)
         except Exception:
             pass
+
+    _shorten_doc_message(structured, getattr(req, "lang", "ms"))
 
     return JSONResponse({
         "response": output,
