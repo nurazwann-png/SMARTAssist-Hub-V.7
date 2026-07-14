@@ -892,6 +892,9 @@ function _buildMissingFieldsForm(missingLabels) {
                 const addLabel = def.type === 'pegawai-list' ? '＋ Tambah Pegawai' : '＋ Tambah Ahli';
                 const namaPh  = def.type === 'pegawai-list' ? 'Nama pegawai' : 'Nama ahli';
                 const extraAttr = def.type === 'pegawai-list' ? ' data-type="pegawai-list"' : '';
+                const semuaBtn = def.type === 'pegawai-list'
+                    ? `<button type="button" class="ff-ahli-semua" onclick="_toggleSemuaHadir('${iid}')">☑ Semua Guru/Staf Hadir</button>`
+                    : '';
                 widget = `<div class="ff-ahli-list" id="${iid}" data-label="${escapeAttr(label)}"${extraAttr}>
                     <div class="ff-ahli-row">
                         <input class="ff-input ff-ahli-nama" type="text" placeholder="${namaPh}">
@@ -899,7 +902,10 @@ function _buildMissingFieldsForm(missingLabels) {
                         <button type="button" class="ff-ahli-remove" onclick="_removeAhliRow(this)" title="Buang">✕</button>
                     </div>
                 </div>
-                <button type="button" class="ff-ahli-add" onclick="_addAhliRow('${iid}')">${addLabel}</button>`;
+                <div class="ff-ahli-actions">
+                    <button type="button" class="ff-ahli-add" onclick="_addAhliRow('${iid}')">${addLabel}</button>
+                    ${semuaBtn}
+                </div>`;
             }
             rows += `<tr class="ff-span"><td colspan="2"><label class="ff-label" for="${iid}">${escapeHtml(label)}</label>${widget}</td></tr>`;
         } else {
@@ -941,6 +947,42 @@ function _addAhliRow(listId) {
         <input class="ff-input ff-ahli-jawatan" type="text" placeholder="Jawatan">
         <button type="button" class="ff-ahli-remove" onclick="_removeAhliRow(this)" title="Buang">✕</button>`;
     list.appendChild(row);
+}
+
+function _toggleSemuaHadir(listId) {
+    const list = document.getElementById(listId);
+    if (!list) return;
+    const btn = list.parentElement.querySelector('.ff-ahli-semua');
+    const isActive = btn && btn.classList.contains('active');
+
+    if (isActive) {
+        // Deactivate — clear and restore one blank row
+        btn.classList.remove('active');
+        btn.textContent = '☑ Semua Guru/Staf Hadir';
+        list.innerHTML = `<div class="ff-ahli-row">
+            <input class="ff-input ff-ahli-nama" type="text" placeholder="Nama pegawai">
+            <input class="ff-input ff-ahli-jawatan" type="text" placeholder="Jawatan">
+            <button type="button" class="ff-ahli-remove" onclick="_removeAhliRow(this)" title="Buang">✕</button>
+        </div>`;
+        list.parentElement.querySelector('.ff-ahli-add').style.display = '';
+    } else {
+        // Activate — ask for count then fill single row
+        const bilangan = prompt('Berapa ramai guru/staf yang hadir?\n(Tekan OK untuk teruskan atau biarkan kosong)', '');
+        if (bilangan === null) return; // cancelled
+        const namaEntry = bilangan.trim()
+            ? `Semua Guru dan Staf Yang Hadir (${bilangan.trim()} orang)`
+            : 'Semua Guru dan Staf Yang Hadir';
+        if (btn) {
+            btn.classList.add('active');
+            btn.textContent = '✕ Batal Semua Hadir';
+        }
+        list.innerHTML = `<div class="ff-ahli-row ff-ahli-row-semua">
+            <input class="ff-input ff-ahli-nama" type="text" value="${escapeAttr(namaEntry)}" readonly>
+            <input class="ff-input ff-ahli-jawatan" type="text" placeholder="Jawatan (cth: Guru)" value="Guru dan Staf">
+            <button type="button" class="ff-ahli-remove" onclick="_removeAhliRow(this)" title="Buang">✕</button>
+        </div>`;
+        list.parentElement.querySelector('.ff-ahli-add').style.display = 'none';
+    }
 }
 
 function _removeAhliRow(btn) {
@@ -1965,9 +2007,10 @@ async function openWordPreview() {
     } catch (_) {}
 
     let pagesHtml;
+    const _htmlContent = isHtmlMode ? previewHtml.innerHTML : null;
     if (isHtmlMode) {
-        // HTML preview already contains logo/letterhead — no need to add again
-        pagesHtml = `<div class="word-page" style="position:relative"><div class="word-page-html-content">${previewHtml.innerHTML}</div></div>`;
+        // Render single hidden page first to measure true content height
+        pagesHtml = `<div id="_wordHtmlMeasure" class="word-page" style="position:fixed;top:-9999px;left:-9999px;visibility:hidden;pointer-events:none;max-height:none;overflow:visible"><div class="word-page-html-content">${_htmlContent}</div></div>`;
     } else {
         if (!preview) return;
         const text = preview.innerText || preview.textContent;
@@ -2004,6 +2047,37 @@ async function openWordPreview() {
                 preview.innerText = wordText.innerText;
             });
         }
+    }
+
+    // HTML mode: measure rendered height then paginate if content exceeds one A4 page
+    if (isHtmlMode) {
+        requestAnimationFrame(() => {
+            const measure = document.getElementById('_wordHtmlMeasure');
+            if (!measure) return;
+            const contentEl = measure.querySelector('.word-page-html-content');
+            const totalH = contentEl ? contentEl.scrollHeight : measure.scrollHeight;
+            measure.remove();
+
+            const MM_TO_PX = 3.7795;
+            // A4 content area height: 297mm - 25.4mm top - 25.4mm bottom = 246.2mm
+            const pageContentH = Math.round(246.2 * MM_TO_PX);
+            const numPages = Math.max(1, Math.ceil(totalH / pageContentH));
+            const scroll = document.querySelector('#wordPreviewOverlay .word-preview-scroll');
+            if (!scroll) return;
+
+            if (numPages <= 1) {
+                scroll.innerHTML = `<div class="word-page"><div class="word-page-html-content">${_htmlContent}</div></div>`;
+            } else {
+                scroll.innerHTML = Array.from({ length: numPages }, (_, i) => {
+                    const offsetPx = i * pageContentH;
+                    const pageNum = `<div class="word-page-num">${i + 1} / ${numPages}</div>`;
+                    return `<div class="word-page" style="overflow:hidden;max-height:297mm;min-height:297mm">
+                        <div class="word-page-html-content" style="position:relative;top:-${offsetPx}px">${_htmlContent}</div>
+                        ${pageNum}
+                    </div>`;
+                }).join('');
+            }
+        });
     }
 }
 

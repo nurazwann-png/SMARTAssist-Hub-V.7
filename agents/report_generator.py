@@ -214,11 +214,25 @@ def _build_report(f: dict) -> str:
     nama_list = _split_field(f.get("pegawai_nama", ""))
     jawatan_list = _split_field(f.get("pegawai_jawatan", ""))
     if nama_list:
-        rows = []
-        for i, nama in enumerate(nama_list):
-            jawatan = jawatan_list[i] if i < len(jawatan_list) else ""
-            rows.append(f"{i+1}) {nama}" + (f"\n   {jawatan}" if jawatan else ""))
-        pegawai_lines = "\n".join(rows)
+        if len(nama_list) >= 2:
+            # 2-column layout: pair names side by side
+            col_w = 38
+            rows = []
+            for i in range(0, len(nama_list), 2):
+                nm_l = f"{i+1}) {nama_list[i]}"
+                jw_l = f"   {jawatan_list[i]}" if i < len(jawatan_list) else ""
+                if i + 1 < len(nama_list):
+                    nm_r = f"{i+2}) {nama_list[i+1]}"
+                    jw_r = f"   {jawatan_list[i+1]}" if i + 1 < len(jawatan_list) else ""
+                else:
+                    nm_r = jw_r = ""
+                rows.append(f"{nm_l:<{col_w}}{nm_r}")
+                if jw_l or jw_r:
+                    rows.append(f"{jw_l:<{col_w}}{jw_r}")
+            pegawai_lines = "\n".join(rows)
+        else:
+            jawatan = jawatan_list[0] if jawatan_list else ""
+            pegawai_lines = f"1) {nama_list[0]}" + (f"\n   {jawatan}" if jawatan else "")
     else:
         pegawai_lines = "[PLACEHOLDER]"
 
@@ -257,6 +271,7 @@ DISEDIAKAN OLEH                          DISAHKAN OLEH
 ............................................................    ............................................................
 NAMA    : {f.get('penyedia_nama', '[PLACEHOLDER]')}              NAMA    : {f.get('pengesah_nama', '[PLACEHOLDER]')}
 JAWATAN : {f.get('penyedia_jawatan', '[PLACEHOLDER]')}           JAWATAN : {f.get('pengesah_jawatan', '[PLACEHOLDER]')}
+ORG     : {f.get('organisasi', '')}                              ORG     : {f.get('organisasi', '')}
 TARIKH  : {f.get('tarikh_disediakan', '[PLACEHOLDER]')}"""
 
 
@@ -415,11 +430,28 @@ def _build_report_html(f: dict) -> str:
 
     nama_pg = _split_f(f.get("pegawai_nama", ""))
     jawatan_pg = _split_f(f.get("pegawai_jawatan", ""))
-    pg_parts = []
-    for i, nm in enumerate(nama_pg):
-        jw = jawatan_pg[i] if i < len(jawatan_pg) else ""
-        pg_parts.append(f"{i+1}) {nm}" + (f"<br>&nbsp;&nbsp;&nbsp;{jw}" if jw else ""))
-    pegawai_html = "<br>".join(pg_parts) if pg_parts else ""
+    if len(nama_pg) >= 2:
+        # 2-column layout to fill available space
+        cell_style = 'style="width:50%;vertical-align:top;padding:3px 8px 5px 0"'
+        rows_html = []
+        for i in range(0, len(nama_pg), 2):
+            nm_l = nama_pg[i]
+            jw_l = jawatan_pg[i] if i < len(jawatan_pg) else ""
+            left = f"{i+1}) {nm_l}" + (f"<br>&nbsp;&nbsp;&nbsp;{jw_l}" if jw_l else "")
+            if i + 1 < len(nama_pg):
+                nm_r = nama_pg[i + 1]
+                jw_r = jawatan_pg[i + 1] if i + 1 < len(jawatan_pg) else ""
+                right = f"{i+2}) {nm_r}" + (f"<br>&nbsp;&nbsp;&nbsp;{jw_r}" if jw_r else "")
+            else:
+                right = ""
+            rows_html.append(f'<tr><td {cell_style}>{left}</td><td {cell_style}>{right}</td></tr>')
+        pegawai_html = f'<table style="width:100%;border-collapse:collapse">{"".join(rows_html)}</table>'
+    elif nama_pg:
+        nm = nama_pg[0]
+        jw = jawatan_pg[0] if jawatan_pg else ""
+        pegawai_html = f"1) {nm}" + (f"<br>&nbsp;&nbsp;&nbsp;{jw}" if jw else "")
+    else:
+        pegawai_html = ""
 
     objektif = f.get("objektif", "")
     if isinstance(objektif, list):
@@ -468,14 +500,16 @@ def _build_report_html(f: dict) -> str:
         f'<tr>'
         f'<td colspan="2" style="border:1px solid #000;padding:8px;height:80px;vertical-align:bottom">'
         f'............................................................<br>'
-        f'NAMA &nbsp;&nbsp;&nbsp;: {f.get("penyedia_nama","")}<br>'
-        f'JAWATAN : {f.get("penyedia_jawatan","")}<br>'
-        f'TARIKH &nbsp;&nbsp;: {f.get("tarikh_disediakan","")}'
+        f'NAMA &nbsp;&nbsp;&nbsp;&nbsp;: {f.get("penyedia_nama","")}<br>'
+        f'JAWATAN &nbsp;: {f.get("penyedia_jawatan","")}<br>'
+        f'ORGANISASI : {f.get("organisasi","")}<br>'
+        f'TARIKH &nbsp;&nbsp;&nbsp;: {f.get("tarikh_disediakan","")}'
         f'</td>'
         f'<td colspan="2" style="border:1px solid #000;padding:8px;height:80px;vertical-align:bottom">'
         f'............................................................<br>'
-        f'NAMA &nbsp;&nbsp;&nbsp;: {f.get("pengesah_nama","")}<br>'
-        f'JAWATAN : {f.get("pengesah_jawatan","")}'
+        f'NAMA &nbsp;&nbsp;&nbsp;&nbsp;: {f.get("pengesah_nama","")}<br>'
+        f'JAWATAN &nbsp;: {f.get("pengesah_jawatan","")}<br>'
+        f'ORGANISASI : {f.get("organisasi","")}'
         f'</td>'
         f'</tr>'
         f'</table>'
@@ -748,16 +782,19 @@ def build_docx(session_id: str) -> bytes | None:
     _add_two_col_row("DISEDIAKAN OLEH", "DISAHKAN OLEH", left_bold=True, right_bold=True, right_center=True, min_height=None)
 
     # Row 11: Signature blocks side by side
+    org = f.get('organisasi', '')
     sig_left = (
         f"............................................................\n"
-        f"NAMA    : {f.get('penyedia_nama', '')}\n"
-        f"JAWATAN : {f.get('penyedia_jawatan', '')}\n"
-        f"TARIKH  : {f.get('tarikh_disediakan', '')}"
+        f"NAMA       : {f.get('penyedia_nama', '')}\n"
+        f"JAWATAN    : {f.get('penyedia_jawatan', '')}\n"
+        f"ORGANISASI : {org}\n"
+        f"TARIKH     : {f.get('tarikh_disediakan', '')}"
     )
     sig_right = (
         f"............................................................\n"
-        f"NAMA    : {f.get('pengesah_nama', '')}\n"
-        f"JAWATAN : {f.get('pengesah_jawatan', '')}"
+        f"NAMA       : {f.get('pengesah_nama', '')}\n"
+        f"JAWATAN    : {f.get('pengesah_jawatan', '')}\n"
+        f"ORGANISASI : {org}"
     )
     _add_two_col_row(sig_left, sig_right, left_bold=False, min_height="1600")
 

@@ -699,12 +699,24 @@ textarea.ff-input { min-height: 52px; }
 }
 .ff-ahli-remove:hover { background: #dc2626; }
 .ff-ahli-remove:disabled { background: #475569; cursor: not-allowed; }
+.ff-ahli-actions { display: flex; gap: 8px; align-items: center; margin-top: 3px; flex-wrap: wrap; }
 .ff-ahli-add {
-    align-self: flex-start; margin-top: 3px; padding: 3px 10px;
+    padding: 3px 10px;
     border: 1.5px dashed #6366f1; border-radius: 6px; background: transparent;
     color: #818cf8; font-size: 11px; cursor: pointer; transition: background 0.15s;
 }
 .ff-ahli-add:hover { background: rgba(99,102,241,0.1); }
+.ff-ahli-semua {
+    padding: 3px 10px;
+    border: 1.5px dashed #10b981; border-radius: 6px; background: transparent;
+    color: #34d399; font-size: 11px; cursor: pointer; transition: all 0.15s;
+}
+.ff-ahli-semua:hover { background: rgba(16,185,129,0.1); }
+.ff-ahli-semua.active {
+    border-style: solid; border-color: #ef4444; color: #f87171;
+}
+.ff-ahli-semua.active:hover { background: rgba(239,68,68,0.1); }
+.ff-ahli-row-semua .ff-ahli-nama { color: #94a3b8; font-style: italic; }
 .review-all-good {
     padding: 10px 14px; font-size: 13px; color: #065f46;
     background: rgba(16,185,129,0.08);
