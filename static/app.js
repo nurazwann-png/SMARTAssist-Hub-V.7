@@ -1016,7 +1016,20 @@ function scrollToAnnotation(num) {
     if (!item) return;
     document.querySelectorAll('.rev-ann-item.ann-active').forEach(el => el.classList.remove('ann-active'));
     item.classList.add('ann-active');
-    item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // Scroll the annotation column container (not the whole page)
+    const col = item.closest('.rev-ann-column');
+    if (col) {
+        // getBoundingClientRect gives visual position; add current scrollTop to get
+        // the absolute position within the scroll container, then subtract 12px padding
+        const targetTop = item.getBoundingClientRect().top
+                        - col.getBoundingClientRect().top
+                        + col.scrollTop
+                        - 12;
+        col.scrollTop = targetTop;
+    } else {
+        item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 }
 
 function highlightDocBadge(num) {
