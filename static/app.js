@@ -739,70 +739,62 @@ function buildTableHtml(table) {
     return html;
 }
 
-// Split doc into blocks preserving blank lines as spacers
-function _splitDocBlocks(text) {
-    const lines = text.split('\n');
-    const blocks = []; // {lines, isEmpty, blockIdx(for non-empty)}
-    let cur = null, blockIdx = 0;
-    lines.forEach(line => {
-        if (!line.trim()) {
-            if (cur) { cur.text = cur.lines.join(' '); blocks.push(cur); cur = null; }
-            blocks.push({ lines: [], isEmpty: true });
-        } else {
-            if (!cur) cur = { lines: [], isEmpty: false, blockIdx: blockIdx++ };
-            cur.lines.push(line);
-        }
-    });
-    if (cur) { cur.text = cur.lines.join(' '); blocks.push(cur); }
-    return blocks;
+// Split doc into individual lines — each line is its own matchable unit
+function _splitDocLines(text) {
+    return text.split('\n').map((line, i) => ({
+        line: line,
+        trimmed: line.trim(),
+        isEmpty: !line.trim(),
+        lineIdx: i,
+    }));
 }
 
-function _matchIssueToBlock(issue, nonEmptyBlocks) {
-    if (!nonEmptyBlocks.length) return -1;
+function _matchIssueToLine(issue, allLines) {
+    const ne = allLines.filter(l => !l.isEmpty); // non-empty lines
+    if (!ne.length) return -1;
+
     const loc = (issue.location || '').toLowerCase().trim();
     const combined = (loc + ' ' + (issue.issue || '') + ' ' + (issue.suggestion || '')).toLowerCase();
 
-    // 1. Paragraph number: "Perenggan 2", "Paragraph 3"
+    // 1. Numbered paragraph: "Perenggan 3" → find line starting with "3."
     const numMatch = loc.match(/(?:perenggan|paragraph)\s*(?:ke-?)?(\d+)/);
     if (numMatch) {
         const n = parseInt(numMatch[1]);
-        // First: look for a block whose first line starts with "N." or "N " (numbered paragraph in letter body)
-        const numbered = nonEmptyBlocks.find(b => /^(\d+)[.\s]/.test(b.lines[0] || '') && parseInt(b.lines[0]) === n);
-        if (numbered) return numbered.blockIdx;
-        // Fallback: nth non-empty block (0-indexed)
-        const byIndex = nonEmptyBlocks[n - 1];
-        return byIndex ? byIndex.blockIdx : -1;
+        const numbered = ne.find(l => /^\d+[.\s]/.test(l.trimmed) && parseInt(l.trimmed) === n);
+        if (numbered) return numbered.lineIdx;
+        return ne[n - 1]?.lineIdx ?? -1;
     }
 
-    // 2. Structural position heuristics
-    const firstBlock = nonEmptyBlocks[0];
-    const lastBlock  = nonEmptyBlocks[nonEmptyBlocks.length - 1];
-    if (/(?:pengirim|penghantar|nama.*pengirim|alamat.*pengirim|nama.*atas|bahagian.*atas|header)/.test(loc))
-        return firstBlock.blockIdx;
-    if (/(?:penutup|tandatangan|tanda tangan|yang benar|yang menjalankan amanah|sekian|penandatangan)/.test(loc))
-        return lastBlock.blockIdx;
+    // 2. Positional heuristics
+    if (/(?:pengirim|penghantar|nama.*pengirim|bahagian.*atas|header|ruj\.|no\.\s*ruj)/.test(loc))
+        return ne[0].lineIdx;
+    if (/(?:penutup|tandatangan|tanda tangan|yang benar|yang menjalankan|sekian|penandatangan)/.test(loc))
+        return ne[ne.length - 1].lineIdx;
     if (/(?:tajuk|perkara|subject|heading)/.test(loc)) {
-        // find first all-caps line block
-        const capsBlock = nonEmptyBlocks.find(b => b.text === b.text.toUpperCase() && b.text.trim().length > 3);
-        if (capsBlock) return capsBlock.blockIdx;
+        const caps = ne.find(l => l.trimmed.length > 4 && l.trimmed === l.trimmed.toUpperCase() && !/^[\d\s\.\:\-]+$/.test(l.trimmed));
+        if (caps) return caps.lineIdx;
     }
     if (/tarikh|date/.test(loc)) {
-        const dateBlock = nonEmptyBlocks.find(b => /\d{1,2}\s+\w+\s+\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(b.text));
-        if (dateBlock) return dateBlock.blockIdx;
+        const dl = ne.find(l => /\d{1,2}\s+\w+\s+\d{4}|\d{1,2}[\/\-]\d{1,2}/.test(l.line));
+        if (dl) return dl.lineIdx;
+    }
+    if (/(?:nama penerima|jawatan penerima|alamat penerima|penerima)/.test(loc)) {
+        // typically 2nd–4th non-empty line
+        return ne[Math.min(2, ne.length - 1)].lineIdx;
     }
 
-    // 3. Keyword search using ALL fields combined
-    const stopwords = new Set(['yang','dan','atau','dalam','untuk','pada','dengan','ini','itu','the','and','or','in','for','on','with','di','ke','ia','adalah','telah','akan','tidak','ada','saya','anda','bahawa','kepada','daripada','oleh','juga','telah','sudah']);
+    // 3. Keyword search across ALL issue fields
+    const stopwords = new Set(['yang','dan','atau','dalam','untuk','pada','dengan','ini','itu','the','and','or','in','for','on','with','di','ke','ia','adalah','telah','akan','tidak','ada','saya','anda','bahawa','kepada','daripada','oleh','juga','sudah']);
     const keywords = combined.split(/[\s,\/\-\(\):;\.\"\']+/).filter(w => w.length > 3 && !stopwords.has(w));
     if (!keywords.length) return -1;
 
-    let bestIdx = -1, bestScore = 0;
-    nonEmptyBlocks.forEach(b => {
-        const bLower = b.text.toLowerCase();
-        const score = keywords.reduce((s, kw) => s + (bLower.includes(kw) ? 1 : 0), 0);
-        if (score > bestScore) { bestScore = score; bestIdx = b.blockIdx; }
+    let bestLineIdx = -1, bestScore = 0;
+    ne.forEach(l => {
+        const ll = l.line.toLowerCase();
+        const score = keywords.reduce((s, kw) => s + (ll.includes(kw) ? 1 : 0), 0);
+        if (score > bestScore) { bestScore = score; bestLineIdx = l.lineIdx; }
     });
-    return bestScore >= 1 ? bestIdx : -1;
+    return bestScore >= 1 ? bestLineIdx : -1;
 }
 
 function toggleRevAnnotation(badge) {
@@ -845,17 +837,16 @@ function buildReviewHtml(data) {
 
 function _buildAnnotatedReview(data, docText) {
     const issues = data.issues || [];
-    const blocks = _splitDocBlocks(docText);
-    const nonEmptyBlocks = blocks.filter(b => !b.isEmpty);
+    const allLines = _splitDocLines(docText);
 
-    // Map issues to blockIdx
-    const blockIssues = {}; // blockIdx -> [{...issue, num}]
+    // Map each issue to a lineIdx
+    const lineIssues = {}; // lineIdx -> [{...issue, num}]
     const unmapped = [];
     issues.forEach((issue, i) => {
-        const bIdx = _matchIssueToBlock(issue, nonEmptyBlocks);
-        if (bIdx >= 0) {
-            if (!blockIssues[bIdx]) blockIssues[bIdx] = [];
-            blockIssues[bIdx].push({ ...issue, num: i + 1 });
+        const lIdx = _matchIssueToLine(issue, allLines);
+        if (lIdx >= 0) {
+            if (!lineIssues[lIdx]) lineIssues[lIdx] = [];
+            lineIssues[lIdx].push({ ...issue, num: i + 1 });
         } else {
             unmapped.push({ ...issue, num: i + 1 });
         }
@@ -864,6 +855,7 @@ function _buildAnnotatedReview(data, docText) {
     const scoreColors = { A: '#22c55e', B: '#3b82f6', C: '#f59e0b', D: '#ef4444' };
     const scoreLabels = { A: 'Cemerlang', B: 'Baik', C: 'Perlu Pembetulan', D: 'Banyak Isu' };
     const scoreColor = scoreColors[data.score] || '#6b7280';
+    const revId = 'rev_' + Date.now();
 
     let html = '<div class="rev-annotated">';
 
@@ -873,13 +865,16 @@ function _buildAnnotatedReview(data, docText) {
     if (data.summary) html += `<span class="rev-summary-text">${escapeHtml(data.summary)}</span>`;
     html += '</div>';
 
-    // Annotated document page
-    html += '<div class="rev-doc-page">';
+    // Doc page header with expand button
+    html += `<div class="rev-doc-header">`;
+    html += `<span class="rev-doc-label">📄 Pratonton Dokumen</span>`;
+    html += `<button class="rev-expand-btn" onclick="toggleRevExpand(this)" title="Kembangkan pratonton">⛶ Kembangkan</button>`;
+    html += `</div>`;
 
-    // Unmapped (global) issues at top
+    // Unmapped (global) issues shown above the doc
     if (unmapped.length) {
-        html += '<div class="rev-para-row rev-para-global">';
-        html += '<div class="rev-para-text rev-global-label">📌 Keseluruhan Dokumen</div>';
+        html += '<div class="rev-global-bar">';
+        html += '<span class="rev-global-label">📌 Keseluruhan Dokumen</span>';
         html += '<div class="rev-badges">';
         unmapped.forEach(issue => {
             const bCls = issue.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
@@ -891,29 +886,28 @@ function _buildAnnotatedReview(data, docText) {
             html += `<div class="ann-cat">${escapeHtml(issue.category || '')}</div>`;
             html += `<div class="ann-desc">${escapeHtml(issue.issue || '')}</div>`;
             if (issue.suggestion) html += `<div class="ann-suggestion">💡 ${escapeHtml(issue.suggestion)}</div>`;
-            html += `<button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="fixReviewIssue(this)">🔧 Betulkan</button>`;
+            html += `<button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="event.stopPropagation();fixReviewIssue(this)">🔧 Betulkan</button>`;
             html += '</div>';
         });
         html += '</div></div>';
     }
 
-    // Render all blocks preserving format
-    blocks.forEach(block => {
-        if (block.isEmpty) {
+    // Annotated document page — line by line
+    html += `<div class="rev-doc-page" id="${revId}_page">`;
+    allLines.forEach(lineObj => {
+        if (lineObj.isEmpty) {
             html += '<div class="rev-spacer"></div>';
             return;
         }
-        const bIssues = blockIssues[block.blockIdx] || [];
-        const hasWajib = bIssues.some(iss => iss.severity === 'WAJIB_BETULKAN');
-        const hasCadangan = bIssues.length > 0 && !hasWajib;
+        const lIssues = lineIssues[lineObj.lineIdx] || [];
+        const hasWajib = lIssues.some(iss => iss.severity === 'WAJIB_BETULKAN');
+        const hasCadangan = lIssues.length > 0 && !hasWajib;
         const rowCls = hasWajib ? ' has-wajib' : hasCadangan ? ' has-cadangan' : '';
-        // Render lines with <br> to preserve internal line breaks
-        const linesHtml = block.lines.map(l => escapeHtml(l)).join('<br>');
         html += `<div class="rev-para-row${rowCls}">`;
-        html += `<div class="rev-para-text">${linesHtml}</div>`;
-        if (bIssues.length) {
+        html += `<div class="rev-para-text">${escapeHtml(lineObj.line)}</div>`;
+        if (lIssues.length) {
             html += '<div class="rev-badges">';
-            bIssues.forEach(issue => {
+            lIssues.forEach(issue => {
                 const bCls = issue.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
                 const fixPrompt = escapeAttr(issue.suggestion
                     ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
@@ -924,14 +918,13 @@ function _buildAnnotatedReview(data, docText) {
                 html += `<div class="ann-loc">${escapeHtml(issue.location || '')}</div>`;
                 html += `<div class="ann-desc">${escapeHtml(issue.issue || '')}</div>`;
                 if (issue.suggestion) html += `<div class="ann-suggestion">💡 ${escapeHtml(issue.suggestion)}</div>`;
-                html += `<button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="fixReviewIssue(this)">🔧 Betulkan</button>`;
+                html += `<button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="event.stopPropagation();fixReviewIssue(this)">🔧 Betulkan</button>`;
                 html += '</div>';
             });
             html += '</div>';
         }
         html += '</div>';
     });
-
     html += '</div>'; // rev-doc-page
 
     if (issues.length === 0) {
@@ -960,12 +953,12 @@ function _buildAnnotatedReview(data, docText) {
         html += '</div>';
     }
 
-    // Corrected document
+    // Corrected document — uses .review-doc-preview-section so intercept in addMessage works
     if (data.corrected_document) {
         const remindMsg = currentLang === 'en'
             ? '⚠️ Please review the corrected document carefully before downloading.'
             : '⚠️ Sila semak semula dokumen yang telah diperbetulkan sebelum dimuat turun.';
-        html += `<div class="da-section doc-preview-section" style="background:var(--bg-secondary);border-radius:8px;padding:12px;margin-top:4px">`;
+        html += `<div class="da-section doc-preview-section review-doc-preview-section" style="background:var(--bg-secondary);border-radius:8px;padding:12px;margin-top:4px">`;
         html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span></div>`;
         html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview">${escapeHtml(data.corrected_document)}</pre>`;
         html += `<div class="doc-review-reminder">${remindMsg}</div>`;
@@ -973,8 +966,16 @@ function _buildAnnotatedReview(data, docText) {
         html += '</div>';
     }
 
-    html += '</div>';
+    html += '</div>'; // rev-annotated
     return html;
+}
+
+function toggleRevExpand(btn) {
+    const page = btn.closest('.rev-annotated')?.querySelector('.rev-doc-page');
+    if (!page) return;
+    const isExpanded = page.classList.toggle('rev-doc-expanded');
+    btn.textContent = isExpanded ? '⛶ Kecilkan' : '⛶ Kembangkan';
+    if (isExpanded) page.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ═══ Inline fields form (replaces "BELUM DIISI" list) ═══
