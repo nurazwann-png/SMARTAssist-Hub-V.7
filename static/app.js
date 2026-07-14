@@ -896,16 +896,27 @@ function _buildAnnotatedReview(data, docText) {
     const scoreLabels = { A: 'Cemerlang', B: 'Baik', C: 'Perlu Pembetulan', D: 'Banyak Isu' };
     const scoreColor = scoreColors[data.score] || '#6b7280';
 
-    // Assign num and map to lines
+    // Map each issue to its line index in the document
+    const issuesMapped = issues.map(issue => ({
+        ...issue,
+        _lineIdx: _matchIssueToLine(issue, allLines)
+    }));
+
+    // Re-number issues in document top-to-bottom order so badge N always
+    // matches annotation N in the right column
+    const mapped   = issuesMapped.filter(i => i._lineIdx >= 0).sort((a, b) => a._lineIdx - b._lineIdx);
+    const unmapped = issuesMapped.filter(i => i._lineIdx < 0);
+    [...mapped, ...unmapped].forEach((issue, i) => { issue.num = i + 1; });
+
+    // Build lineIssues map (keyed by lineIdx)
     const lineIssues = {};
-    issues.forEach((issue, i) => {
-        issue.num = i + 1;
-        const lIdx = _matchIssueToLine(issue, allLines);
-        if (lIdx >= 0) {
-            if (!lineIssues[lIdx]) lineIssues[lIdx] = [];
-            lineIssues[lIdx].push(issue);
-        }
+    mapped.forEach(issue => {
+        if (!lineIssues[issue._lineIdx]) lineIssues[issue._lineIdx] = [];
+        lineIssues[issue._lineIdx].push(issue);
     });
+
+    // Ordered list for annotation column (doc order first, then unmapped)
+    const orderedIssues = [...mapped, ...unmapped];
 
     const docHtml = _reviewDocHtml;
     const isPdf   = _reviewIsPdf;
@@ -972,7 +983,7 @@ function _buildAnnotatedReview(data, docText) {
     html += '</div>'; // rev-doc-page
 
     // Right: annotation column
-    html += _buildAnnColumn(issues);
+    html += _buildAnnColumn(orderedIssues);
 
     html += '</div>'; // rev-split-layout
 
