@@ -875,7 +875,7 @@ function _buildAnnColumn(issues) {
                 ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
                 : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`);
             html += `<div class="rev-ann-item" id="annItem_${issue.num}">`;
-            html += `<span class="rev-badge ${bCls} ann-num" onclick="highlightDocBadge(${issue.num})" title="Tunjuk dalam dokumen">${issue.num}</span>`;
+            html += `<span class="rev-badge ${bCls} ann-num">${issue.num}</span>`;
             html += `<div class="rev-ann-body">`;
             if (issue.category) html += `<div class="rev-ann-cat">${escapeHtml(issue.category)}</div>`;
             if (issue.location) html += `<div class="rev-ann-loc">📍 ${escapeHtml(issue.location)}</div>`;
@@ -1160,10 +1160,9 @@ function _injectBadgesIntoHtml(docHtml, lineIssues, allLines) {
         el.appendChild(badgeWrap);
     });
 
-    // Clone the node tree to detach from document before removing tmp
-    const result = tmp.cloneNode(true);
+    // Return tmp itself — cloneNode would strip event listeners
     document.body.removeChild(tmp);
-    return result; // returns a DOM node, not a string
+    return tmp;
 }
 
 function toggleRevExpand(btn) {

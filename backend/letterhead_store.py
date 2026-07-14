@@ -1,13 +1,16 @@
-"""Letterhead store — manages uploaded letterhead/logo images and active selection per type."""
+"""Letterhead store — manages uploaded letterhead/logo images via PostgreSQL.
 
-import json
+API awam tidak berubah. Fail fizikal masih disimpan di static/letterheads/;
+hanya metadata yang kini disimpan dalam PostgreSQL.
+"""
+
 import uuid
 from pathlib import Path
-from datetime import datetime
+
+from backend.db import dict_cur, get_conn
 
 _BASE = Path(__file__).parent.parent
 _LH_DIR = _BASE / "static" / "letterheads"
-_META_FILE = _LH_DIR / "metadata.json"
 
 _ALLOWED_EXT = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
 TYPES = ("letterhead", "logo")
@@ -17,51 +20,44 @@ def _ensure_dir():
     _LH_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _load() -> dict:
-    _ensure_dir()
-    if _META_FILE.exists():
-        try:
-            data = json.loads(_META_FILE.read_text(encoding="utf-8"))
-            # Migrate old format (single active_id → per-type active)
-            if "active_id" in data and "active_letterhead_id" not in data:
-                data["active_letterhead_id"] = data.pop("active_id")
-                data.setdefault("active_logo_id", None)
-                # Tag all existing entries as letterhead if no type set
-                for lh in data.get("letterheads", []):
-                    lh.setdefault("type", "letterhead")
-                _save(data)
-            return data
-        except (json.JSONDecodeError, OSError):
-            pass
-    return {"letterheads": [], "active_letterhead_id": None, "active_logo_id": None}
-
-
-def _save(data: dict):
-    _ensure_dir()
-    _META_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-def _active_key(lh_type: str) -> str:
+def _active_col(lh_type: str) -> str:
     return "active_logo_id" if lh_type == "logo" else "active_letterhead_id"
 
 
+# ── Baca ─────────────────────────────────────────────────────────────────────
+
 def list_letterheads(lh_type: str | None = None) -> list[dict]:
-    items = _load()["letterheads"]
-    if lh_type:
-        items = [lh for lh in items if lh.get("type", "letterhead") == lh_type]
-    return items
+    with get_conn() as conn, dict_cur(conn) as cur:
+        if lh_type:
+            cur.execute(
+                "SELECT id, name, filename, original_name, type, is_active, "
+                "uploaded_at AS uploaded FROM letterheads WHERE type = %s "
+                "ORDER BY uploaded_at DESC",
+                (lh_type,)
+            )
+        else:
+            cur.execute(
+                "SELECT id, name, filename, original_name, type, is_active, "
+                "uploaded_at AS uploaded FROM letterheads ORDER BY uploaded_at DESC"
+            )
+        return [dict(r) for r in cur.fetchall()]
 
 
 def get_active_by_type(lh_type: str) -> dict | None:
-    data = _load()
-    active_id = data.get(_active_key(lh_type))
-    if not active_id:
+    with get_conn() as conn, dict_cur(conn) as cur:
+        cur.execute(
+            "SELECT id, name, filename, original_name, type, is_active, "
+            "uploaded_at AS uploaded FROM letterheads "
+            "WHERE type = %s AND is_active = TRUE LIMIT 1",
+            (lh_type,)
+        )
+        row = cur.fetchone()
+    if not row:
         return None
-    for lh in data["letterheads"]:
-        if lh["id"] == active_id and lh.get("type", "letterhead") == lh_type:
-            if (_LH_DIR / lh["filename"]).exists():
-                return lh
-    return None
+    entry = dict(row)
+    if not (_LH_DIR / entry["filename"]).exists():
+        return None
+    return entry
 
 
 def get_active_path_by_type(lh_type: str) -> Path | None:
@@ -72,7 +68,14 @@ def get_active_path_by_type(lh_type: str) -> Path | None:
     return p if p.exists() else None
 
 
-def add_letterhead(file_bytes: bytes, original_name: str, label: str = "", lh_type: str = "letterhead") -> dict:
+# ── Tulis ─────────────────────────────────────────────────────────────────────
+
+def add_letterhead(
+    file_bytes: bytes,
+    original_name: str,
+    label: str = "",
+    lh_type: str = "letterhead",
+) -> dict:
     _ensure_dir()
     if lh_type not in TYPES:
         lh_type = "letterhead"
@@ -84,61 +87,84 @@ def add_letterhead(file_bytes: bytes, original_name: str, label: str = "", lh_ty
     filename = lh_id + ext
     (_LH_DIR / filename).write_bytes(file_bytes)
 
-    entry = {
-        "id": lh_id,
-        "name": label or Path(original_name).stem,
-        "filename": filename,
-        "original_name": original_name,
-        "type": lh_type,
-        "uploaded": datetime.now().isoformat(),
-    }
+    name = label or Path(original_name).stem
 
-    data = _load()
-    data["letterheads"].append(entry)
-    # Auto-activate if first of this type
-    if not data.get(_active_key(lh_type)):
-        data[_active_key(lh_type)] = lh_id
-    _save(data)
-    return entry
+    with get_conn() as conn, dict_cur(conn) as cur:
+        # Auto-aktifkan jika tiada rekod aktif untuk jenis ini
+        cur.execute(
+            "SELECT COUNT(*) AS cnt FROM letterheads WHERE type = %s AND is_active = TRUE",
+            (lh_type,)
+        )
+        is_first = cur.fetchone()["cnt"] == 0
+
+        cur.execute("""
+            INSERT INTO letterheads (id, name, filename, original_name, type, is_active, uploaded_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+        """, (lh_id, name, filename, original_name, lh_type, is_first))
+
+        cur.execute(
+            "SELECT id, name, filename, original_name, type, is_active, "
+            "uploaded_at AS uploaded FROM letterheads WHERE id = %s",
+            (lh_id,)
+        )
+        return dict(cur.fetchone())
 
 
 def set_active(lh_id: str, lh_type: str = "letterhead") -> bool:
-    data = _load()
-    ids = {lh["id"] for lh in data["letterheads"] if lh.get("type", "letterhead") == lh_type}
-    if lh_id not in ids:
-        return False
-    data[_active_key(lh_type)] = lh_id
-    _save(data)
+    with get_conn() as conn, dict_cur(conn) as cur:
+        # Semak rekod wujud
+        cur.execute(
+            "SELECT 1 FROM letterheads WHERE id = %s AND type = %s",
+            (lh_id, lh_type)
+        )
+        if not cur.fetchone():
+            return False
+        # Nyahaktifkan semua → aktifkan yang dipilih
+        cur.execute(
+            "UPDATE letterheads SET is_active = FALSE WHERE type = %s", (lh_type,)
+        )
+        cur.execute(
+            "UPDATE letterheads SET is_active = TRUE WHERE id = %s", (lh_id,)
+        )
     return True
 
 
 def delete_letterhead(lh_id: str) -> bool:
-    data = _load()
-    entry = next((lh for lh in data["letterheads"] if lh["id"] == lh_id), None)
-    if not entry:
-        return False
+    with get_conn() as conn, dict_cur(conn) as cur:
+        cur.execute(
+            "SELECT filename, type, is_active FROM letterheads WHERE id = %s",
+            (lh_id,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return False
 
-    p = _LH_DIR / entry["filename"]
-    if p.exists():
-        p.unlink()
+        # Padam fail fizikal
+        p = _LH_DIR / row["filename"]
+        if p.exists():
+            p.unlink()
 
-    lh_type = entry.get("type", "letterhead")
-    data["letterheads"] = [lh for lh in data["letterheads"] if lh["id"] != lh_id]
+        cur.execute("DELETE FROM letterheads WHERE id = %s", (lh_id,))
 
-    # Auto-select next of same type if deleted was active
-    if data.get(_active_key(lh_type)) == lh_id:
-        remaining = [lh for lh in data["letterheads"] if lh.get("type", "letterhead") == lh_type]
-        data[_active_key(lh_type)] = remaining[0]["id"] if remaining else None
-
-    _save(data)
+        # Auto-aktifkan rekod seterusnya jika yang dipadam adalah aktif
+        if row["is_active"]:
+            cur.execute(
+                "SELECT id FROM letterheads WHERE type = %s ORDER BY uploaded_at DESC LIMIT 1",
+                (row["type"],)
+            )
+            next_row = cur.fetchone()
+            if next_row:
+                cur.execute(
+                    "UPDATE letterheads SET is_active = TRUE WHERE id = %s",
+                    (next_row["id"],)
+                )
     return True
 
 
 def update_name(lh_id: str, name: str) -> bool:
-    data = _load()
-    for lh in data["letterheads"]:
-        if lh["id"] == lh_id:
-            lh["name"] = name
-            _save(data)
-            return True
-    return False
+    with get_conn() as conn, dict_cur(conn) as cur:
+        cur.execute(
+            "UPDATE letterheads SET name = %s WHERE id = %s RETURNING id",
+            (name, lh_id)
+        )
+        return cur.fetchone() is not None
