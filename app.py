@@ -227,9 +227,7 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
                 pages = [p.extract_text() or "" for p in pdf.pages]
             text = "\n".join(p for p in pages if p.strip())
             doc_type = "PDF"
-            # Store raw PDF as base64 for client-side embed
-            import base64
-            doc_html = "data:application/pdf;base64," + base64.b64encode(raw).decode()
+            doc_html = None  # client uses URL.createObjectURL on the uploaded file
         elif ext in (".docx", ".doc"):
             # mammoth for rich HTML preview (preserves tables, bold, etc.)
             import mammoth

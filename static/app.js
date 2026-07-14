@@ -13,8 +13,9 @@ let lastStructuredData = null;
 let currentLang = localStorage.getItem('smartassist_lang') || 'bm';
 let _msgIndex = 0;
 let _reviewDocText = null;
-let _reviewDocHtml = null;
-let _reviewIsPdf   = false;
+let _reviewDocHtml      = null;
+let _reviewIsPdf        = false;
+let _reviewPdfObjectUrl = null;
 
 // ── i18n ──
 const I18N = {
@@ -803,9 +804,24 @@ function toggleRevAnnotation(badge) {
     const popup = badge.nextElementSibling;
     if (!popup || !popup.classList.contains('rev-annotation-popup')) return;
     const isOpen = popup.style.display !== 'none';
-    // close all popups first
     document.querySelectorAll('.rev-annotation-popup').forEach(p => { p.style.display = 'none'; });
-    if (!isOpen) popup.style.display = 'block';
+    if (!isOpen) {
+        const rect = badge.getBoundingClientRect();
+        popup.style.display = 'block';
+        popup.style.position = 'fixed';
+        popup.style.zIndex   = '9999';
+        popup.style.right    = 'auto';
+        popup.style.bottom   = 'auto';
+        const popW = 280, popH = 220;
+        // prefer left of badge; fallback to right if too close to edge
+        let left = rect.left - popW - 6;
+        if (left < 8) left = rect.right + 6;
+        if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+        let top = rect.top;
+        if (top + popH > window.innerHeight - 8) top = window.innerHeight - popH - 8;
+        popup.style.left = Math.max(8, left) + 'px';
+        popup.style.top  = Math.max(8, top)  + 'px';
+    }
 }
 
 function buildReviewHtml(data) {
@@ -928,17 +944,25 @@ function _buildAnnotatedReview(data, docText) {
     const docHtml = _reviewDocHtml;
     const isPdf   = _reviewIsPdf;
 
+    // For DOCX badge injection, build the DOM node now (before html string is finalized)
+    let docxNode = null;
+    if (!isPdf && docHtml) {
+        docxNode = _injectBadgesIntoHtml(docHtml, lineIssues, allLines);
+    }
+
+    // Use a placeholder ID so we can attach the docxNode after innerHTML assignment
+    const docxPlaceholderId = 'revDocxInject_' + Date.now();
+
     html += `<div class="rev-doc-page" id="revDocPage">`;
     html += `<button class="rev-close-btn" onclick="toggleRevExpand(this.closest('.rev-annotated').querySelector('.rev-expand-btn'))" title="Tutup pratonton">✕ Tutup Pratonton</button>`;
 
-    if (isPdf && docHtml) {
-        // PDF — embed via data URI
-        html += `<iframe class="rev-pdf-embed" src="${docHtml}" title="Pratonton PDF"></iframe>`;
-    } else if (docHtml) {
-        // DOCX — inject badges into mammoth HTML
-        html += `<div class="rev-html-doc">`;
-        html += _injectBadgesIntoHtml(docHtml, lineIssues, allLines);
-        html += `</div>`;
+    if (isPdf) {
+        // PDF — use blob URL created from file on client (set after upload)
+        const pdfSrc = _reviewPdfObjectUrl || '';
+        html += `<iframe class="rev-pdf-embed" src="${escapeAttr(pdfSrc)}" title="Pratonton PDF"></iframe>`;
+    } else if (docxNode) {
+        // DOCX — placeholder; real node appended after addMessage inserts this HTML
+        html += `<div class="rev-html-doc" id="${docxPlaceholderId}"></div>`;
     } else {
         // Fallback — plain text line view
         allLines.forEach(lineObj => {
@@ -983,86 +1007,95 @@ function _buildAnnotatedReview(data, docText) {
     }
 
     html += '</div>'; // rev-annotated
+
+    // After returning, inject the DOCX node (with real event listeners) into its placeholder
+    if (docxNode) {
+        setTimeout(() => {
+            const placeholder = document.getElementById(docxPlaceholderId);
+            if (placeholder) {
+                // Move children from docxNode into placeholder
+                while (docxNode.firstChild) placeholder.appendChild(docxNode.firstChild);
+            }
+        }, 0);
+    }
+
     return html;
 }
 
-// Inject numbered badge spans into mammoth-generated HTML, matched by plain-text line content
+// Inject numbered badge spans into mammoth HTML using live DOM (no DOMParser serialization issues)
 function _injectBadgesIntoHtml(docHtml, lineIssues, allLines) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(`<div id="_root">${docHtml}</div>`, 'text/html');
-    const root = doc.getElementById('_root');
+    // Use a live DOM element so event handlers survive without serialization
+    const tmp = document.createElement('div');
+    tmp.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden';
+    document.body.appendChild(tmp);
+    tmp.innerHTML = docHtml;
 
-    // Build a map: trimmed text snippet → issues
-    const snippetMap = {};
+    // Build map: lowercased text snippet → issues
+    const snippetMap = new Map();
     Object.entries(lineIssues).forEach(([lineIdx, issues]) => {
         const line = allLines[parseInt(lineIdx)];
-        if (!line || !line.trimmed) return;
-        const key = line.trimmed.substring(0, 40).toLowerCase();
-        snippetMap[key] = issues;
+        if (!line || !line.trimmed || line.trimmed.length < 3) return;
+        snippetMap.set(line.trimmed.substring(0, 40).toLowerCase(), issues);
     });
 
-    // Walk all text-containing elements
-    const candidates = root.querySelectorAll('p, td, th, li, h1, h2, h3, h4, h5');
+    const candidates = tmp.querySelectorAll('p, td, th, li, h1, h2, h3, h4, h5');
     candidates.forEach(el => {
         const elText = el.textContent.trim().substring(0, 40).toLowerCase();
-        if (!elText) return;
+        if (!elText || elText.length < 3) return;
 
-        // Find best matching snippet
-        let matched = null;
-        for (const [key, issues] of Object.entries(snippetMap)) {
-            if (elText.includes(key) || key.includes(elText.substring(0, 20))) {
-                matched = issues;
-                break;
+        let matched = null, usedKey = null;
+        for (const [key, issues] of snippetMap) {
+            if (elText.includes(key.substring(0, 20)) || key.includes(elText.substring(0, 20))) {
+                matched = issues; usedKey = key; break;
             }
         }
         if (!matched) return;
+        snippetMap.delete(usedKey);
 
-        // Wrap element content in a rev-para-row
-        const wrapper = doc.createElement('span');
-        wrapper.className = 'rev-html-row';
         const hasWajib = matched.some(i => i.severity === 'WAJIB_BETULKAN');
-        wrapper.style.cssText = hasWajib
-            ? 'background:rgba(239,68,68,0.12);border-left:3px solid #ef4444;padding-left:4px;display:block'
-            : 'background:rgba(245,158,11,0.10);border-left:3px solid #f59e0b;padding-left:4px;display:block';
+        el.style.cssText += (hasWajib
+            ? ';background:rgba(239,68,68,0.12);border-left:3px solid #ef4444;padding-left:4px'
+            : ';background:rgba(245,158,11,0.10);border-left:3px solid #f59e0b;padding-left:4px');
+        el.style.position = 'relative';
 
-        const badgeWrap = doc.createElement('span');
-        badgeWrap.className = 'rev-badges rev-badges-inline';
+        const badgeWrap = document.createElement('span');
+        badgeWrap.className = 'rev-badges-inline';
+        badgeWrap.style.cssText = 'display:inline-flex;align-items:center;gap:3px;margin-left:4px;vertical-align:middle';
+
         matched.forEach(issue => {
             const bCls = issue.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
-            const badge = doc.createElement('span');
+            const fixPrompt = issue.suggestion
+                ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
+                : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`;
+
+            const badge = document.createElement('span');
             badge.className = `rev-badge ${bCls}`;
             badge.textContent = issue.num;
-            badge.setAttribute('onclick', 'toggleRevAnnotation(this)');
-            badge.style.cssText = 'vertical-align:middle;cursor:pointer';
+            badge.style.cssText = 'cursor:pointer;vertical-align:middle';
+            // Use addEventListener so the handler is a real function reference
+            badge.addEventListener('click', function(e) { e.stopPropagation(); toggleRevAnnotation(this); });
 
-            const popup = doc.createElement('div');
+            const popup = document.createElement('div');
             popup.className = 'rev-annotation-popup';
             popup.style.display = 'none';
-            const fixPrompt = (issue.suggestion
-                ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
-                : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`
-            ).replace(/"/g, '&quot;');
             popup.innerHTML = `
-                <div class="ann-cat">${issue.category || ''}</div>
-                ${issue.location ? `<div class="ann-loc">${issue.location}</div>` : ''}
-                <div class="ann-desc">${issue.issue || ''}</div>
-                ${issue.suggestion ? `<div class="ann-suggestion">💡 ${issue.suggestion}</div>` : ''}
-                <button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="event.stopPropagation();fixReviewIssue(this)">🔧 Betulkan</button>`;
+                <div class="ann-cat">${escapeHtml(issue.category || '')}</div>
+                ${issue.location ? `<div class="ann-loc">${escapeHtml(issue.location)}</div>` : ''}
+                <div class="ann-desc">${escapeHtml(issue.issue || '')}</div>
+                ${issue.suggestion ? `<div class="ann-suggestion">💡 ${escapeHtml(issue.suggestion)}</div>` : ''}
+                <button class="ann-fix-btn" data-prompt="${escapeAttr(fixPrompt)}" onclick="event.stopPropagation();fixReviewIssue(this)">🔧 Betulkan</button>`;
+
             badgeWrap.appendChild(badge);
             badgeWrap.appendChild(popup);
         });
 
-        // Move el's children into wrapper, then append badge
-        while (el.firstChild) wrapper.appendChild(el.firstChild);
-        wrapper.appendChild(badgeWrap);
-        el.appendChild(wrapper);
-
-        // Remove snippet from map so it doesn't match twice
-        const usedKey = Object.keys(snippetMap).find(k => elText.includes(k) || k.includes(elText.substring(0,20)));
-        if (usedKey) delete snippetMap[usedKey];
+        el.appendChild(badgeWrap);
     });
 
-    return root.innerHTML;
+    // Clone the node tree to detach from document before removing tmp
+    const result = tmp.cloneNode(true);
+    document.body.removeChild(tmp);
+    return result; // returns a DOM node, not a string
 }
 
 function toggleRevExpand(btn) {
@@ -1924,6 +1957,14 @@ async function handleReviewUpload(file) {
             _reviewDocText = data.text || null;
             _reviewDocHtml = data.html || null;
             _reviewIsPdf   = data.is_pdf || false;
+            // For PDF: create a blob URL from the original file (avoids huge base64 in response)
+            if (_reviewIsPdf) {
+                if (_reviewPdfObjectUrl) URL.revokeObjectURL(_reviewPdfObjectUrl);
+                _reviewPdfObjectUrl = URL.createObjectURL(file);
+            } else {
+                if (_reviewPdfObjectUrl) URL.revokeObjectURL(_reviewPdfObjectUrl);
+                _reviewPdfObjectUrl = null;
+            }
             uploadBtn.classList.add('has-file');
             fileIndicator.style.display = 'flex';
             fileIndicatorText.textContent = `📄 ${data.filename} (${data.doc_type}, ${data.char_count} aksara)`;
