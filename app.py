@@ -290,6 +290,78 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
     })
 
 
+@app.post("/api/review/download-edited")
+async def review_download_edited(request: Request):
+    """Convert edited HTML doc back to DOCX and return as download."""
+    try:
+        body = await request.json()
+        html_content = body.get("html", "")
+        if not html_content:
+            return JSONResponse({"error": "No HTML content"}, status_code=400)
+
+        import io as _io2
+        from docx import Document as _DocxDoc2
+        from docx.shared import Pt as _Pt
+
+        # Try html2docx if available (best quality)
+        try:
+            from html2docx import html2docx as _html2docx
+            buf = _html2docx(html_content, title="Dokumen Disemak")
+            return Response(
+                content=buf.getvalue(),
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                headers={"Content-Disposition": 'attachment; filename="dokumen_disemak.docx"'},
+            )
+        except ImportError:
+            pass
+
+        # Fallback: BeautifulSoup → python-docx (text only, basic formatting)
+        from bs4 import BeautifulSoup as _BS
+        soup = _BS(html_content, "html.parser")
+
+        doc = _DocxDoc2()
+        # Set default font
+        style = doc.styles["Normal"]
+        style.font.name = "Arial"
+        style.font.size = _Pt(11)
+
+        def _add_run_text(para, text, bold=False):
+            run = para.add_run(text)
+            if bold:
+                run.bold = True
+
+        for el in soup.find_all(["p", "h1", "h2", "h3", "h4", "li", "td"]):
+            text = el.get_text(separator=" ").strip()
+            if not text:
+                continue
+            if el.name in ("h1", "h2"):
+                para = doc.add_heading(text, level=int(el.name[1]))
+            elif el.name in ("h3", "h4"):
+                para = doc.add_heading(text, level=int(el.name[1]))
+            elif el.name == "li":
+                para = doc.add_paragraph(text, style="List Bullet")
+            else:
+                para = doc.add_paragraph()
+                bold_parts = el.find_all(["strong", "b"])
+                if bold_parts:
+                    raw = str(el)
+                    # Simple bold detection: add whole text with bold if most is bold
+                    _add_run_text(para, text, bold=len(bold_parts) > 0 and len(text) < 60)
+                else:
+                    para.add_run(text)
+
+        buf = _io2.BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+        return Response(
+            content=buf.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": 'attachment; filename="dokumen_disemak.docx"'},
+        )
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
 @app.get("/api/data-status")
 async def data_status(session_id: str = "default"):
     data = da_get_data(session_id)
