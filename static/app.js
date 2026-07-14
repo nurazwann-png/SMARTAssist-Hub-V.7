@@ -894,6 +894,7 @@ function _buildAnnotatedReview(data, docText) {
 
     // Annotated document page — line by line
     html += `<div class="rev-doc-page" id="${revId}_page">`;
+    html += `<button class="rev-close-btn" onclick="toggleRevExpand(this.closest('.rev-annotated').querySelector('.rev-expand-btn'))" title="Tutup pratonton">✕ Tutup Pratonton</button>`;
     allLines.forEach(lineObj => {
         if (lineObj.isEmpty) {
             html += '<div class="rev-spacer"></div>';
@@ -971,10 +972,13 @@ function _buildAnnotatedReview(data, docText) {
 }
 
 function toggleRevExpand(btn) {
+    if (!btn) return;
     const page = btn.closest('.rev-annotated')?.querySelector('.rev-doc-page');
     if (!page) return;
     const isExpanded = page.classList.toggle('rev-doc-expanded');
     btn.textContent = isExpanded ? '⛶ Kecilkan' : '⛶ Kembangkan';
+    const closeBtn = page.querySelector('.rev-close-btn');
+    if (closeBtn) closeBtn.style.display = isExpanded ? 'block' : 'none';
     if (isExpanded) page.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 

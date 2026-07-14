@@ -957,6 +957,16 @@ textarea.ff-input { min-height: 52px; }
     box-shadow: none;
 }
 
+.rev-close-btn {
+    display: none;
+    position: sticky; top: 12px; float: right; margin-bottom: 8px;
+    padding: 7px 16px; border-radius: 8px; border: none; cursor: pointer;
+    background: #ef4444; color: #fff; font-size: 13px; font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25); z-index: 210;
+    transition: background 0.15s;
+}
+.rev-close-btn:hover { background: #dc2626; }
+
 .rev-global-bar {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     padding: 7px 10px; background: var(--bg-tertiary);
