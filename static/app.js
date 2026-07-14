@@ -38,6 +38,16 @@ const I18N = {
         lh_delete: '🗑', lh_upload_success: 'Imej berjaya dimuat naik.',
         lh_upload_fail: 'Gagal muat naik fail.',
         word_preview: 'Pratonton Dokumen', word_close: 'Tutup',
+        profile_title: 'Profil Pengguna',
+        profile_nama: 'Nama Penuh', profile_nama_ph: 'Nama seperti dalam kad pengenalan',
+        profile_jawatan: 'Jawatan', profile_jawatan_ph: 'cth: Penolong Pegawai Pendidikan',
+        profile_stesen: 'Stesen Bertugas', profile_stesen_ph: 'cth: PPD Hulu Langat',
+        profile_daerah: 'Daerah', profile_daerah_ph: 'cth: Hulu Langat',
+        profile_negeri: 'Negeri', profile_negeri_ph: '— Pilih Negeri —',
+        profile_save: 'Simpan Profil', profile_logout: 'Log Keluar',
+        profile_dashboard: 'Papan Pemuka Penggunaan',
+        profile_saved_ok: '✓ Profil berjaya disimpan', profile_saved_fail: 'Gagal menyimpan. Cuba semula.',
+        profile_conn_err: 'Ralat sambungan.',
     },
     en: {
         nav_home: 'HOME', nav_agents: 'AGENTS',
@@ -62,6 +72,16 @@ const I18N = {
         lh_delete: '🗑', lh_upload_success: 'Image uploaded successfully.',
         lh_upload_fail: 'Failed to upload file.',
         word_preview: 'Document Preview', word_close: 'Close',
+        profile_title: 'User Profile',
+        profile_nama: 'Full Name', profile_nama_ph: 'Name as per identity card',
+        profile_jawatan: 'Position', profile_jawatan_ph: 'e.g.: Assistant Education Officer',
+        profile_stesen: 'Work Station', profile_stesen_ph: 'e.g.: PPD Hulu Langat',
+        profile_daerah: 'District', profile_daerah_ph: 'e.g.: Hulu Langat',
+        profile_negeri: 'State', profile_negeri_ph: '— Select State —',
+        profile_save: 'Save Profile', profile_logout: 'Log Out',
+        profile_dashboard: 'Usage Dashboard',
+        profile_saved_ok: '✓ Profile saved successfully', profile_saved_fail: 'Failed to save. Please try again.',
+        profile_conn_err: 'Connection error.',
     },
 };
 
@@ -2043,7 +2063,9 @@ function closeWordPreview() {
 let _adminAgentChart = null;
 let _adminFeedbackChart = null;
 
+
 function openAdminPage() {
+    closeProfilePanel();
     landingPage.style.display = 'none';
     document.getElementById('adminPage').style.display = 'flex';
     loadAdminStats();
@@ -2144,3 +2166,88 @@ async function loadAdminStats() {
         console.error('Admin stats error:', e);
     }
 }
+
+// ═══════════════════════════════════════
+//  PROFILE PANEL
+// ═══════════════════════════════════════
+
+const profilePanel   = document.getElementById('profilePanel');
+const profileOverlay = document.getElementById('profileOverlay');
+const profileBtn     = document.getElementById('profileBtn');
+const profileCloseBtn = document.getElementById('profileCloseBtn');
+
+function openProfilePanel() {
+    profilePanel.classList.add('open');
+    profileOverlay.classList.add('open');
+    loadProfile();
+}
+
+function closeProfilePanel() {
+    profilePanel.classList.remove('open');
+    profileOverlay.classList.remove('open');
+}
+
+async function loadProfile() {
+    try {
+        const res = await fetch('/api/profile');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Google avatar / initials — use server proxy to avoid CORS/referrer blocks
+        const avatarEl = document.getElementById('profileAvatarLarge');
+        if (data.picture) {
+            avatarEl.innerHTML = `<img src="/api/avatar" alt="" style="width:52px;height:52px;object-fit:cover;display:block;border-radius:50%;">`;
+        } else {
+            avatarEl.innerHTML = `<span class="profile-avatar-large-initials">${(data.nama || '?')[0].toUpperCase()}</span>`;
+        }
+
+        document.getElementById('profileGoogleName').textContent  = data.nama  || '';
+        document.getElementById('profileGoogleEmail').textContent = data.email || '';
+
+        document.getElementById('pNama').value    = data.nama    || '';
+        document.getElementById('pJawatan').value = data.jawatan || '';
+        document.getElementById('pStesen').value  = data.stesen  || '';
+        document.getElementById('pDaerah').value  = data.daerah  || '';
+        document.getElementById('pNegeri').value  = data.negeri  || '';
+    } catch (e) {
+        console.error('Profile load error:', e);
+    }
+}
+
+document.getElementById('profileForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('profileSaveBtn');
+    const msg = document.getElementById('profileSaveMsg');
+    btn.disabled = true;
+    btn.textContent = 'Menyimpan...';
+    try {
+        const res = await fetch('/api/profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                nama:    document.getElementById('pNama').value.trim(),
+                jawatan: document.getElementById('pJawatan').value.trim(),
+                stesen:  document.getElementById('pStesen').value.trim(),
+                daerah:  document.getElementById('pDaerah').value.trim(),
+                negeri:  document.getElementById('pNegeri').value,
+            })
+        });
+        if (res.ok) {
+            msg.textContent = I18N[currentLang].profile_saved_ok;
+            msg.style.color = '#22c55e';
+            setTimeout(() => { msg.textContent = ''; }, 3000);
+        } else {
+            msg.textContent = I18N[currentLang].profile_saved_fail;
+            msg.style.color = '#f87171';
+        }
+    } catch (e) {
+        msg.textContent = I18N[currentLang].profile_conn_err;
+        msg.style.color = '#f87171';
+    }
+    btn.disabled = false;
+    btn.textContent = I18N[currentLang].profile_save;
+});
+
+if (profileBtn)     profileBtn.addEventListener('click', openProfilePanel);
+if (profileCloseBtn) profileCloseBtn.addEventListener('click', closeProfilePanel);
+if (profileOverlay)  profileOverlay.addEventListener('click', closeProfilePanel);

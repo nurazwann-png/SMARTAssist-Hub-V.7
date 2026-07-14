@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from fastapi.responses import RedirectResponse, HTMLResponse
 from starlette.requests import Request
 from authlib.integrations.starlette_client import OAuth
+from backend.profile_store import get_profile, save_profile
 
 router = APIRouter()
 
@@ -47,12 +48,29 @@ async def auth_callback(request: Request):
         if domain not in ALLOWED_DOMAINS:
             return RedirectResponse(f"/login?error=unauthorized_domain&email={email}")
 
+    google_sub = user.get("sub", "")
+    google_name = user.get("name", "")
+
+    # @moe-dl.edu.my accounts use format "ORGANISASI-NAMA-AKAUN" — extract middle part only
+    domain = email.split("@")[-1] if "@" in email else ""
+    if domain == "moe-dl.edu.my":
+        parts = [p.strip() for p in google_name.split("-")]
+        display_name = "-".join(parts[1:-1]).title() if len(parts) >= 3 else google_name.title()
+    else:
+        display_name = google_name
+
     request.session["user"] = {
         "email": email,
-        "name": user.get("name", ""),
+        "name": display_name,
         "picture": user.get("picture", ""),
-        "sub": user.get("sub", ""),
+        "sub": google_sub,
     }
+
+    # Auto-fill nama from Google — always sync on login so name stays current
+    existing = get_profile(google_sub)
+    if not existing.get("nama") or existing.get("nama") == google_name:
+        save_profile(google_sub, email, {"nama": display_name})
+
     return RedirectResponse("/")
 
 

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMARTAssist Hub</title>
-    <link rel="stylesheet" href="/static/style.css?v=14">
+    <link rel="stylesheet" href="/static/style.css?v=21">
     <script src="/static/chart.min.js"></script>
 </head>
 <body>
@@ -20,6 +20,116 @@
     </aside>
     <div class="history-overlay" id="historyOverlay"></div>
 
+    <!-- ═══ Profile Panel ═══ -->
+    <div class="profile-overlay" id="profileOverlay"></div>
+    <aside class="profile-panel" id="profilePanel">
+        <div class="profile-panel-header">
+            <h3 data-i18n="profile_title">Profil Pengguna</h3>
+            <button class="profile-close-btn" id="profileCloseBtn">&times;</button>
+        </div>
+
+        <div class="profile-google-info">
+            <div id="profileAvatarLarge" class="profile-avatar-large"></div>
+            <div class="profile-google-text">
+                <p id="profileGoogleName" class="profile-google-name"></p>
+                <p id="profileGoogleEmail" class="profile-google-email"></p>
+            </div>
+        </div>
+
+        <form class="profile-form" id="profileForm" autocomplete="off">
+            <div class="profile-field">
+                <label for="pNama" data-i18n="profile_nama">Nama Penuh</label>
+                <input type="text" id="pNama" name="nama" placeholder="Nama seperti dalam kad pengenalan" data-i18n-placeholder="profile_nama_ph">
+            </div>
+            <div class="profile-field">
+                <label for="pJawatan" data-i18n="profile_jawatan">Jawatan</label>
+                <input type="text" id="pJawatan" name="jawatan" placeholder="cth: Penolong Pegawai Pendidikan" data-i18n-placeholder="profile_jawatan_ph">
+            </div>
+            <div class="profile-field">
+                <label for="pStesen" data-i18n="profile_stesen">Stesen Bertugas</label>
+                <input type="text" id="pStesen" name="stesen" placeholder="cth: PPD Hulu Langat" data-i18n-placeholder="profile_stesen_ph">
+            </div>
+            <div class="profile-field">
+                <label for="pDaerah" data-i18n="profile_daerah">Daerah</label>
+                <input type="text" id="pDaerah" name="daerah" placeholder="cth: Hulu Langat" data-i18n-placeholder="profile_daerah_ph">
+            </div>
+            <div class="profile-field">
+                <label for="pNegeri" data-i18n="profile_negeri">Negeri</label>
+                <select id="pNegeri" name="negeri">
+                    <option value="" data-i18n="profile_negeri_ph">— Pilih Negeri —</option>
+                    <option>Johor</option><option>Kedah</option><option>Kelantan</option>
+                    <option>Melaka</option><option>Negeri Sembilan</option><option>Pahang</option>
+                    <option>Perak</option><option>Perlis</option><option>Pulau Pinang</option>
+                    <option>Sabah</option><option>Sarawak</option><option>Selangor</option>
+                    <option>Terengganu</option><option>W.P. Kuala Lumpur</option>
+                    <option>W.P. Labuan</option><option>W.P. Putrajaya</option>
+                </select>
+            </div>
+
+            <div class="profile-actions">
+                <button type="submit" class="btn-profile-save" id="profileSaveBtn" data-i18n="profile_save">Simpan Profil</button>
+                <p class="profile-save-msg" id="profileSaveMsg"></p>
+            </div>
+        </form>
+
+        <div class="profile-bottom-actions">
+            <button class="btn-profile-dashboard" id="adminBtn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                <span data-i18n="profile_dashboard">Papan Pemuka Penggunaan</span>
+            </button>
+            <a href="/auth/logout" class="btn-profile-logout">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <span data-i18n="profile_logout">Log Keluar</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- ═══ Admin Dashboard Page ═══ -->
+    <div class="admin-page" id="adminPage" style="display:none;">
+        <div class="admin-header">
+            <button class="back-btn" id="adminBackBtn">&#8592; Kembali</button>
+            <div class="admin-title">&#128202; Papan Pemuka Penggunaan</div>
+            <button class="admin-refresh-btn" id="adminRefreshBtn" title="Muat Semula">&#8635;</button>
+        </div>
+        <div class="admin-body">
+            <div class="admin-stats-row">
+                <div class="admin-stat-card">
+                    <div class="admin-stat-value" id="statTotalSessions">—</div>
+                    <div class="admin-stat-label">Jumlah Sesi</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="admin-stat-value" id="statTotalMessages">—</div>
+                    <div class="admin-stat-label">Jumlah Mesej</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="admin-stat-value" id="statFeedbackUp">—</div>
+                    <div class="admin-stat-label">👍 Maklum Balas Positif</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="admin-stat-value" id="statFeedbackDown">—</div>
+                    <div class="admin-stat-label">👎 Maklum Balas Negatif</div>
+                </div>
+            </div>
+            <div class="admin-charts-row">
+                <div class="admin-chart-card">
+                    <div class="admin-chart-title">📊 Penggunaan Mengikut Ejen</div>
+                    <div class="admin-chart-wrap"><canvas id="adminAgentChart"></canvas></div>
+                </div>
+                <div class="admin-chart-card">
+                    <div class="admin-chart-title">💬 Maklum Balas Mengikut Ejen</div>
+                    <div class="admin-chart-wrap"><canvas id="adminFeedbackChart"></canvas></div>
+                </div>
+            </div>
+            <div class="admin-table-card">
+                <div class="admin-chart-title">🕓 Sesi Terkini</div>
+                <table class="admin-table" id="adminRecentTable">
+                    <thead><tr><th>Sesi</th><th>Ejen</th><th>Tajuk</th><th>Mesej</th><th>Dikemaskini</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- ═══ Welcome / Landing Page ═══ -->
     <div class="landing-page" id="landingPage">
         <canvas id="particleCanvas"></canvas>
@@ -28,17 +138,29 @@
             <button class="nav-btn" id="historyBtn">&#9776;</button>
 
             <div class="nav-right">
-                <button class="nav-settings-btn" id="adminBtn" title="Papan Pemuka Penggunaan">&#128202;</button>
                 <button class="lang-toggle" id="langToggle" title="Tukar Bahasa">
                     <span class="lang-flag">🇲🇾</span>
                     <span class="lang-code">BM</span>
                 </button>
+                {% if user %}
+                <button class="nav-profile-btn" id="profileBtn" title="Profil Pengguna">
+                    {% if user.picture %}
+                    <img src="/api/avatar" alt="" style="width:34px;height:34px;object-fit:cover;display:block;border-radius:50%;">
+                    {% else %}
+                    <span class="nav-avatar-initials">{{ user.name[:1] }}</span>
+                    {% endif %}
+                </button>
+                {% endif %}
             </div>
         </nav>
 
         <div class="landing-hero">
             <h1 class="hero-title"><span class="hero-gold">SMART</span>Assist Hub</h1>
             <p class="hero-subtitle" data-i18n="hero_subtitle">Selamat Datang</p>
+            {% if user %}
+            <p class="hero-username">{{ profile.nama if profile and profile.nama else user.name }}</p>
+            {% if profile and profile.jawatan %}<p class="hero-jawatan">{{ profile.jawatan }}</p>{% endif %}
+            {% endif %}
             <div class="hero-line"></div>
         </div>
 
@@ -383,52 +505,7 @@
         </div>
     </div>
 
-    <!-- ═══ Admin Dashboard Page ═══ -->
-    <div class="admin-page" id="adminPage" style="display:none;">
-        <div class="admin-header">
-            <button class="back-btn" id="adminBackBtn">&#8592; Kembali</button>
-            <div class="admin-title">&#128202; Papan Pemuka Penggunaan</div>
-            <button class="admin-refresh-btn" id="adminRefreshBtn" title="Muat Semula">&#8635;</button>
-        </div>
-        <div class="admin-body">
-            <div class="admin-stats-row">
-                <div class="admin-stat-card">
-                    <div class="admin-stat-value" id="statTotalSessions">—</div>
-                    <div class="admin-stat-label">Jumlah Sesi</div>
-                </div>
-                <div class="admin-stat-card">
-                    <div class="admin-stat-value" id="statTotalMessages">—</div>
-                    <div class="admin-stat-label">Jumlah Mesej</div>
-                </div>
-                <div class="admin-stat-card">
-                    <div class="admin-stat-value" id="statFeedbackUp">—</div>
-                    <div class="admin-stat-label">👍 Maklum Balas Positif</div>
-                </div>
-                <div class="admin-stat-card">
-                    <div class="admin-stat-value" id="statFeedbackDown">—</div>
-                    <div class="admin-stat-label">👎 Maklum Balas Negatif</div>
-                </div>
-            </div>
-            <div class="admin-charts-row">
-                <div class="admin-chart-card">
-                    <div class="admin-chart-title">📊 Penggunaan Mengikut Ejen</div>
-                    <div class="admin-chart-wrap"><canvas id="adminAgentChart"></canvas></div>
-                </div>
-                <div class="admin-chart-card">
-                    <div class="admin-chart-title">💬 Maklum Balas Mengikut Ejen</div>
-                    <div class="admin-chart-wrap"><canvas id="adminFeedbackChart"></canvas></div>
-                </div>
-            </div>
-            <div class="admin-table-card">
-                <div class="admin-chart-title">🕓 Sesi Terkini</div>
-                <table class="admin-table" id="adminRecentTable">
-                    <thead><tr><th>Sesi</th><th>Ejen</th><th>Tajuk</th><th>Mesej</th><th>Dikemaskini</th></tr></thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 
-    <script src="/static/app.js?v=30"></script>
+    <script src="/static/app.js?v=35"></script>
 </body>
 </html>

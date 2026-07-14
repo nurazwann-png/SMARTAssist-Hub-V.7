@@ -153,6 +153,22 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
     margin-top: 12px; font-weight: 400; letter-spacing: 6px;
     animation: shimmerText 4s linear infinite;
 }
+.hero-username {
+    font-size: clamp(17px, 2.8vw, 26px);
+    font-weight: 600;
+    color: #f1f5f9;
+    letter-spacing: 0.08em;
+    margin-top: 10px;
+    opacity: 0.9;
+}
+.hero-jawatan {
+    font-size: clamp(12px, 1.6vw, 14px);
+    font-weight: 400;
+    color: #94a3b8;
+    letter-spacing: 0.06em;
+    margin-top: 4px;
+    text-transform: uppercase;
+}
 @keyframes shimmerText {
     0% { background-position: 0% center; }
     100% { background-position: 200% center; }
@@ -176,7 +192,7 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
     border: 1px solid rgba(255,255,255,0.07);
     border-top: 2px solid var(--card-color, rgba(99,102,241,0.45));
     border-radius: 20px;
-    padding: 30px 22px; width: 165px; text-align: center;
+    padding: 34px 26px; width: 190px; text-align: center;
     cursor: pointer; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
     position: relative; overflow: hidden;
 }
@@ -202,14 +218,14 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 }
 .agent-card:hover::after { opacity: 1; }
 .agent-card-icon { font-size: 36px; margin-bottom: 14px; position: relative; z-index: 1; display: flex; justify-content: center; align-items: center; }
-.agent-card-icon svg { width: 84px; height: 84px; display: block; filter: drop-shadow(0 0 8px var(--card-color, rgba(99,102,241,0.5))); transition: filter 0.35s; }
+.agent-card-icon svg { width: 100px; height: 100px; display: block; filter: drop-shadow(0 0 8px var(--card-color, rgba(99,102,241,0.5))); transition: filter 0.35s; }
 .agent-card:hover .agent-card-icon svg { filter: drop-shadow(0 0 16px var(--card-color, rgba(99,102,241,0.8))); }
 .agent-card-name {
-    font-size: 14px; font-weight: 700; margin-bottom: 6px;
+    font-size: 16px; font-weight: 700; margin-bottom: 6px;
     position: relative; z-index: 1; color: var(--text-primary);
 }
 .agent-card-desc {
-    font-size: 11px; color: var(--text-secondary); line-height: 1.45;
+    font-size: 12.5px; color: var(--text-secondary); line-height: 1.45;
     position: relative; z-index: 1;
 }
 
@@ -1257,6 +1273,148 @@ textarea.ff-input { min-height: 52px; }
     .history-panel { width: 280px; left: -290px; }
 }
 
+/* ═══════════════════════════════════════
+   PROFILE NAV BUTTON
+   ═══════════════════════════════════════ */
+.nav-profile-btn {
+    background: none; border: none; cursor: pointer;
+    padding: 0; margin-left: 8px;
+    width: 34px; height: 34px; border-radius: 50%;
+    overflow: hidden; flex-shrink: 0;
+    box-shadow: 0 0 0 2px rgba(245,158,11,0.5);
+    transition: box-shadow 0.2s;
+    -webkit-appearance: none; appearance: none;
+    display: block;
+}
+.nav-profile-btn:hover { box-shadow: 0 0 0 2px #f59e0b; }
+.nav-avatar-img {
+    width: 34px; height: 34px;
+    object-fit: cover; display: block;
+    border-radius: 50%;
+}
+.nav-avatar-initials {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(245,158,11,0.15);
+    border: 2px solid rgba(245,158,11,0.5);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: #f59e0b;
+}
+
+/* ═══════════════════════════════════════
+   PROFILE PANEL
+   ═══════════════════════════════════════ */
+.profile-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45); z-index: 199;
+}
+.profile-overlay.open { display: block; }
+
+.profile-panel {
+    position: fixed; top: 0; right: -380px; width: 360px; height: 100vh;
+    background: #0f172a; border-left: 1px solid rgba(255,255,255,0.08);
+    z-index: 200; display: flex; flex-direction: column;
+    transition: right 0.28s ease; overflow-y: auto;
+}
+.profile-panel.open { right: 0; }
+
+.profile-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.profile-panel-header h3 {
+    margin: 0; font-size: 15px; font-weight: 600;
+    color: #f1f5f9; letter-spacing: 0.03em;
+}
+.profile-close-btn {
+    background: none; border: none; color: #64748b;
+    font-size: 22px; cursor: pointer; line-height: 1;
+    transition: color 0.15s;
+}
+.profile-close-btn:hover { color: #f1f5f9; }
+
+.profile-google-info {
+    display: flex; align-items: center; gap: 14px;
+    padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.profile-avatar-large {
+    width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
+    overflow: hidden; box-shadow: 0 0 0 2px rgba(245,158,11,0.4);
+    display: flex; align-items: center; justify-content: center;
+}
+.profile-avatar-large img { width: 52px; height: 52px; object-fit: cover; display: block; border-radius: 50%; }
+.profile-avatar-large-initials {
+    font-size: 20px; font-weight: 700; color: #f59e0b;
+}
+.profile-google-text { min-width: 0; }
+.profile-google-name {
+    margin: 0; font-size: 14px; font-weight: 600; color: #f1f5f9;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.profile-google-email {
+    margin: 3px 0 0; font-size: 12px; color: #64748b;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.profile-form { padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+
+.profile-field { display: flex; flex-direction: column; gap: 5px; }
+.profile-field label {
+    font-size: 12px; font-weight: 500; color: #94a3b8; letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.profile-field input,
+.profile-field select {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 9px 12px;
+    color: #f1f5f9; font-size: 14px;
+    transition: border-color 0.2s;
+    outline: none; width: 100%;
+}
+.profile-field input::placeholder { color: #475569; }
+.profile-field select option { background: #1e293b; color: #f1f5f9; }
+.profile-field input:focus,
+.profile-field select:focus { border-color: rgba(245,158,11,0.5); }
+
+.profile-actions { margin-top: 4px; }
+.btn-profile-save {
+    width: 100%; padding: 11px;
+    background: rgba(245,158,11,0.12);
+    border: 1px solid rgba(245,158,11,0.35);
+    border-radius: 10px; color: #f59e0b;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+.btn-profile-save:hover {
+    background: rgba(245,158,11,0.22);
+    border-color: rgba(245,158,11,0.6);
+}
+.profile-save-msg {
+    margin: 8px 0 0; font-size: 12px; text-align: center;
+    color: #22c55e; min-height: 16px;
+}
+
+.profile-bottom-actions {
+    padding: 14px 20px 24px;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    display: flex; flex-direction: column; gap: 8px;
+}
+.btn-profile-logout {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 10px;
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.25);
+    border-radius: 10px; color: #f87171;
+    font-size: 14px; font-weight: 500;
+    text-decoration: none;
+    transition: background 0.2s, border-color 0.2s;
+}
+.btn-profile-logout:hover {
+    background: rgba(239,68,68,0.18);
+    border-color: rgba(239,68,68,0.5);
+}
+
 /* Small mobile */
 @media (max-width: 380px) {
     .agent-card { width: 100%; }
@@ -1367,6 +1525,19 @@ textarea.ff-input { min-height: 52px; }
     padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.04);
     color: var(--text-primary); max-width: 200px; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Dashboard button inside profile panel */
+.btn-profile-dashboard {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 11px 16px; border-radius: 10px; cursor: pointer;
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    color: var(--text-primary); font-size: 13px; font-weight: 500;
+    transition: all 0.2s;
+}
+.btn-profile-dashboard:hover {
+    background: var(--bg-card); border-color: var(--accent);
+    color: var(--accent);
 }
 
 /* ═══════════════════════════════════════

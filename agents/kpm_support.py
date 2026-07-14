@@ -110,12 +110,13 @@ def _format_doc_context(docs: list[dict]) -> str:
     return "\n\nDokumen rujukan:\n" + "\n\n".join(sections)
 
 
-def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm") -> str:
+def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm", user_name: str = "") -> str:
+    sapaan = f", {user_name.split()[0]}" if user_name else ""
     if query == '__INTRO__':
         if lang == "en":
-            return ("Assalamualaikum and greetings! 😊 I am the SMARTAssist Hub KPM Support Agent. I am here to help you with any issues related to KPM systems such as EMIS, APDM, DTPCare, SK@S and others. How may I assist you today?\n\n"
+            return (f"Assalamualaikum and greetings{sapaan}! 😊 I am the SMARTAssist Hub KPM Support Agent. I am here to help you with any issues related to KPM systems such as EMIS, APDM, DTPCare, SK@S and others. How may I assist you today?\n\n"
                     "⚠️ Reminder: Answers provided are AI-generated based on available reference documents. Please verify with the official helpdesk or relevant officer before taking any formal action.")
-        return ("Assalamualaikum dan salam sejahtera! 😊 Saya SMARTAssist Hub KPM Support Agent. Saya di sini untuk membantu tuan/puan dengan sebarang isu berkaitan sistem KPM seperti EMIS, APDM, DTPCare, SK@S dan lain-lain. Apa yang boleh saya bantu hari ini?\n\n"
+        return (f"Assalamualaikum dan salam sejahtera{sapaan}! 😊 Saya SMARTAssist Hub KPM Support Agent. Saya di sini untuk membantu anda dengan sebarang isu berkaitan sistem KPM seperti EMIS, APDM, DTPCare, SK@S dan lain-lain. Apa yang boleh saya bantu hari ini?\n\n"
                 "⚠️ Peringatan: Jawapan yang diberikan adalah hasil AI berdasarkan dokumen rujukan yang ada. Sila sahkan dengan helpdesk rasmi atau pegawai berkaitan sebelum mengambil sebarang tindakan formal.")
 
     session = _get_session(session_id)

@@ -155,12 +155,13 @@ def _check_placeholders(text: str) -> list[dict]:
     return issues
 
 
-def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm") -> str:
+def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm", user_name: str = "") -> str:
+    sapaan = f", {user_name.split()[0]}" if user_name else ""
     if query == '__INTRO__':
         if lang == "en":
-            return ("Assalamualaikum and welcome! 📝 I am the Document Review Agent. Upload your PDF or Word document using the 📎 button, or paste the document text directly here. I will check grammar, format, spelling and compliance with official KPM format. Which document would you like to review today?\n\n"
+            return (f"Assalamualaikum and welcome{sapaan}! 📝 I am the Document Review Agent. Upload your PDF or Word document using the 📎 button, or paste the document text directly here. I will check grammar, format, spelling and compliance with official KPM format. Which document would you like to review today?\n\n"
                     "⚠️ Reminder: This review is AI-generated and may not catch every error. Please treat it as a guide only and perform a final check yourself before the document is used officially.")
-        return ("Assalamualaikum dan selamat datang! 📝 Saya Semakan Dokumen Agent. Muat naik dokumen PDF atau Word tuan/puan menggunakan butang 📎, atau tampal teks dokumen terus ke sini. Saya akan menyemak tatabahasa, format, ejaan dan pematuhan format rasmi KPM. Dokumen apa yang ingin tuan/puan semak hari ini?\n\n"
+        return (f"Assalamualaikum dan selamat datang{sapaan}! 📝 Saya Semakan Dokumen Agent. Muat naik dokumen PDF atau Word anda menggunakan butang 📎, atau tampal teks dokumen terus ke sini. Saya akan menyemak tatabahasa, format, ejaan dan pematuhan format rasmi KPM. Dokumen apa yang ingin anda semak hari ini?\n\n"
                 "⚠️ Peringatan: Semakan ini dihasilkan oleh AI dan mungkin tidak mengesan semua kesilapan. Anggap ia sebagai panduan sahaja dan lakukan semakan akhir sendiri sebelum dokumen digunakan secara rasmi.")
 
     session = _get_session(session_id)

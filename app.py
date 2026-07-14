@@ -1,5 +1,9 @@
 import json
+import os
 import uvicorn
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def _parse_agent_json(text: str):
@@ -47,14 +51,17 @@ def _shorten_doc_message(structured, lang="ms"):
         )
 from datetime import datetime
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, UploadFile, File, Form, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel
+from starlette.middleware.sessions import SessionMiddleware
 
 from fastapi.responses import PlainTextResponse, Response
 
+from auth import router as auth_router, get_current_user
+from backend.profile_store import get_profile, save_profile
 from backend.orchestrator import run_query
 from backend.session_store import get_store as _get_store
 from agents.data_analysis import upload_file as da_upload, get_session_data as da_get_data
@@ -76,6 +83,13 @@ from agents.report_generator import (
 
 app = FastAPI(title="SMARTAssist Hub", version="7.0")
 
+# Session middleware must be added before including routers
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SESSION_SECRET_KEY", "change-me-in-production"),
+)
+
+app.include_router(auth_router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 _jinja_env = Environment(loader=FileSystemLoader("templates"), autoescape=True)
@@ -104,15 +118,29 @@ class FeedbackRequest(BaseModel):
     agent: str = ""
 
 
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request, error: str = "", email: str = ""):
+    user = get_current_user(request)
+    if user:
+        return RedirectResponse("/")
+    template = _jinja_env.get_template("login.html")
+    html = template.render(error=error, email=email)
+    return HTMLResponse(html)
+
+
 @app.get("/", response_class=HTMLResponse)
-async def index():
+async def index(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    profile = get_profile(user["sub"])
     agents_list = [
         {"key": k, "icon": v["icon"], "name": v["name"]}
         for k, v in AGENT_LABELS.items()
         if k != "fallback"
     ]
     template = _jinja_env.get_template("index.html")
-    html = template.render(agents_list=agents_list)
+    html = template.render(agents_list=agents_list, user=user, profile=profile)
     return HTMLResponse(html)
 
 
@@ -558,8 +586,13 @@ async def get_session_messages(session_id: str):
 
 
 @app.post("/api/agent-chat")
-async def agent_chat(req: AgentChatRequest):
+async def agent_chat(req: AgentChatRequest, request: Request):
     """Direct chat with a specific agent, bypassing intent classification."""
+    user = get_current_user(request)
+    user_name = ""
+    if user:
+        profile = get_profile(user["sub"])
+        user_name = profile.get("nama") or user.get("name", "")
     store = _get_store()
     is_intro = req.message == "__INTRO__"
     history = store.get_messages(req.session_id)
@@ -588,6 +621,8 @@ async def agent_chat(req: AgentChatRequest):
                 kwargs["session_id"] = req.session_id
             if "lang" in sig.parameters:
                 kwargs["lang"] = req.lang
+            if "user_name" in sig.parameters:
+                kwargs["user_name"] = user_name
             output = module.handle(**kwargs)
 
             # JSON retry: if agent expects JSON but output fails to parse, try once more
@@ -691,6 +726,55 @@ async def agent_chat(req: AgentChatRequest):
         "agent_name": agent_info["name"],
         "structured": structured,
     })
+
+
+@app.get("/api/avatar")
+async def api_avatar(request: Request):
+    """Proxy Google profile picture server-side to avoid browser CORS/referrer blocks."""
+    user = get_current_user(request)
+    if not user or not user.get("picture"):
+        return Response(status_code=204)
+    pic_url = user["picture"]
+    # Request larger size for retina displays
+    pic_url = pic_url.split("=s")[0] + "=s120-c" if "=" in pic_url else pic_url
+    try:
+        import httpx
+        async with httpx.AsyncClient(follow_redirects=True, timeout=8.0) as client:
+            resp = await client.get(pic_url, headers={"User-Agent": "Mozilla/5.0"})
+        if resp.status_code == 200:
+            content_type = resp.headers.get("content-type", "image/jpeg")
+            return Response(content=resp.content, media_type=content_type,
+                            headers={"Cache-Control": "public, max-age=3600"})
+    except Exception:
+        pass
+    return Response(status_code=204)
+
+
+@app.get("/api/profile")
+async def api_get_profile(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "Tidak log masuk."}, status_code=401)
+    profile = get_profile(user["sub"])
+    return JSONResponse({
+        "nama":    profile.get("nama", "") or user.get("name", ""),
+        "jawatan": profile.get("jawatan", ""),
+        "stesen":  profile.get("stesen", ""),
+        "daerah":  profile.get("daerah", ""),
+        "negeri":  profile.get("negeri", ""),
+        "email":   user.get("email", ""),
+        "picture": user.get("picture", ""),
+    })
+
+
+@app.post("/api/profile")
+async def api_save_profile(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "Tidak log masuk."}, status_code=401)
+    data = await request.json()
+    profile = save_profile(user["sub"], user["email"], data)
+    return JSONResponse({"ok": True, "profile": dict(profile)})
 
 
 if __name__ == "__main__":
