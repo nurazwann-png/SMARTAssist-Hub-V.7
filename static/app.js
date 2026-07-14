@@ -12,6 +12,7 @@ let lastActiveAgent = 'fallback';
 let lastStructuredData = null;
 let currentLang = localStorage.getItem('smartassist_lang') || 'bm';
 let _msgIndex = 0;
+let _reviewDocText = null;
 
 // ── i18n ──
 const I18N = {
@@ -738,82 +739,239 @@ function buildTableHtml(table) {
     return html;
 }
 
-function buildReviewHtml(data) {
-    let html = '<div class="message-bubble structured-response review-response">';
+// Split doc into blocks preserving blank lines as spacers
+function _splitDocBlocks(text) {
+    const lines = text.split('\n');
+    const blocks = []; // {lines, isEmpty, blockIdx(for non-empty)}
+    let cur = null, blockIdx = 0;
+    lines.forEach(line => {
+        if (!line.trim()) {
+            if (cur) { cur.text = cur.lines.join(' '); blocks.push(cur); cur = null; }
+            blocks.push({ lines: [], isEmpty: true });
+        } else {
+            if (!cur) cur = { lines: [], isEmpty: false, blockIdx: blockIdx++ };
+            cur.lines.push(line);
+        }
+    });
+    if (cur) { cur.text = cur.lines.join(' '); blocks.push(cur); }
+    return blocks;
+}
 
-    if (data.message) {
-        html += `<div class="da-message">${escapeHtml(data.message)}</div>`;
+function _matchIssueToBlock(issue, nonEmptyBlocks) {
+    if (!nonEmptyBlocks.length) return -1;
+    const loc = (issue.location || '').toLowerCase().trim();
+    const combined = (loc + ' ' + (issue.issue || '') + ' ' + (issue.suggestion || '')).toLowerCase();
+
+    // 1. Paragraph number: "Perenggan 2", "Paragraph 3"
+    const numMatch = loc.match(/(?:perenggan|paragraph)\s*(?:ke-?)?(\d+)/);
+    if (numMatch) {
+        const n = parseInt(numMatch[1]);
+        // First: look for a block whose first line starts with "N." or "N " (numbered paragraph in letter body)
+        const numbered = nonEmptyBlocks.find(b => /^(\d+)[.\s]/.test(b.lines[0] || '') && parseInt(b.lines[0]) === n);
+        if (numbered) return numbered.blockIdx;
+        // Fallback: nth non-empty block (0-indexed)
+        const byIndex = nonEmptyBlocks[n - 1];
+        return byIndex ? byIndex.blockIdx : -1;
     }
 
+    // 2. Structural position heuristics
+    const firstBlock = nonEmptyBlocks[0];
+    const lastBlock  = nonEmptyBlocks[nonEmptyBlocks.length - 1];
+    if (/(?:pengirim|penghantar|nama.*pengirim|alamat.*pengirim|nama.*atas|bahagian.*atas|header)/.test(loc))
+        return firstBlock.blockIdx;
+    if (/(?:penutup|tandatangan|tanda tangan|yang benar|yang menjalankan amanah|sekian|penandatangan)/.test(loc))
+        return lastBlock.blockIdx;
+    if (/(?:tajuk|perkara|subject|heading)/.test(loc)) {
+        // find first all-caps line block
+        const capsBlock = nonEmptyBlocks.find(b => b.text === b.text.toUpperCase() && b.text.trim().length > 3);
+        if (capsBlock) return capsBlock.blockIdx;
+    }
+    if (/tarikh|date/.test(loc)) {
+        const dateBlock = nonEmptyBlocks.find(b => /\d{1,2}\s+\w+\s+\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(b.text));
+        if (dateBlock) return dateBlock.blockIdx;
+    }
+
+    // 3. Keyword search using ALL fields combined
+    const stopwords = new Set(['yang','dan','atau','dalam','untuk','pada','dengan','ini','itu','the','and','or','in','for','on','with','di','ke','ia','adalah','telah','akan','tidak','ada','saya','anda','bahawa','kepada','daripada','oleh','juga','telah','sudah']);
+    const keywords = combined.split(/[\s,\/\-\(\):;\.\"\']+/).filter(w => w.length > 3 && !stopwords.has(w));
+    if (!keywords.length) return -1;
+
+    let bestIdx = -1, bestScore = 0;
+    nonEmptyBlocks.forEach(b => {
+        const bLower = b.text.toLowerCase();
+        const score = keywords.reduce((s, kw) => s + (bLower.includes(kw) ? 1 : 0), 0);
+        if (score > bestScore) { bestScore = score; bestIdx = b.blockIdx; }
+    });
+    return bestScore >= 1 ? bestIdx : -1;
+}
+
+function toggleRevAnnotation(badge) {
+    const popup = badge.nextElementSibling;
+    if (!popup || !popup.classList.contains('rev-annotation-popup')) return;
+    const isOpen = popup.style.display !== 'none';
+    // close all popups first
+    document.querySelectorAll('.rev-annotation-popup').forEach(p => { p.style.display = 'none'; });
+    if (!isOpen) popup.style.display = 'block';
+}
+
+function buildReviewHtml(data) {
+    const docText = _reviewDocText;
+
+    // If we have the document text, build annotated preview
+    if (docText) {
+        return _buildAnnotatedReview(data, docText);
+    }
+
+    // Fallback: plain list view (no uploaded doc text available)
+    let html = '<div class="message-bubble structured-response review-response">';
+    if (data.message) html += `<div class="da-message">${escapeHtml(data.message)}</div>`;
     if (data.summary) {
-        html += `<div class="da-section"><div class="da-section-title">\u{1F4CB} Ringkasan Semakan</div>`;
+        const scoreColors = { A: '#22c55e', B: '#3b82f6', C: '#f59e0b', D: '#ef4444' };
+        const scoreLabels = { A: 'Cemerlang', B: 'Baik', C: 'Perlu Pembetulan', D: 'Banyak Isu' };
+        html += `<div class="da-section"><div class="da-section-title">📋 Ringkasan</div>`;
         html += `<p style="font-size:13px;color:var(--text-secondary);line-height:1.6">${escapeHtml(data.summary)}</p>`;
         if (data.score) {
-            const scoreColors = { A: '#22c55e', B: '#3b82f6', C: '#f59e0b', D: '#ef4444' };
-            const scoreLabels = { A: 'Cemerlang', B: 'Baik', C: 'Perlu Pembetulan', D: 'Banyak Isu' };
             const color = scoreColors[data.score] || '#888';
-            const label = scoreLabels[data.score] || data.score;
-            html += `<div class="review-score" style="color:${color};font-weight:bold;font-size:1.1em;margin-top:6px;">Skor: ${data.score} — ${label}</div>`;
+            html += `<div class="review-score" style="color:${color};font-weight:bold;margin-top:6px;">Skor: ${data.score} — ${scoreLabels[data.score] || data.score}</div>`;
+        }
+        html += '</div>';
+    }
+    if (data.issues && data.issues.length === 0) {
+        html += '<div class="da-section"><div class="da-section-title">✅ Tiada Isu</div><p style="font-size:13px;color:var(--text-secondary)">Dokumen ini dalam keadaan baik.</p></div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function _buildAnnotatedReview(data, docText) {
+    const issues = data.issues || [];
+    const blocks = _splitDocBlocks(docText);
+    const nonEmptyBlocks = blocks.filter(b => !b.isEmpty);
+
+    // Map issues to blockIdx
+    const blockIssues = {}; // blockIdx -> [{...issue, num}]
+    const unmapped = [];
+    issues.forEach((issue, i) => {
+        const bIdx = _matchIssueToBlock(issue, nonEmptyBlocks);
+        if (bIdx >= 0) {
+            if (!blockIssues[bIdx]) blockIssues[bIdx] = [];
+            blockIssues[bIdx].push({ ...issue, num: i + 1 });
+        } else {
+            unmapped.push({ ...issue, num: i + 1 });
+        }
+    });
+
+    const scoreColors = { A: '#22c55e', B: '#3b82f6', C: '#f59e0b', D: '#ef4444' };
+    const scoreLabels = { A: 'Cemerlang', B: 'Baik', C: 'Perlu Pembetulan', D: 'Banyak Isu' };
+    const scoreColor = scoreColors[data.score] || '#6b7280';
+
+    let html = '<div class="rev-annotated">';
+
+    // Score bar
+    html += '<div class="rev-score-bar">';
+    if (data.score) html += `<span class="rev-score-badge" style="background:${scoreColor}">Skor ${data.score} — ${scoreLabels[data.score] || data.score}</span>`;
+    if (data.summary) html += `<span class="rev-summary-text">${escapeHtml(data.summary)}</span>`;
+    html += '</div>';
+
+    // Annotated document page
+    html += '<div class="rev-doc-page">';
+
+    // Unmapped (global) issues at top
+    if (unmapped.length) {
+        html += '<div class="rev-para-row rev-para-global">';
+        html += '<div class="rev-para-text rev-global-label">📌 Keseluruhan Dokumen</div>';
+        html += '<div class="rev-badges">';
+        unmapped.forEach(issue => {
+            const bCls = issue.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
+            const fixPrompt = escapeAttr(issue.suggestion
+                ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
+                : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`);
+            html += `<span class="rev-badge ${bCls}" onclick="toggleRevAnnotation(this)">${issue.num}</span>`;
+            html += `<div class="rev-annotation-popup" style="display:none">`;
+            html += `<div class="ann-cat">${escapeHtml(issue.category || '')}</div>`;
+            html += `<div class="ann-desc">${escapeHtml(issue.issue || '')}</div>`;
+            if (issue.suggestion) html += `<div class="ann-suggestion">💡 ${escapeHtml(issue.suggestion)}</div>`;
+            html += `<button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="fixReviewIssue(this)">🔧 Betulkan</button>`;
+            html += '</div>';
+        });
+        html += '</div></div>';
+    }
+
+    // Render all blocks preserving format
+    blocks.forEach(block => {
+        if (block.isEmpty) {
+            html += '<div class="rev-spacer"></div>';
+            return;
+        }
+        const bIssues = blockIssues[block.blockIdx] || [];
+        const hasWajib = bIssues.some(iss => iss.severity === 'WAJIB_BETULKAN');
+        const hasCadangan = bIssues.length > 0 && !hasWajib;
+        const rowCls = hasWajib ? ' has-wajib' : hasCadangan ? ' has-cadangan' : '';
+        // Render lines with <br> to preserve internal line breaks
+        const linesHtml = block.lines.map(l => escapeHtml(l)).join('<br>');
+        html += `<div class="rev-para-row${rowCls}">`;
+        html += `<div class="rev-para-text">${linesHtml}</div>`;
+        if (bIssues.length) {
+            html += '<div class="rev-badges">';
+            bIssues.forEach(issue => {
+                const bCls = issue.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
+                const fixPrompt = escapeAttr(issue.suggestion
+                    ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
+                    : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`);
+                html += `<span class="rev-badge ${bCls}" onclick="toggleRevAnnotation(this)">${issue.num}</span>`;
+                html += `<div class="rev-annotation-popup" style="display:none">`;
+                html += `<div class="ann-cat">${escapeHtml(issue.category || '')}</div>`;
+                html += `<div class="ann-loc">${escapeHtml(issue.location || '')}</div>`;
+                html += `<div class="ann-desc">${escapeHtml(issue.issue || '')}</div>`;
+                if (issue.suggestion) html += `<div class="ann-suggestion">💡 ${escapeHtml(issue.suggestion)}</div>`;
+                html += `<button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="fixReviewIssue(this)">🔧 Betulkan</button>`;
+                html += '</div>';
+            });
+            html += '</div>';
+        }
+        html += '</div>';
+    });
+
+    html += '</div>'; // rev-doc-page
+
+    if (issues.length === 0) {
+        html += '<div class="rev-no-issues">✅ Tiada isu ditemui. Dokumen ini dalam keadaan baik.</div>';
+    }
+
+    // Legend
+    if (issues.length > 0) {
+        const wajibIssues = issues.filter(iss => iss.severity === 'WAJIB_BETULKAN');
+        const cadanganIssues = issues.filter(iss => iss.severity !== 'WAJIB_BETULKAN');
+        html += '<div class="rev-legend">';
+        if (wajibIssues.length) {
+            html += `<div class="rev-legend-section-title">🚨 Wajib Betulkan (${wajibIssues.length})</div>`;
+            wajibIssues.forEach(issue => {
+                const num = issues.indexOf(issue) + 1;
+                html += `<div class="rev-legend-item"><span class="rev-badge wajib sm">${num}</span><span class="legend-loc">${escapeHtml(issue.location || '')}</span><span class="legend-desc">${escapeHtml(issue.issue || '')}</span></div>`;
+            });
+        }
+        if (cadanganIssues.length) {
+            html += `<div class="rev-legend-section-title" style="margin-top:8px">💡 Cadangan (${cadanganIssues.length})</div>`;
+            cadanganIssues.forEach(issue => {
+                const num = issues.indexOf(issue) + 1;
+                html += `<div class="rev-legend-item"><span class="rev-badge cadangan sm">${num}</span><span class="legend-loc">${escapeHtml(issue.location || '')}</span><span class="legend-desc">${escapeHtml(issue.issue || '')}</span></div>`;
+            });
         }
         html += '</div>';
     }
 
-    if (data.issues && data.issues.length > 0) {
-        const mustFix = data.issues.filter(i => i.severity === 'WAJIB_BETULKAN');
-        const suggestions = data.issues.filter(i => i.severity !== 'WAJIB_BETULKAN');
-        const _reviewMsgId = 'rev_' + Date.now();
-
-        if (mustFix.length > 0) {
-            html += '<div class="da-section"><div class="da-section-title">\u{1F6A8} Wajib Betulkan (' + mustFix.length + ')</div>';
-            html += '<div class="review-issues">';
-            mustFix.forEach((issue, idx) => {
-                const btnId = `${_reviewMsgId}_mf${idx}`;
-                const fixPrompt = issue.suggestion
-                    ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
-                    : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`;
-                html += `<div class="review-issue must-fix">`;
-                html += `<div class="issue-header"><span class="issue-num">${idx + 1}</span><span class="issue-cat">${escapeHtml(issue.category || '')}</span></div>`;
-                html += `<div class="issue-location">${escapeHtml(issue.location || '')}</div>`;
-                html += `<div class="issue-desc">${escapeHtml(issue.issue || '')}</div>`;
-                if (issue.suggestion) html += `<div class="issue-suggestion">\u{1F4A1} ${escapeHtml(issue.suggestion)}</div>`;
-                html += `<button class="issue-fix-btn" id="${btnId}" data-prompt="${escapeAttr(fixPrompt)}" onclick="fixReviewIssue(this)">🔧 Betulkan</button>`;
-                html += '</div>';
-            });
-            html += '</div></div>';
-        }
-
-        if (suggestions.length > 0) {
-            html += '<div class="da-section"><div class="da-section-title">\u{1F4A1} Cadangan (' + suggestions.length + ')</div>';
-            html += '<div class="review-issues">';
-            suggestions.forEach((issue, idx) => {
-                const btnId = `${_reviewMsgId}_cd${idx}`;
-                const fixPrompt = issue.suggestion
-                    ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
-                    : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`;
-                html += `<div class="review-issue suggestion">`;
-                html += `<div class="issue-header"><span class="issue-num">${idx + 1}</span><span class="issue-cat">${escapeHtml(issue.category || '')}</span></div>`;
-                html += `<div class="issue-location">${escapeHtml(issue.location || '')}</div>`;
-                html += `<div class="issue-desc">${escapeHtml(issue.issue || '')}</div>`;
-                if (issue.suggestion) html += `<div class="issue-suggestion">\u{1F4A1} ${escapeHtml(issue.suggestion)}</div>`;
-                html += `<button class="issue-fix-btn issue-fix-btn--cadangan" id="${btnId}" data-prompt="${escapeAttr(fixPrompt)}" onclick="fixReviewIssue(this)">🔧 Betulkan</button>`;
-                html += '</div>';
-            });
-            html += '</div></div>';
-        }
-    } else if (data.issues && data.issues.length === 0) {
-        html += '<div class="da-section"><div class="da-section-title">\u{2705} Tiada Isu Ditemui</div>';
-        html += '<p style="font-size:13px;color:var(--text-secondary)">Dokumen ini dalam keadaan baik.</p></div>';
+    // Corrected document
+    if (data.corrected_document) {
+        const remindMsg = currentLang === 'en'
+            ? '⚠️ Please review the corrected document carefully before downloading.'
+            : '⚠️ Sila semak semula dokumen yang telah diperbetulkan sebelum dimuat turun.';
+        html += `<div class="da-section doc-preview-section" style="background:var(--bg-secondary);border-radius:8px;padding:12px;margin-top:4px">`;
+        html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span></div>`;
+        html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview">${escapeHtml(data.corrected_document)}</pre>`;
+        html += `<div class="doc-review-reminder">${remindMsg}</div>`;
+        html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 Muat Turun (.docx)</button></div>`;
+        html += '</div>';
     }
-
-    html += `<div class="da-section doc-preview-section review-doc-preview-section" style="${data.corrected_document ? '' : 'display:none'}">`;
-    html += `<div class="da-section-title">\u{1F4C4} Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span></div>`;
-    html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview">${data.corrected_document ? escapeHtml(data.corrected_document) : ''}</pre>`;
-    const remindMsgRev = currentLang === 'en'
-        ? '⚠️ Please review the corrected document carefully before downloading. Ensure all information is accurate and complete.'
-        : '⚠️ Sila semak semula dokumen yang telah diperbetulkan sebelum dimuat turun. Pastikan semua maklumat adalah tepat dan lengkap.';
-    html += `<div class="doc-review-reminder">${remindMsgRev}</div>`;
-    html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">\u{1F4E5} Muat Turun (.docx)</button></div>`;
-    html += '</div>';
 
     html += '</div>';
     return html;
@@ -1664,6 +1822,7 @@ async function handleReviewUpload(file) {
         const res = await fetch('/api/review/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if (data.ok) {
+            _reviewDocText = data.text || null;
             uploadBtn.classList.add('has-file');
             fileIndicator.style.display = 'flex';
             fileIndicatorText.textContent = `📄 ${data.filename} (${data.doc_type}, ${data.char_count} aksara)`;

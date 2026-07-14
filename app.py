@@ -268,6 +268,7 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
         "doc_type": doc_type,
         "char_count": len(text),
         "preview": text[:300],
+        "text": text,
     })
 
 
