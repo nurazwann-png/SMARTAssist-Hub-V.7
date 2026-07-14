@@ -86,12 +86,18 @@ def _save_session(session_id: str, session: dict):
     get_store().set_all(session_id, _NS, session)
 
 
-def set_uploaded_document(session_id: str, text: str, filename: str, doc_type: str = "Dokumen"):
+def set_uploaded_document(session_id: str, text: str, filename: str, doc_type: str = "Dokumen", html: str | None = None):
     session = _get_session(session_id)
     session["uploaded_doc"] = text
     session["uploaded_doc_type"] = doc_type
     session["uploaded_filename"] = filename
+    session["uploaded_doc_html"] = html
     _save_session(session_id, session)
+
+
+def get_uploaded_html(session_id: str) -> str | None:
+    session = _get_session(session_id)
+    return session.get("uploaded_doc_html")
 
 
 def get_uploaded_document(session_id: str) -> tuple[str | None, str, str | None]:

@@ -13,6 +13,8 @@ let lastStructuredData = null;
 let currentLang = localStorage.getItem('smartassist_lang') || 'bm';
 let _msgIndex = 0;
 let _reviewDocText = null;
+let _reviewDocHtml = null;
+let _reviewIsPdf   = false;
 
 // ── i18n ──
 const I18N = {
@@ -835,12 +837,52 @@ function buildReviewHtml(data) {
     return html;
 }
 
+function _buildPopupHtml(issue) {
+    const fixPrompt = escapeAttr(issue.suggestion
+        ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
+        : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`);
+    let p = `<div class="rev-annotation-popup" style="display:none">`;
+    p += `<div class="ann-cat">${escapeHtml(issue.category || '')}</div>`;
+    if (issue.location) p += `<div class="ann-loc">${escapeHtml(issue.location)}</div>`;
+    p += `<div class="ann-desc">${escapeHtml(issue.issue || '')}</div>`;
+    if (issue.suggestion) p += `<div class="ann-suggestion">💡 ${escapeHtml(issue.suggestion)}</div>`;
+    p += `<button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="event.stopPropagation();fixReviewIssue(this)">🔧 Betulkan</button>`;
+    p += `</div>`;
+    return p;
+}
+
+function _buildLegend(issues) {
+    if (!issues.length) return '';
+    const wajib = issues.filter(i => i.severity === 'WAJIB_BETULKAN');
+    const cadangan = issues.filter(i => i.severity !== 'WAJIB_BETULKAN');
+    let html = '<div class="rev-legend">';
+    if (wajib.length) {
+        html += `<div class="rev-legend-section-title">🚨 Wajib Betulkan (${wajib.length})</div>`;
+        wajib.forEach(issue => {
+            const num = issues.indexOf(issue) + 1;
+            html += `<div class="rev-legend-item"><span class="rev-badge wajib sm">${num}</span><span class="legend-loc">${escapeHtml(issue.location || '')}</span><span class="legend-desc">${escapeHtml(issue.issue || '')}</span></div>`;
+        });
+    }
+    if (cadangan.length) {
+        html += `<div class="rev-legend-section-title" style="margin-top:8px">💡 Cadangan (${cadangan.length})</div>`;
+        cadangan.forEach(issue => {
+            const num = issues.indexOf(issue) + 1;
+            html += `<div class="rev-legend-item"><span class="rev-badge cadangan sm">${num}</span><span class="legend-loc">${escapeHtml(issue.location || '')}</span><span class="legend-desc">${escapeHtml(issue.issue || '')}</span></div>`;
+        });
+    }
+    html += '</div>';
+    return html;
+}
+
 function _buildAnnotatedReview(data, docText) {
     const issues = data.issues || [];
     const allLines = _splitDocLines(docText);
+    const scoreColors = { A: '#22c55e', B: '#3b82f6', C: '#f59e0b', D: '#ef4444' };
+    const scoreLabels = { A: 'Cemerlang', B: 'Baik', C: 'Perlu Pembetulan', D: 'Banyak Isu' };
+    const scoreColor = scoreColors[data.score] || '#6b7280';
 
-    // Map each issue to a lineIdx
-    const lineIssues = {}; // lineIdx -> [{...issue, num}]
+    // Map issues to line indices
+    const lineIssues = {};
     const unmapped = [];
     issues.forEach((issue, i) => {
         const lIdx = _matchIssueToLine(issue, allLines);
@@ -852,11 +894,6 @@ function _buildAnnotatedReview(data, docText) {
         }
     });
 
-    const scoreColors = { A: '#22c55e', B: '#3b82f6', C: '#f59e0b', D: '#ef4444' };
-    const scoreLabels = { A: 'Cemerlang', B: 'Baik', C: 'Perlu Pembetulan', D: 'Banyak Isu' };
-    const scoreColor = scoreColors[data.score] || '#6b7280';
-    const revId = 'rev_' + Date.now();
-
     let html = '<div class="rev-annotated">';
 
     // Score bar
@@ -865,96 +902,74 @@ function _buildAnnotatedReview(data, docText) {
     if (data.summary) html += `<span class="rev-summary-text">${escapeHtml(data.summary)}</span>`;
     html += '</div>';
 
-    // Doc page header with expand button
+    // Doc page header
     html += `<div class="rev-doc-header">`;
     html += `<span class="rev-doc-label">📄 Pratonton Dokumen</span>`;
     html += `<button class="rev-expand-btn" onclick="toggleRevExpand(this)" title="Kembangkan pratonton">⛶ Kembangkan</button>`;
     html += `</div>`;
 
-    // Unmapped (global) issues shown above the doc
+    // Global/unmapped issues bar
     if (unmapped.length) {
         html += '<div class="rev-global-bar">';
         html += '<span class="rev-global-label">📌 Keseluruhan Dokumen</span>';
         html += '<div class="rev-badges">';
         unmapped.forEach(issue => {
             const bCls = issue.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
-            const fixPrompt = escapeAttr(issue.suggestion
-                ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
-                : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`);
             html += `<span class="rev-badge ${bCls}" onclick="toggleRevAnnotation(this)">${issue.num}</span>`;
-            html += `<div class="rev-annotation-popup" style="display:none">`;
-            html += `<div class="ann-cat">${escapeHtml(issue.category || '')}</div>`;
-            html += `<div class="ann-desc">${escapeHtml(issue.issue || '')}</div>`;
-            if (issue.suggestion) html += `<div class="ann-suggestion">💡 ${escapeHtml(issue.suggestion)}</div>`;
-            html += `<button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="event.stopPropagation();fixReviewIssue(this)">🔧 Betulkan</button>`;
-            html += '</div>';
+            html += _buildPopupHtml(issue);
         });
         html += '</div></div>';
     }
 
-    // Annotated document page — line by line
-    html += `<div class="rev-doc-page" id="${revId}_page">`;
+    // ── VISUAL DOCUMENT ──
+    // If we have original HTML (from mammoth/DOCX), inject badges into it
+    // If PDF, embed it directly
+    // Otherwise fall back to plain-text line view
+    const docHtml = _reviewDocHtml;
+    const isPdf   = _reviewIsPdf;
+
+    html += `<div class="rev-doc-page" id="revDocPage">`;
     html += `<button class="rev-close-btn" onclick="toggleRevExpand(this.closest('.rev-annotated').querySelector('.rev-expand-btn'))" title="Tutup pratonton">✕ Tutup Pratonton</button>`;
-    allLines.forEach(lineObj => {
-        if (lineObj.isEmpty) {
-            html += '<div class="rev-spacer"></div>';
-            return;
-        }
-        const lIssues = lineIssues[lineObj.lineIdx] || [];
-        const hasWajib = lIssues.some(iss => iss.severity === 'WAJIB_BETULKAN');
-        const hasCadangan = lIssues.length > 0 && !hasWajib;
-        const rowCls = hasWajib ? ' has-wajib' : hasCadangan ? ' has-cadangan' : '';
-        html += `<div class="rev-para-row${rowCls}">`;
-        html += `<div class="rev-para-text">${escapeHtml(lineObj.line)}</div>`;
-        if (lIssues.length) {
-            html += '<div class="rev-badges">';
-            lIssues.forEach(issue => {
-                const bCls = issue.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
-                const fixPrompt = escapeAttr(issue.suggestion
-                    ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
-                    : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`);
-                html += `<span class="rev-badge ${bCls}" onclick="toggleRevAnnotation(this)">${issue.num}</span>`;
-                html += `<div class="rev-annotation-popup" style="display:none">`;
-                html += `<div class="ann-cat">${escapeHtml(issue.category || '')}</div>`;
-                html += `<div class="ann-loc">${escapeHtml(issue.location || '')}</div>`;
-                html += `<div class="ann-desc">${escapeHtml(issue.issue || '')}</div>`;
-                if (issue.suggestion) html += `<div class="ann-suggestion">💡 ${escapeHtml(issue.suggestion)}</div>`;
-                html += `<button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="event.stopPropagation();fixReviewIssue(this)">🔧 Betulkan</button>`;
+
+    if (isPdf && docHtml) {
+        // PDF — embed via data URI
+        html += `<iframe class="rev-pdf-embed" src="${docHtml}" title="Pratonton PDF"></iframe>`;
+    } else if (docHtml) {
+        // DOCX — inject badges into mammoth HTML
+        html += `<div class="rev-html-doc">`;
+        html += _injectBadgesIntoHtml(docHtml, lineIssues, allLines);
+        html += `</div>`;
+    } else {
+        // Fallback — plain text line view
+        allLines.forEach(lineObj => {
+            if (lineObj.isEmpty) { html += '<div class="rev-spacer"></div>'; return; }
+            const lIssues = lineIssues[lineObj.lineIdx] || [];
+            const hasWajib = lIssues.some(i => i.severity === 'WAJIB_BETULKAN');
+            const rowCls = hasWajib ? ' has-wajib' : lIssues.length ? ' has-cadangan' : '';
+            html += `<div class="rev-para-row${rowCls}">`;
+            html += `<div class="rev-para-text">${escapeHtml(lineObj.line)}</div>`;
+            if (lIssues.length) {
+                html += '<div class="rev-badges">';
+                lIssues.forEach(issue => {
+                    const bCls = issue.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
+                    html += `<span class="rev-badge ${bCls}" onclick="toggleRevAnnotation(this)">${issue.num}</span>`;
+                    html += _buildPopupHtml(issue);
+                });
                 html += '</div>';
-            });
+            }
             html += '</div>';
-        }
-        html += '</div>';
-    });
+        });
+    }
+
     html += '</div>'; // rev-doc-page
 
     if (issues.length === 0) {
         html += '<div class="rev-no-issues">✅ Tiada isu ditemui. Dokumen ini dalam keadaan baik.</div>';
     }
 
-    // Legend
-    if (issues.length > 0) {
-        const wajibIssues = issues.filter(iss => iss.severity === 'WAJIB_BETULKAN');
-        const cadanganIssues = issues.filter(iss => iss.severity !== 'WAJIB_BETULKAN');
-        html += '<div class="rev-legend">';
-        if (wajibIssues.length) {
-            html += `<div class="rev-legend-section-title">🚨 Wajib Betulkan (${wajibIssues.length})</div>`;
-            wajibIssues.forEach(issue => {
-                const num = issues.indexOf(issue) + 1;
-                html += `<div class="rev-legend-item"><span class="rev-badge wajib sm">${num}</span><span class="legend-loc">${escapeHtml(issue.location || '')}</span><span class="legend-desc">${escapeHtml(issue.issue || '')}</span></div>`;
-            });
-        }
-        if (cadanganIssues.length) {
-            html += `<div class="rev-legend-section-title" style="margin-top:8px">💡 Cadangan (${cadanganIssues.length})</div>`;
-            cadanganIssues.forEach(issue => {
-                const num = issues.indexOf(issue) + 1;
-                html += `<div class="rev-legend-item"><span class="rev-badge cadangan sm">${num}</span><span class="legend-loc">${escapeHtml(issue.location || '')}</span><span class="legend-desc">${escapeHtml(issue.issue || '')}</span></div>`;
-            });
-        }
-        html += '</div>';
-    }
+    html += _buildLegend(issues);
 
-    // Corrected document — uses .review-doc-preview-section so intercept in addMessage works
+    // Corrected document section
     if (data.corrected_document) {
         const remindMsg = currentLang === 'en'
             ? '⚠️ Please review the corrected document carefully before downloading.'
@@ -969,6 +984,85 @@ function _buildAnnotatedReview(data, docText) {
 
     html += '</div>'; // rev-annotated
     return html;
+}
+
+// Inject numbered badge spans into mammoth-generated HTML, matched by plain-text line content
+function _injectBadgesIntoHtml(docHtml, lineIssues, allLines) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div id="_root">${docHtml}</div>`, 'text/html');
+    const root = doc.getElementById('_root');
+
+    // Build a map: trimmed text snippet → issues
+    const snippetMap = {};
+    Object.entries(lineIssues).forEach(([lineIdx, issues]) => {
+        const line = allLines[parseInt(lineIdx)];
+        if (!line || !line.trimmed) return;
+        const key = line.trimmed.substring(0, 40).toLowerCase();
+        snippetMap[key] = issues;
+    });
+
+    // Walk all text-containing elements
+    const candidates = root.querySelectorAll('p, td, th, li, h1, h2, h3, h4, h5');
+    candidates.forEach(el => {
+        const elText = el.textContent.trim().substring(0, 40).toLowerCase();
+        if (!elText) return;
+
+        // Find best matching snippet
+        let matched = null;
+        for (const [key, issues] of Object.entries(snippetMap)) {
+            if (elText.includes(key) || key.includes(elText.substring(0, 20))) {
+                matched = issues;
+                break;
+            }
+        }
+        if (!matched) return;
+
+        // Wrap element content in a rev-para-row
+        const wrapper = doc.createElement('span');
+        wrapper.className = 'rev-html-row';
+        const hasWajib = matched.some(i => i.severity === 'WAJIB_BETULKAN');
+        wrapper.style.cssText = hasWajib
+            ? 'background:rgba(239,68,68,0.12);border-left:3px solid #ef4444;padding-left:4px;display:block'
+            : 'background:rgba(245,158,11,0.10);border-left:3px solid #f59e0b;padding-left:4px;display:block';
+
+        const badgeWrap = doc.createElement('span');
+        badgeWrap.className = 'rev-badges rev-badges-inline';
+        matched.forEach(issue => {
+            const bCls = issue.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
+            const badge = doc.createElement('span');
+            badge.className = `rev-badge ${bCls}`;
+            badge.textContent = issue.num;
+            badge.setAttribute('onclick', 'toggleRevAnnotation(this)');
+            badge.style.cssText = 'vertical-align:middle;cursor:pointer';
+
+            const popup = doc.createElement('div');
+            popup.className = 'rev-annotation-popup';
+            popup.style.display = 'none';
+            const fixPrompt = (issue.suggestion
+                ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
+                : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`
+            ).replace(/"/g, '&quot;');
+            popup.innerHTML = `
+                <div class="ann-cat">${issue.category || ''}</div>
+                ${issue.location ? `<div class="ann-loc">${issue.location}</div>` : ''}
+                <div class="ann-desc">${issue.issue || ''}</div>
+                ${issue.suggestion ? `<div class="ann-suggestion">💡 ${issue.suggestion}</div>` : ''}
+                <button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="event.stopPropagation();fixReviewIssue(this)">🔧 Betulkan</button>`;
+            badgeWrap.appendChild(badge);
+            badgeWrap.appendChild(popup);
+        });
+
+        // Move el's children into wrapper, then append badge
+        while (el.firstChild) wrapper.appendChild(el.firstChild);
+        wrapper.appendChild(badgeWrap);
+        el.appendChild(wrapper);
+
+        // Remove snippet from map so it doesn't match twice
+        const usedKey = Object.keys(snippetMap).find(k => elText.includes(k) || k.includes(elText.substring(0,20)));
+        if (usedKey) delete snippetMap[usedKey];
+    });
+
+    return root.innerHTML;
 }
 
 function toggleRevExpand(btn) {
@@ -1828,6 +1922,8 @@ async function handleReviewUpload(file) {
         const data = await res.json();
         if (data.ok) {
             _reviewDocText = data.text || null;
+            _reviewDocHtml = data.html || null;
+            _reviewIsPdf   = data.is_pdf || false;
             uploadBtn.classList.add('has-file');
             fileIndicator.style.display = 'flex';
             fileIndicatorText.textContent = `📄 ${data.filename} (${data.doc_type}, ${data.char_count} aksara)`;

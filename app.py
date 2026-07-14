@@ -217,6 +217,7 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
 
     raw = await file.read()
     text = ""
+    doc_html = None   # rich HTML for visual preview
     doc_type = "Dokumen"
 
     try:
@@ -224,13 +225,30 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
             import pdfplumber
             with pdfplumber.open(_io.BytesIO(raw)) as pdf:
                 pages = [p.extract_text() or "" for p in pdf.pages]
-            text = "\n\n".join(p for p in pages if p.strip())
+            text = "\n".join(p for p in pages if p.strip())
             doc_type = "PDF"
+            # Store raw PDF as base64 for client-side embed
+            import base64
+            doc_html = "data:application/pdf;base64," + base64.b64encode(raw).decode()
         elif ext in (".docx", ".doc"):
+            # mammoth for rich HTML preview (preserves tables, bold, etc.)
+            import mammoth
+            result = mammoth.convert_to_html(_io.BytesIO(raw))
+            doc_html = result.value  # HTML string
+
+            # python-docx for plain text (AI review)
             from docx import Document as _DocxDoc
             doc = _DocxDoc(_io.BytesIO(raw))
-            paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-            text = "\n".join(paragraphs)
+            parts = []
+            for para in doc.paragraphs:
+                parts.append(para.text)
+            # Also extract table cells so AI sees tabular content
+            for table in doc.tables:
+                for row in table.rows:
+                    row_texts = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                    if row_texts:
+                        parts.append("  ".join(row_texts))
+            text = "\n".join(parts)
             doc_type = "Word (.docx)"
     except Exception as e:
         return JSONResponse({"ok": False, "error": f"Gagal membaca fail: {e}"}, status_code=500)
@@ -257,7 +275,7 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
     # else keep original doc_type (PDF / Word)
 
     from agents.document_reviewer import set_uploaded_document
-    set_uploaded_document(session_id, text, fname, doc_type)
+    set_uploaded_document(session_id, text, fname, doc_type, html=doc_html)
 
     # Add to session history so context is preserved
     _get_store().append_message(session_id, {"role": "user", "content": f"[Fail dimuat naik: {fname}]"})
@@ -269,6 +287,8 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
         "char_count": len(text),
         "preview": text[:300],
         "text": text,
+        "html": doc_html,   # rich HTML (DOCX) or PDF data-URI
+        "is_pdf": ext == ".pdf",
     })
 
 
