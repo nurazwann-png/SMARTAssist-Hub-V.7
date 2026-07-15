@@ -2197,6 +2197,16 @@ async function lgHandleLetterPdfUpload(file) {
             const pagesNote = data.pages_note || '';
             fileIndicatorText.textContent = `📄 ${data.filename} (${data.char_count} aksara diekstrak${pagesNote})`;
             canvasWelcome.style.display = 'none';
+            // Papar ringkasan PDF dalam chat sebelum trigger AI form
+            const fields = data.extracted_fields || {};
+            const fieldLines = Object.entries(fields).map(([k, v]) => `• ${k}: ${v}`).join('\n');
+            const docTypeLabel = data.suggested_type === 'memo' ? 'Memo Dalaman' : 'Surat Rasmi';
+            const summaryMsg = `📄 PDF berjaya dianalisis.\n\n`
+                + (data.analysis_summary ? `${data.analysis_summary}\n\n` : '')
+                + `Jenis dokumen dicadangkan: ${docTypeLabel}\n`
+                + (fieldLines ? `\nMaklumat yang diekstrak:\n${fieldLines}\n` : '\nTiada maklumat khusus dapat diekstrak. Sila isi borang secara manual.\n')
+                + `\nSila lengkapkan borang di bawah untuk jana surat.`;
+            addMessage(summaryMsg, 'assistant', '📄', 'Penjana Surat Rasmi');
             await lgSendPdfAnalysisRequest(file.name, data.analysis_summary, data.suggested_type, data.extracted_fields);
         } else {
             addMessage(data.error || 'Gagal memproses PDF.', 'assistant', '⚠️', 'Sistem');
