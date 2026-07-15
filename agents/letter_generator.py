@@ -201,6 +201,24 @@ def _save_session(session_id: str, session: dict):
     get_store().set_all(session_id, _NS, session)
 
 
+def inject_pdf_context(session_id: str, fields: dict, doc_type: str) -> None:
+    """Pra-isi session dengan maklumat yang diekstrak dari PDF.
+    Dipanggil oleh /api/letter/upload-pdf sebelum pengguna hantar sebarang mesej."""
+    session = _get_session(session_id)
+    # Reset ke phase 0 supaya AI mula dari awal dengan konteks PDF
+    session["phase"] = 0
+    # Set doc_type cadangan jika valid
+    if doc_type in ("surat", "memo"):
+        session["doc_type"] = doc_type
+    # Pra-isi hanya field yang ada nilai (tidak overwrite dengan null/kosong)
+    for k, v in fields.items():
+        if v and str(v).strip():
+            session["fields"][k] = str(v).strip()
+    # Flag untuk beritahu AI bahawa ada konteks dari PDF
+    session["pdf_context"] = True
+    _save_session(session_id, session)
+
+
 def _get_field_schema(doc_type: str) -> list[dict]:
     if doc_type == "memo":
         return MEMO_FIELDS["fields"]
@@ -394,13 +412,25 @@ Kembalikan HANYA dokumen yang telah dikemaskini dalam format JSON:
         except Exception:
             pass
 
+    # Nota PDF context — hanya papar sekali, kemudian clear flag
+    pdf_note = ""
+    if session.get("pdf_context"):
+        pdf_note = f"""
+NOTA PENTING: Pengguna telah memuat naik dokumen PDF. Maklumat berikut telah diekstrak secara automatik dan disimpan dalam field terkumpul. Sila:
+1. Maklumkan kepada pengguna apakah yang telah diekstrak dari PDF
+2. Sahkan jenis surat yang dicadangkan
+3. Teruskan tanya field yang masih belum diisi
+"""
+        session["pdf_context"] = False
+        _save_session(session_id, session)
+
     context_info = f"""
 Status sesi semasa:
 - Phase: {session['phase']}
 - Jenis dokumen: {session['doc_type'] or 'belum ditentukan'}
 - Field terkumpul: {json.dumps(session['fields'], ensure_ascii=False) if session['fields'] else 'tiada lagi'}
 - Field belum diisi: {json.dumps([f['label'] for f in _find_missing_fields(session['doc_type'], session['fields'])], ensure_ascii=False) if session['doc_type'] else 'tentukan jenis dokumen dahulu'}
-"""
+{pdf_note}"""
 
     now = datetime.now()
     date_str = now.strftime("%#d %B %Y") if os.name == "nt" else now.strftime("%-d %B %Y")
