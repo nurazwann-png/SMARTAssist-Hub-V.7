@@ -2436,7 +2436,11 @@ async function openWordPreview() {
             const MM_TO_PX = 3.7795;
             // A4 content area height: 297mm - 25.4mm top - 25.4mm bottom = 246.2mm
             const pageContentH = Math.round(246.2 * MM_TO_PX);
-            const numPages = Math.max(1, Math.ceil(totalH / pageContentH));
+            // Single-page threshold: full page height minus top padding only (96px).
+            // Allows content that fits within the printable area to stay on 1 page
+            // even if it slightly exceeds pageContentH due to letterhead or tight spacing.
+            const singlePageH = Math.round(297 * MM_TO_PX) - 96;
+            const numPages = totalH <= singlePageH ? 1 : Math.max(2, Math.ceil(totalH / pageContentH));
             const scroll = document.querySelector('#wordPreviewOverlay .word-preview-scroll');
             if (!scroll) return;
 
@@ -2446,8 +2450,11 @@ async function openWordPreview() {
                 scroll.innerHTML = Array.from({ length: numPages }, (_, i) => {
                     const offsetPx = i * pageContentH;
                     const pageNum = `<div class="word-page-num">${i + 1} / ${numPages}</div>`;
+                    // Clip wrapper ensures content is cut at exactly pageContentH — no overlap between pages
                     return `<div class="word-page" style="overflow:hidden;max-height:297mm;min-height:297mm">
-                        <div class="word-page-html-content" style="position:relative;top:-${offsetPx}px">${_htmlContent}</div>
+                        <div style="overflow:hidden;height:${pageContentH}px">
+                            <div class="word-page-html-content" style="position:relative;top:-${offsetPx}px">${_htmlContent}</div>
+                        </div>
                         ${pageNum}
                     </div>`;
                 }).join('');

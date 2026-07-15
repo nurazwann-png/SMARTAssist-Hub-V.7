@@ -792,17 +792,32 @@ def _build_memo_html(f: dict) -> str:
     )
 
     panggilan = _auto_panggilan(f.get('pengerusi', 'Tuan'))
-    isi = _strip_para_num(f.get('isi', '').split('\n')[0].strip()).replace('\n', '<br>')
     tarikh_acara = f.get('tarikh_acara', '')
     masa_acara = f.get('masa_acara', '')
     tempat_acara = f.get('tempat_acara', '')
+
+    # Strip isi from AI-added tarikh/masa/tempat info (already in dedicated block)
+    _isi_raw = _strip_para_num(f.get('isi', '').split('\n')[0].strip())
+    _isi_lower = _isi_raw.lower()
+    # Remove trailing sentences that mention date/time/place
+    for _kw in [tarikh_acara.lower(), masa_acara.lower(), tempat_acara.lower()]:
+        if _kw and _kw in _isi_lower:
+            # Truncate isi at the sentence that first mentions these details
+            for _sent_end in ['. ', ', ']:
+                _idx = _isi_lower.find(_kw)
+                _start = _isi_raw.rfind('.', 0, _idx)
+                if _start != -1:
+                    _isi_raw = _isi_raw[:_start + 1].strip()
+                    _isi_lower = _isi_raw.lower()
+                    break
+    isi = _isi_raw.replace('\n', '<br>')
 
     # Langkah kerja — numbered paragraphs starting at 4
     langkah_str = f.get('langkah_kerja', '')
     langkah_list = [l.strip() for l in langkah_str.split('\n') if l.strip()] if langkah_str else []
 
-    # Hanging indent style for numbered paragraphs
-    hang = 'style="margin:6px 0;padding-left:2em;text-indent:-2em;line-height:1.6"'
+    # No hanging indent — continuation wraps under number (per user request)
+    hang = 'style="margin:6px 0;line-height:1.6;text-align:justify"'
     acara_indent = 'style="margin:2px 0 2px 4em;line-height:1.6"'
     normal = 'style="margin:6px 0;line-height:1.6"'
 
@@ -828,8 +843,10 @@ def _build_memo_html(f: dict) -> str:
         f'<p {hang}>3.&nbsp;&nbsp;&nbsp;&nbsp;Kehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.</p>'
         f'{langkah_html}'
         f'<p {normal}>Sekian, terima kasih.</p>'
+        f'<div style="page-break-inside:avoid">'
         f'<br>'
         f'<p {normal}><b>&ldquo;MALAYSIA MADANI&rdquo;</b></p>'
+        f'<br>'
         f'<p {normal}><b>&ldquo;BERKHIDMAT UNTUK NEGARA&rdquo;</b></p>'
         f'<br>'
         f'<p {normal}>Saya yang menjalankan amanah,</p>'
@@ -837,6 +854,7 @@ def _build_memo_html(f: dict) -> str:
         f'<p {normal}><b>({f.get("penandatangan_nama", "").upper()})</b></p>'
         f'<p {normal}>{f.get("penandatangan_jawatan", "")}</p>'
         f'<p {normal}>{f.get("nama_pejabat", "")}</p>'
+        f'</div>'
         f'</div>'
     )
 
@@ -1058,13 +1076,19 @@ def _build_memo_docx(doc, fields: dict):
                   align=WD_ALIGN_PARAGRAPH.JUSTIFY)
     p_dengan.paragraph_format.space_after = Pt(6)
 
-    isi = _strip_para_num(fields.get('isi', '').split('\n')[0].strip())
+    _isi_raw = _strip_para_num(fields.get('isi', '').split('\n')[0].strip())
+    # Strip tarikh/masa/tempat sentences already handled by dedicated block
+    for _kw in [fields.get('tarikh_acara', ''), fields.get('masa_acara', ''), fields.get('tempat_acara', '')]:
+        if _kw and _kw.lower() in _isi_raw.lower():
+            _idx = _isi_raw.lower().find(_kw.lower())
+            _start = _isi_raw.rfind('.', 0, _idx)
+            if _start != -1:
+                _isi_raw = _isi_raw[:_start + 1].strip()
+    isi = _isi_raw
     isi_para = doc.add_paragraph()
     isi_para.paragraph_format.space_after = Pt(6)
     isi_para.paragraph_format.space_before = Pt(0)
     isi_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    isi_para.paragraph_format.left_indent = Cm(1.27)
-    isi_para.paragraph_format.first_line_indent = Cm(-1.27)
     r2 = isi_para.add_run(f"2.\t{isi}")
     r2.font.size = Pt(12); r2.font.name = "Arial"
 
@@ -1101,6 +1125,7 @@ def _build_memo_docx(doc, fields: dict):
     _p("Sekian, terima kasih.")
     doc.add_paragraph("")
     _p('"MALAYSIA MADANI"', bold=True)
+    doc.add_paragraph("")
     _p('"BERKHIDMAT UNTUK NEGARA"', bold=True)
     doc.add_paragraph("")
     _p("Saya yang menjalankan amanah,")
