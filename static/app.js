@@ -1196,10 +1196,10 @@ const _FIELD_DEFS = {
     'Tarikh Acara':                           { type: 'date',     ph: '' },
     'Tarikh Program':                         { type: 'date',     ph: '' },
     'Tarikh Disediakan':                      { type: 'date',     ph: '' },
-    'Nama Penerima':                          { type: 'text',     ph: 'cth: Encik Ahmad bin Ali' },
-    'Jawatan Penerima':                       { type: 'text',     ph: 'cth: Pengetua' },
-    'Nama Organisasi Penerima':               { type: 'text',     ph: 'cth: SMK Taman Maju' },
-    'Alamat Penerima':                        { type: 'textarea', ph: 'Alamat penuh penerima...' },
+    'Penerima':                               { type: 'penerima', ph: 'cth: Semua Pengetua / Rujuk Senarai Edaran / SK Taman Maju' },
+    'Nama Organisasi Penerima':               { type: 'text',     ph: 'cth: SMK Taman Maju', hideable: true },
+    'Alamat Penerima':                        { type: 'textarea', ph: 'Alamat penuh penerima...', hideable: true },
+    'Senarai Edaran':                         { type: 'senarai-edaran', ph: '' },
     'Perkara / Tajuk Surat':                  { type: 'text',     ph: 'Tajuk surat...' },
     'Perkara / Tajuk Memo (huruf besar)':     { type: 'text',     ph: 'TAJUK MEMO (HURUF BESAR)' },
     'Nama Pengerusi dan Jawatan':             { type: 'text',     ph: 'cth: Pn. Zainab bt. Ahmad, Pengetua' },
@@ -1245,11 +1245,68 @@ let _formCounter = 0;
 function _buildMissingFieldsForm(missingLabels) {
     if (!missingLabels || missingLabels.length === 0) return '';
     const fid = 'ff_' + (++_formCounter);
+    const hasPenerima = missingLabels.includes('Penerima');
     let rows = '';
     missingLabels.forEach(label => {
         const def = _FIELD_DEFS[label] || { type: 'text', ph: '' };
         if (def.type === '_skip') return;
         const iid = `${fid}_${label.replace(/\W/g,'_')}`;
+
+        if (def.type === 'penerima') {
+            const seId = `${fid}_se_inline`;
+            const widget = `<input class="ff-input" type="text" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}"
+                oninput="_onPenerimaInput(this,'${fid}')">
+                <div class="ff-penerima-hint" id="${iid}_hint" style="display:none">
+                    <span class="ff-hint-badge">📋 Senarai Edaran dikesan</span> — Sila isi senarai edaran di bawah.
+                </div>`;
+            rows += `<tr><td><label class="ff-label" for="${iid}">${escapeHtml(label)}</label></td><td>${widget}</td></tr>`;
+            rows += `<tr id="${fid}_se_section" style="display:none"><td colspan="2">
+                <label class="ff-label">Senarai Edaran</label>
+                <div class="ff-se-list" id="${seId}" data-label="Senarai Edaran">
+                    <div class="ff-se-header">
+                        <span class="ff-se-col ff-se-col-bil">Bil.</span>
+                        <span class="ff-se-col ff-se-col-nama">Nama <span class="ff-optional">(boleh kosong)</span></span>
+                        <span class="ff-se-col ff-se-col-jawatan">Jawatan</span>
+                        <span class="ff-se-col ff-se-col-jabatan">Jabatan / Sekolah</span>
+                        <span class="ff-se-col ff-se-col-del"></span>
+                    </div>
+                    <div class="ff-se-row" data-bil="1">
+                        <span class="ff-se-num">1.</span>
+                        <input class="ff-input ff-se-nama" type="text" placeholder="Nama (pilihan)">
+                        <input class="ff-input ff-se-jawatan" type="text" placeholder="Jawatan">
+                        <input class="ff-input ff-se-jabatan" type="text" placeholder="Jabatan / Sekolah">
+                        <button type="button" class="ff-ahli-remove" onclick="_removeSERow(this)" title="Buang">✕</button>
+                    </div>
+                </div>
+                <button type="button" class="ff-ahli-add" onclick="_addSERow('${seId}')">+ Tambah Baris</button>
+            </td></tr>`;
+            return;
+        }
+
+        if (def.type === 'senarai-edaran') {
+            const widget = `<div class="ff-se-list" id="${iid}" data-label="${escapeAttr(label)}">
+                    <div class="ff-se-header">
+                        <span class="ff-se-col ff-se-col-bil">Bil.</span>
+                        <span class="ff-se-col ff-se-col-nama">Nama <span class="ff-optional">(boleh kosong)</span></span>
+                        <span class="ff-se-col ff-se-col-jawatan">Jawatan</span>
+                        <span class="ff-se-col ff-se-col-jabatan">Jabatan / Sekolah</span>
+                        <span class="ff-se-col ff-se-col-del"></span>
+                    </div>
+                    <div class="ff-se-row" data-bil="1">
+                        <span class="ff-se-num">1.</span>
+                        <input class="ff-input ff-se-nama" type="text" placeholder="Nama (pilihan)">
+                        <input class="ff-input ff-se-jawatan" type="text" placeholder="Jawatan" required>
+                        <input class="ff-input ff-se-jabatan" type="text" placeholder="Jabatan / Sekolah" required>
+                        <button type="button" class="ff-ahli-remove" onclick="_removeSERow(this)" title="Buang">✕</button>
+                    </div>
+                </div>
+                <div class="ff-ahli-actions">
+                    <button type="button" class="ff-ahli-add" onclick="_addSERow('${iid}')">＋ Tambah Penerima</button>
+                </div>`;
+            rows += `<tr class="ff-span"><td colspan="2"><label class="ff-label">${escapeHtml(label)}</label>${widget}</td></tr>`;
+            return;
+        }
+
         const isWide = def.type === 'textarea' || def.type === 'ahli-list' || def.type === 'pegawai-list';
         if (isWide) {
             let widget = '';
@@ -1274,7 +1331,9 @@ function _buildMissingFieldsForm(missingLabels) {
                     ${semuaBtn}
                 </div>`;
             }
-            rows += `<tr class="ff-span"><td colspan="2"><label class="ff-label" for="${iid}">${escapeHtml(label)}</label>${widget}</td></tr>`;
+            const shouldHide = def.hideable && hasPenerima;
+            const hideAttr = shouldHide ? ` id="${fid}_hide_${iid}" style="display:none"` : '';
+            rows += `<tr class="ff-span"${hideAttr}><td colspan="2"><label class="ff-label" for="${iid}">${escapeHtml(label)}</label>${widget}</td></tr>`;
         } else {
             let input = '';
             if (def.type === 'date') {
@@ -1282,7 +1341,9 @@ function _buildMissingFieldsForm(missingLabels) {
             } else {
                 input = `<input class="ff-input" type="text" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}">`;
             }
-            rows += `<tr><td><label class="ff-label" for="${iid}">${escapeHtml(label)}</label></td><td>${input}</td></tr>`;
+            const shouldHide = def.hideable && hasPenerima;
+            const hideAttr = shouldHide ? ` id="${fid}_hide_${iid}" style="display:none"` : '';
+            rows += `<tr${hideAttr}><td><label class="ff-label" for="${iid}">${escapeHtml(label)}</label></td><td>${input}</td></tr>`;
         }
     });
     return `<div class="da-section fields-form-section">
@@ -1293,6 +1354,56 @@ function _buildMissingFieldsForm(missingLabels) {
             <button type="submit" class="ff-submit-btn">\u{1F4E4} Hantar Maklumat</button>
         </td></tr></tbody></table>
         </form></div>`;
+}
+
+function _onPenerimaInput(input, fid) {
+    const hint = document.getElementById(input.id + '_hint');
+    const seSection = document.getElementById(fid + '_se_section');
+    const val = input.value.trim();
+    const isSE = /senarai\s*edaran/i.test(val);
+    // Generic patterns: "Rujuk...", "Semua...", "SK ...", "SMK ...", empty
+    const isGeneric = !val || isSE || /^(semua|rujuk|sk\b|smk\b)/i.test(val);
+    if (hint) hint.style.display = isSE ? 'block' : 'none';
+    if (seSection) seSection.style.display = isSE ? '' : 'none';
+    // Show/hide hideable fields (Nama Organisasi, Alamat) — only visible for specific names
+    const form = document.getElementById(fid);
+    if (form) {
+        form.querySelectorAll('[id*="_hide_"]').forEach(row => {
+            row.style.display = isGeneric ? 'none' : '';
+        });
+    }
+}
+
+function _addSERow(listId) {
+    const list = document.getElementById(listId);
+    if (!list) return;
+    const rows = list.querySelectorAll('.ff-se-row');
+    const bil = rows.length + 1;
+    const div = document.createElement('div');
+    div.className = 'ff-se-row';
+    div.dataset.bil = bil;
+    div.innerHTML = `<span class="ff-se-num">${bil}.</span>
+        <input class="ff-input ff-se-nama" type="text" placeholder="Nama (pilihan)">
+        <input class="ff-input ff-se-jawatan" type="text" placeholder="Jawatan">
+        <input class="ff-input ff-se-jabatan" type="text" placeholder="Jabatan / Sekolah">
+        <button type="button" class="ff-ahli-remove" onclick="_removeSERow(this)" title="Buang">✕</button>`;
+    list.appendChild(div);
+    _renumberSERows(list);
+}
+
+function _removeSERow(btn) {
+    const list = btn.closest('.ff-se-list');
+    if (!list) return;
+    if (list.querySelectorAll('.ff-se-row').length <= 1) return;
+    btn.closest('.ff-se-row').remove();
+    _renumberSERows(list);
+}
+
+function _renumberSERows(list) {
+    list.querySelectorAll('.ff-se-row').forEach((row, i) => {
+        const num = row.querySelector('.ff-se-num');
+        if (num) num.textContent = (i + 1) + '.';
+    });
 }
 
 function _onDateChange(input, fid) {
@@ -1364,7 +1475,17 @@ function _submitFieldsForm(fid) {
     if (!form) return;
     const parts = [];
     form.querySelectorAll('[data-label]').forEach(el => {
-        if (el.classList.contains('ff-ahli-list')) {
+        if (el.classList.contains('ff-se-list')) {
+            // Senarai Edaran — serialize as JSON
+            const entries = [];
+            el.querySelectorAll('.ff-se-row').forEach(row => {
+                const nama    = row.querySelector('.ff-se-nama')?.value.trim() || '';
+                const jawatan = row.querySelector('.ff-se-jawatan')?.value.trim() || '';
+                const jabatan = row.querySelector('.ff-se-jabatan')?.value.trim() || '';
+                if (jawatan || jabatan) entries.push({ nama, jawatan, jabatan });
+            });
+            if (entries.length) parts.push(`${el.dataset.label}: ${JSON.stringify(entries)}`);
+        } else if (el.classList.contains('ff-ahli-list')) {
             const isPegawai = el.dataset.type === 'pegawai-list';
             const names = [], jawatans = [];
             el.querySelectorAll('.ff-ahli-row').forEach(row => {
@@ -1782,34 +1903,39 @@ async function saveOverlayEdits(btn) {
     if (inlineSaveBtn) { inlineSaveBtn.style.display = 'none'; inlineSaveBtn.classList.remove('unsaved', 'saved'); }
 }
 
-// Download current document as PDF via print dialog
-function downloadDocumentPdf() {
+// Download current document as PDF — direct download, no print dialog
+async function downloadDocumentPdf() {
     const previewHtml = document.getElementById('docPreviewHtml') || document.getElementById('wordPreviewHtmlEdit');
     const preview     = document.getElementById('docPreview') || document.getElementById('reviewDocPreview') || document.getElementById('wordPreviewText');
     const html = previewHtml ? previewHtml.innerHTML : (preview ? `<pre style="font-family:Arial,sans-serif;font-size:12pt;white-space:pre-wrap">${preview.innerText}</pre>` : '');
     if (!html) return;
 
-    // Use hidden iframe to avoid popup blocker
-    let iframe = document.getElementById('_pdfPrintFrame');
-    if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = '_pdfPrintFrame';
-        iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:0';
-        document.body.appendChild(iframe);
+    // Determine filename from agent
+    const agentNames = { letter_generator: 'surat_rasmi', report_generator: 'laporan', data_analysis: 'analisis', document_reviewer: 'semakan' };
+    const filename = (agentNames[currentAgent] || 'dokumen') + '.pdf';
+
+    try {
+        const res = await fetch('/api/export/pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ html, filename })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            alert(err.error || 'Gagal hasilkan PDF. Sila cuba semula.');
+            return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    } catch (e) {
+        alert('Ralat muat turun PDF: ' + e.message);
     }
-    const doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Dokumen</title>
-        <style>
-            @page { size: A4; margin: 25.4mm; }
-            body { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin: 0; color: #000; }
-            table { border-collapse: collapse; width: 100%; }
-            td, th { border: 1px solid #000; padding: 5px 8px; }
-            img { max-width: 100%; }
-            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-        </style></head><body>${html}</body></html>`);
-    doc.close();
-    setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); }, 600);
 }
 
 function showEmailDialog() {
@@ -2221,8 +2347,8 @@ async function lgSendPdfAnalysisRequest(filename, summary, suggestedType, extrac
         ? ` Maklumat berikut telah diekstrak: ${Object.entries(extractedFields).map(([k,v]) => `${k}: ${v}`).join(', ')}.`
         : '';
     const msg = currentLang === 'bm'
-        ? `Saya telah memuat naik PDF "${filename}".${fieldsInfo} ${summary || ''} Sila cadangkan jenis surat yang sesuai dan mulakan proses pengisian borang.`
-        : `I uploaded PDF "${filename}".${fieldsInfo} ${summary || ''} Please suggest a suitable letter type and begin the form.`;
+        ? `Saya telah memuat naik PDF "${filename}".${fieldsInfo} ${summary || ''} Sila jana surat pemakluman berdasarkan dokumen PDF ini dan mulakan proses pengisian borang. Saya perlukan surat pemakluman yang memaklumkan penerima tentang kandungan dokumen asal tersebut.`
+        : `I uploaded PDF "${filename}".${fieldsInfo} ${summary || ''} Please generate a notification/forwarding letter (surat pemakluman) based on this PDF document and begin the form filling process.`;
 
     setProcessing(true);
     typingIndicator.classList.add('active');

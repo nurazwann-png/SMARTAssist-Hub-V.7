@@ -332,18 +332,21 @@ async def letter_upload_pdf(file: UploadFile = File(...), session_id: str = Form
     text_for_llm = full_text[:4000]
     pages_note = f" (hanya 5 halaman pertama daripada {total_pages} halaman dianalisis)" if total_pages > 5 else ""
 
-    # LLM analisis — ekstrak field dan cadangkan jenis surat
+    # LLM analisis — ekstrak field dan jana isi surat pemakluman
     from backend.deepseek_client import chat_completion
     analysis_prompt = f"""Analisis teks dari dokumen rasmi berikut dan ekstrak maklumat dalam format JSON.
+
+Dokumen yang dimuat naik ini akan digunakan untuk menjana SURAT PEMAKLUMAN — iaitu surat rasmi untuk memaklumkan penerima baharu tentang kandungan dokumen asal ini.
 
 Kembalikan HANYA JSON ini tanpa sebarang teks lain:
 {{
   "suggested_type": "surat atau memo",
-  "rujukan": "nombor rujukan rasmi jika ada (cth: KPM.600-1/2/3), atau null",
+  "rujukan": "nombor rujukan rasmi dokumen asal jika ada (cth: KPM.600-1/2/3), atau null",
   "tarikh": "tarikh dalam format D Bulan YYYY jika ada (cth: 10 Julai 2026), atau null",
-  "tajuk": "tajuk atau perkara utama dokumen jika ada, atau null",
+  "tajuk": "PEMAKLUMAN: [tajuk/perkara utama dokumen asal]",
   "penerima_nama": "nama penerima jika ada (untuk surat), atau null",
   "penerima_organisasi": "nama organisasi/jabatan penerima jika ada, atau null",
+  "isi_pemakluman": "perenggan isi surat pemakluman dalam Bahasa Melayu rasmi (2-3 ayat): mula dengan 'Adalah dimaklumkan bahawa...', kemudian ringkaskan kandungan utama dokumen asal, dan nyatakan tindakan atau makluman yang diperlukan daripada penerima. Gunakan gaya bahasa surat rasmi KPM.",
   "analysis_summary": "ringkasan pendek 1-2 ayat dalam Bahasa Melayu tentang kandungan dokumen ini"
 }}
 
@@ -358,7 +361,7 @@ Teks dokumen:
         raw_json = chat_completion(
             messages=[{"role": "user", "content": analysis_prompt}],
             temperature=0.1,
-            max_tokens=500
+            max_tokens=800
         )
         import re as _re
         # Ekstrak JSON dari response (buang teks sekeliling jika ada)
@@ -369,7 +372,7 @@ Teks dokumen:
             if suggested_type not in ("surat", "memo"):
                 suggested_type = "surat"
             analysis_summary = parsed.get("analysis_summary", "")
-            for k in ("rujukan", "tarikh", "tajuk", "penerima_nama", "penerima_organisasi"):
+            for k in ("rujukan", "tarikh", "tajuk", "penerima_nama", "penerima_organisasi", "isi_pemakluman"):
                 val = parsed.get(k)
                 if val and str(val).strip().lower() not in ("null", "none", ""):
                     extracted[k] = str(val).strip()
@@ -388,6 +391,49 @@ Teks dokumen:
         "char_count": len(full_text),
         "pages_note": pages_note,
     })
+
+
+@app.post("/api/export/pdf")
+async def export_pdf(request: Request):
+    """Convert HTML content to PDF and return as direct download (no print dialog)."""
+    try:
+        body = await request.json()
+        html_content = body.get("html", "")
+        filename = body.get("filename", "dokumen") or "dokumen"
+        # Sanitize filename
+        import re as _re
+        filename = _re.sub(r'[^\w\-.]', '_', filename)
+        if not filename.endswith(".pdf"):
+            filename += ".pdf"
+        if not html_content.strip():
+            return JSONResponse({"ok": False, "error": "Tiada kandungan HTML."}, status_code=400)
+
+        full_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+@page {{ size: A4; margin: 25.4mm; }}
+body {{ font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin: 0; color: #000; }}
+table {{ border-collapse: collapse; width: 100%; }}
+td, th {{ border: 1px solid #000; padding: 5px 8px; font-size: 11pt; }}
+pre {{ white-space: pre-wrap; font-family: Arial, sans-serif; font-size: 12pt; }}
+img {{ max-width: 100%; }}
+h1,h2,h3 {{ font-family: Arial, sans-serif; }}
+</style></head><body>{html_content}</body></html>"""
+
+        import io as _io
+        from xhtml2pdf import pisa
+        pdf_buffer = _io.BytesIO()
+        result = pisa.CreatePDF(_io.StringIO(full_html), dest=pdf_buffer, encoding='utf-8')
+        if result.err:
+            return JSONResponse({"ok": False, "error": "Gagal hasilkan PDF."}, status_code=500)
+        pdf_bytes = pdf_buffer.getvalue()
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
 @app.post("/api/review/download-edited")

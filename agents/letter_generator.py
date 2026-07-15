@@ -18,14 +18,15 @@ SURAT_FIELDS = {
     "fields": [
         {"key": "rujukan", "label": "Ruj. Kami (Nombor Rujukan)", "example": "PPD.XXX/XXX/XX/XX ( )"},
         {"key": "tarikh", "label": "Tarikh", "example": "10 Julai 2026"},
-        {"key": "penerima_nama", "label": "Nama Penerima", "example": "YBhg. Dato'/Tuan/Puan"},
-        {"key": "penerima_jawatan", "label": "Jawatan Penerima", "example": "Pengarah Pendidikan Negeri"},
-        {"key": "penerima_organisasi", "label": "Nama Organisasi Penerima", "example": "Jabatan Pendidikan Negeri Selangor"},
-        {"key": "penerima_alamat", "label": "Alamat Penerima", "example": "Aras 5, Blok E, 40000 Shah Alam, Selangor"},
+        {"key": "penerima", "label": "Penerima", "example": "Semua Pengetua / Rujuk Senarai Edaran / SK Taman Maju"},
+        {"key": "penerima_organisasi", "label": "Nama Organisasi Penerima", "example": "Jabatan Pendidikan Negeri Selangor", "optional": True},
+        {"key": "penerima_alamat", "label": "Alamat Penerima", "example": "Aras 5, Blok E, 40000 Shah Alam, Selangor", "optional": True},
+        {"key": "senarai_edaran", "label": "Senarai Edaran", "example": "[{\"nama\":\"\",\"jawatan\":\"Pengetua\",\"jabatan\":\"SK Taman Maju\"}]", "optional": True},
         {"key": "tajuk", "label": "Perkara / Tajuk Surat (huruf besar)", "example": "PERMOHONAN PERUNTUKAN KHAS"},
         {"key": "isi", "label": "Isi Kandungan Utama (pisahkan perenggan dengan baris kosong)", "example": "Penerangan tujuan surat.\n\nButiran lanjut."},
         {"key": "penandatangan_nama", "label": "Nama Penandatangan", "example": "Ahmad bin Ali"},
         {"key": "penandatangan_jawatan", "label": "Jawatan Penandatangan", "example": "Pegawai Pendidikan Daerah"},
+        {"key": "pegawai_dihubungi", "label": "Pegawai Untuk Dihubungi", "example": "Puan Farah binti Zainudin, 084-123456", "optional": True},
         {"key": "nama_pejabat", "label": "Nama Pejabat / Unit", "example": "Pejabat Pendidikan Daerah Dalat", "optional": True},
         {"key": "nama_organisasi", "label": "Nama Organisasi Penandatangan", "example": "Kementerian Pendidikan Malaysia", "optional": True},
         {"key": "salinan_kepada", "label": "Salinan Kepada (s.k.)", "example": "Pengarah JPN, Ketua Unit ICT", "optional": True},
@@ -66,7 +67,8 @@ CARA KERJA:
 5. Pastikan tiada [PLACEHOLDER] yang belum diisi sebelum dokumen siap
 
 URUTAN SOALAN (ikut susunan ini):
-- Surat: rujukan → tarikh → penerima_nama → penerima_jawatan → penerima_organisasi → penerima_alamat → tajuk → (jana isi secara automatik) → penandatangan_nama → penandatangan_jawatan → nama_pejabat (pilihan) → nama_organisasi (pilihan) → salinan_kepada (pilihan)
+- Surat: rujukan → tarikh → penerima → (penerima_organisasi + penerima_alamat HANYA jika penerima adalah nama individu/organisasi — LANGKAU jika "Rujuk Senarai Edaran" atau "Semua...") → tajuk → (jana isi secara automatik) → penandatangan_nama → penandatangan_jawatan → nama_pejabat (pilihan) → nama_organisasi (pilihan) → salinan_kepada (pilihan)
+- Jika penerima = "Senarai Edaran" atau "Rujuk Senarai Edaran": sistem akan tanya senarai_edaran berasingan melalui borang khas — JANGAN tanya pengguna untuk senarai_edaran dalam chat. JANGAN tanya penerima_organisasi dan penerima_alamat.
 - Memo: rujukan → tarikh → pengerusi → penyelaras → ahli → urus_setia → tajuk → tarikh_acara → masa_acara → tempat_acara → (jana isi secara automatik) → langkah_kerja (tanya jika relevan) → penandatangan_nama → penandatangan_jawatan → nama_pejabat
 
 GAYA:
@@ -101,8 +103,16 @@ PHASES:
 - Phase 3: Tunjukkan pratonton dokumen lengkap — SEMAK tiada [PLACEHOLDER] kekal
 - Phase 4: Dokumen disahkan dan sedia untuk dimuat turun / dihantar emel
 
-FIELD KEYS YANG WAJIB DIGUNAKAN (guna key tepat ini dalam fields_collected):
-Untuk surat: rujukan, tarikh, penerima_nama, penerima_jawatan, penerima_organisasi, penerima_alamat, tajuk, isi, penandatangan_nama, penandatangan_jawatan, salinan_kepada
+FIELD KEYS YANG WAJIB DIGUNAKAN (guna key TEPAT ini dalam fields_collected — JANGAN guna nama lain):
+Untuk surat: rujukan, tarikh, penerima, penerima_organisasi, penerima_alamat, tajuk, isi, penandatangan_nama, penandatangan_jawatan, salinan_kepada, senarai_edaran (pilihan)
+PENTING: Gunakan "penerima" (BUKAN "penerima_nama"), simpan data senarai edaran dalam key "senarai_edaran"
+- Field "penerima" boleh mengandungi sebarang teks: nama orang, jawatan, "Rujuk Senarai Edaran", "SK/SMK", dsb.
+- PERATURAN SENARAI EDARAN — WAJIB DIIKUTI:
+  * Jika penerima mengandungi perkataan "senarai edaran" (tidak kira huruf besar/kecil):
+    a) Dalam blok alamat penerima, tulis HANYA: "Rujuk Senarai Edaran" (JANGAN tulis nama/jawatan individu)
+    b) Di HUJUNG surat (selepas penandatangan), tambah halaman senarai edaran (lihat FORMAT SENARAI EDARAN)
+  * Jika field "senarai_edaran" ada data JSON, gunakan data tersebut untuk jana halaman senarai edaran
+  * JANGAN abaikan senarai_edaran — ia WAJIB dipaparkan sebagai halaman berasingan
 Untuk memo: rujukan, tarikh, pengerusi, penyelaras, ahli, urus_setia, tajuk, tarikh_acara, masa_acara, tempat_acara, isi, langkah_kerja (pilihan), penandatangan_nama, penandatangan_jawatan, nama_pejabat
 
 FORMAT TEMPLATE YANG MESTI DIIKUTI:
@@ -111,8 +121,7 @@ FORMAT TEMPLATE YANG MESTI DIIKUTI:
                                       No. Rujukan : [rujukan]
                                       Tarikh      : [tarikh]
 
-[penerima_nama]
-[penerima_jawatan]
+[penerima]          ← Jika senarai edaran: tulis "Rujuk Senarai Edaran" sahaja di sini
 [penerima_organisasi]
 [penerima_alamat]
 
@@ -174,11 +183,29 @@ Saya yang menjalankan amanah
 [Jawatan]
 [Nama Pejabat]
 
+=== FORMAT SENARAI EDARAN (halaman berasingan) ===
+Jika field "senarai_edaran" mengandungi data (JSON array atau teks berformat), tambah halaman baru di hujung surat dengan format ini:
+
+---
+
+SENARAI EDARAN
+
+BIL.  NAMA                        JAWATAN                     JABATAN/SEKOLAH
+----  --------------------------  --------------------------  ---------------------------
+1.    [NAMA PENERIMA]             [JAWATAN]                   [JABATAN/SEKOLAH]
+2.    [NAMA PENERIMA]             [JAWATAN]                   [JABATAN/SEKOLAH]
+
+PERATURAN SENARAI EDARAN:
+- Semua teks dalam senarai edaran MESTI dalam HURUF BESAR (ALL CAPS) dan BOLD
+- Jika nama kosong, biarkan ruang nama kosong — hanya jawatan dan jabatan
+- Nombor BIL. berurutan dari 1
+- Pisahkan halaman senarai edaran dengan "---" (garis pemisah) dan nyatakan "SENARAI EDARAN" sebagai tajuk bahagian
+
 PENTING:
 - Jangan reka maklumat PERIBADI (nama, jawatan, alamat) — tanya pengguna
 - ISI KANDUNGAN surat/memo WAJIB dijana secara automatik oleh anda berdasarkan tajuk dan konteks. JANGAN tanya pengguna untuk menulis isi.
 - Jika tajuk terlalu umum dan anda perlukan konteks tambahan, tanya soalan spesifik (contoh: "Apakah jumlah peruntukan yang dipohon?" atau "Berapa buah sekolah yang terlibat?")
-- Gunakan KEY TEPAT seperti senarai di atas dalam fields_collected (contoh: "penerima_nama", BUKAN "nama_penerima")
+- Gunakan KEY TEPAT seperti senarai di atas dalam fields_collected (contoh: "penerima", BUKAN "penerima_nama")
 - Jika pengguna minta tukar dari surat ke memo (atau sebaliknya), pindahkan field yang sama (rujukan, tarikh, tajuk, isi)
 - Pastikan JSON sah"""
 
@@ -211,11 +238,28 @@ def inject_pdf_context(session_id: str, fields: dict, doc_type: str) -> None:
     if doc_type in ("surat", "memo"):
         session["doc_type"] = doc_type
     # Pra-isi hanya field yang ada nilai (tidak overwrite dengan null/kosong)
-    for k, v in fields.items():
+    # Map isi_pemakluman → isi field
+    field_map = dict(fields)
+    if "isi_pemakluman" in field_map:
+        field_map["isi"] = field_map.pop("isi_pemakluman")
+    for k, v in field_map.items():
         if v and str(v).strip():
             session["fields"][k] = str(v).strip()
-    # Flag untuk beritahu AI bahawa ada konteks dari PDF
+    # Fallback: jana isi asas dari tajuk jika isi_pemakluman tiada
+    if not session["fields"].get("isi"):
+        tajuk = session["fields"].get("tajuk", "")
+        rujukan = session["fields"].get("rujukan", "")
+        rujukan_text = f" (Ruj: {rujukan})" if rujukan else ""
+        fallback_isi = (
+            f"Adalah dimaklumkan bahawa pihak kami telah menerima surat{rujukan_text} "
+            f"berkenaan {tajuk.replace('PEMAKLUMAN: ', '') if tajuk else 'perkara di atas'}. "
+            f"Sehubungan dengan itu, perkara ini dimaklumkan kepada pihak tuan/puan untuk "
+            f"makluman dan tindakan selanjutnya."
+        )
+        session["fields"]["isi"] = fallback_isi
+    # Flag untuk beritahu AI bahawa ada konteks dari PDF (surat pemakluman)
     session["pdf_context"] = True
+    session["is_pemakluman"] = True
     _save_session(session_id, session)
 
 
@@ -274,6 +318,42 @@ def _auto_panggilan(nama: str) -> str:
     return "Tuan/Puan"
 
 
+def _build_senarai_edaran_page(se_raw: str) -> str:
+    """Jana halaman senarai edaran dari JSON string atau teks."""
+    entries = []
+    if se_raw and se_raw.strip():
+        try:
+            data = json.loads(se_raw)
+            if isinstance(data, list):
+                entries = data
+        except Exception:
+            # Fallback: baris per baris
+            for line in se_raw.strip().splitlines():
+                line = line.strip()
+                if line:
+                    entries.append({"nama": "", "jawatan": "", "jabatan": line})
+
+    if not entries:
+        return ""
+
+    lines = [
+        "",
+        "---",
+        "",
+        "SENARAI EDARAN",
+        "",
+        f"{'BIL.':<6}{'NAMA':<30}{'JAWATAN':<30}JABATAN/SEKOLAH",
+        f"{'----':<6}{'----------------------------':<30}{'----------------------------':<30}{'----------------------------'}",
+    ]
+    for i, entry in enumerate(entries, 1):
+        nama    = str(entry.get("nama", "") or "").upper()
+        jawatan = str(entry.get("jawatan", "") or "").upper()
+        jabatan = str(entry.get("jabatan", "") or "").upper()
+        lines.append(f"{str(i)+'.  ':<6}{nama:<30}{jawatan:<30}{jabatan}")
+
+    return "\n".join(lines)
+
+
 def _build_surat(f: dict) -> str:
     sk = f.get("salinan_kepada", "")
     sk_lines = ""
@@ -283,19 +363,28 @@ def _build_surat(f: dict) -> str:
         if items:
             sk_lines = "\n\ns.k.:\n" + "\n".join(f"{i+1}. {item}" for i, item in enumerate(items))
 
+    # Tentukan blok penerima — jika senarai edaran, tulis "Rujuk Senarai Edaran"
+    penerima_raw = f.get('penerima', '') or f.get('penerima_nama', '[PLACEHOLDER]')
+    is_se = 'senarai edaran' in penerima_raw.lower()
+    penerima_line = "Rujuk Senarai Edaran" if is_se else penerima_raw
+
     # Ruj/Tarikh right-aligned block, then penerima address below
     RIGHT_W = 70
+    addr_lines = [penerima_line]
+    org = f.get('penerima_organisasi', '')
+    alamat = f.get('penerima_alamat', '')
+    if org and org != '[PLACEHOLDER]': addr_lines.append(org)
+    if alamat and alamat != '[PLACEHOLDER]': addr_lines.append(alamat)
+
     header_lines = [
         f"{'No. Rujukan : ' + f.get('rujukan', '[PLACEHOLDER]'):>{RIGHT_W}}",
         f"{'Tarikh      : ' + f.get('tarikh', '[PLACEHOLDER]'):>{RIGHT_W}}",
         "",
-        f.get('penerima_nama', '[PLACEHOLDER]'),
-        f.get('penerima_jawatan', '[PLACEHOLDER]'),
-        f.get('penerima_organisasi', '[PLACEHOLDER]'),
-        f.get('penerima_alamat', '[PLACEHOLDER]'),
-    ]
+    ] + addr_lines
 
-    panggilan = _auto_panggilan(f.get('penerima_nama', ''))
+    panggilan = "Tuan/Puan" if is_se else _auto_panggilan(penerima_raw)
+
+    se_page = _build_senarai_edaran_page(f.get('senarai_edaran', '')) if is_se else ""
 
     return "\n".join(header_lines) + f"""
 
@@ -316,7 +405,7 @@ Saya yang menjalankan amanah,
 
 
 ({f.get('penandatangan_nama', '[PLACEHOLDER]').upper()})
-{f.get('penandatangan_jawatan', '[PLACEHOLDER]')}""" + sk_lines
+{f.get('penandatangan_jawatan', '[PLACEHOLDER]')}""" + sk_lines + se_page
 
 
 def _build_memo(f: dict) -> str:
@@ -415,11 +504,29 @@ Kembalikan HANYA dokumen yang telah dikemaskini dalam format JSON:
     # Nota PDF context — hanya papar sekali, kemudian clear flag
     pdf_note = ""
     if session.get("pdf_context"):
+        collected_fields = session.get("fields", {})
+        has_isi = bool(collected_fields.get("isi"))
         pdf_note = f"""
-NOTA PENTING: Pengguna telah memuat naik dokumen PDF. Maklumat berikut telah diekstrak secara automatik dan disimpan dalam field terkumpul. Sila:
-1. Maklumkan kepada pengguna apakah yang telah diekstrak dari PDF
-2. Sahkan jenis surat yang dicadangkan
-3. Teruskan tanya field yang masih belum diisi
+ARAHAN PENTING — SURAT PEMAKLUMAN DARI PDF:
+Pengguna telah memuat naik dokumen PDF rasmi. Sistem telah menganalisis dokumen tersebut dan mengekstrak maklumat berikut secara automatik (SUDAH DISIMPAN, tidak perlu tanya semula):
+{json.dumps(collected_fields, ensure_ascii=False, indent=2)}
+
+PERATURAN WAJIB — JANGAN LANGGAR:
+1. Field "isi" TELAH DIJANA AUTOMATIK dari kandungan PDF. JANGAN tanya pengguna untuk isi kandungan surat. JANGAN minta pengguna tulis atau masukkan isi. Gunakan terus nilai "isi" yang telah ada.
+2. Field "tajuk", "rujukan", "tarikh", "penerima", "penerima_organisasi" jika sudah ada — JANGAN tanya semula.
+3. Ini adalah SURAT PEMAKLUMAN. Tajuk MESTI bermula dengan "PEMAKLUMAN:".
+
+Field yang MASIH PERLU ditanya daripada pengguna (hanya yang belum ada nilai):
+- Penerima (penerima) — nama/jawatan/organisasi penerima jika belum ada
+- Alamat penerima (penerima_alamat) — jika belum ada
+- Nama penandatangan (penandatangan_nama) — jika belum ada
+- Jawatan penandatangan (penandatangan_jawatan) — jika belum ada
+- Pegawai untuk dihubungi (pegawai_dihubungi) — nama dan nombor telefon pegawai hubungan
+
+Sila:
+a) Maklumkan ringkas kepada pengguna maklumat yang telah diekstrak dari PDF
+b) Terus tanya HANYA maklumat yang masih belum lengkap (lihat senarai di atas)
+c) JANGAN tanya isi kandungan surat — ia sudah dijana dari PDF
 """
         session["pdf_context"] = False
         _save_session(session_id, session)
@@ -471,12 +578,29 @@ Status sesi semasa:
         session["doc_type"] = new_type
 
     if parsed.get("fields_collected"):
-        session["fields"].update(parsed["fields_collected"])
+        fc = parsed["fields_collected"]
+        # Normalize: map old key penerima_nama → penerima
+        if "penerima_nama" in fc and "penerima" not in fc:
+            fc["penerima"] = fc.pop("penerima_nama")
+        if "penerima_jawatan" in fc:
+            # If penerima exists, append jawatan to it; else discard (merged field)
+            if fc.get("penerima") and fc["penerima_jawatan"]:
+                fc["penerima"] = f"{fc['penerima']} ({fc.pop('penerima_jawatan')})"
+            else:
+                fc.pop("penerima_jawatan", None)
+        session["fields"].update(fc)
         # For memo, isi must be one sentence only — trim anything after first newline
         if session.get("doc_type") == "memo" and "isi" in session["fields"]:
             isi_val = session["fields"]["isi"]
             if "\n" in isi_val:
                 session["fields"]["isi"] = isi_val.split("\n")[0].strip()
+
+    # Extract senarai_edaran from raw query if not yet captured (AI may miss it)
+    if "senarai_edaran" not in session["fields"]:
+        import re as _re2
+        se_match = _re2.search(r'[Ss]enarai [Ee]daran\s*:\s*(\[.*?\])', query, _re2.DOTALL)
+        if se_match:
+            session["fields"]["senarai_edaran"] = se_match.group(1).strip()
 
     if parsed.get("phase") is not None:
         session["phase"] = parsed["phase"]
@@ -690,9 +814,11 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
 
         doc.add_paragraph("")
 
+        penerima_raw = fields.get('penerima', '') or fields.get('penerima_nama', '')
+        is_se = 'senarai edaran' in penerima_raw.lower()
+        penerima_line = "Rujuk Senarai Edaran" if is_se else penerima_raw
         for line in [
-            fields.get('penerima_nama', ''),
-            fields.get('penerima_jawatan', ''),
+            penerima_line,
             fields.get('penerima_organisasi', ''),
             fields.get('penerima_alamat', ''),
         ]:
@@ -701,7 +827,7 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
 
         doc.add_paragraph("")
 
-        panggilan = _auto_panggilan(fields.get('penerima_nama', ''))
+        panggilan = "Tuan/Puan" if is_se else _auto_panggilan(penerima_raw)
         _p(f"{panggilan},")
         doc.add_paragraph("")
 
@@ -753,6 +879,42 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
                 _p("s.k.:")
                 for i, item in enumerate(sk_items):
                     _p(f"{i+1}. {item}")
+
+        # Senarai edaran — halaman baru dalam DOCX
+        if is_se:
+            se_raw = fields.get('senarai_edaran', '')
+            se_entries = []
+            try:
+                se_data = json.loads(se_raw) if se_raw else []
+                if isinstance(se_data, list):
+                    se_entries = se_data
+            except Exception:
+                pass
+            if se_entries:
+                doc.add_page_break()
+                heading = doc.add_paragraph()
+                heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                run = heading.add_run("SENARAI EDARAN")
+                run.bold = True
+                run.font.size = Pt(13)
+                run.font.name = "Arial"
+                doc.add_paragraph("")
+                from docx.oxml.ns import qn
+                from docx.oxml import OxmlElement
+                table = doc.add_table(rows=1, cols=4)
+                table.style = 'Table Grid'
+                hdr = table.rows[0].cells
+                for cell, txt in zip(hdr, ["BIL.", "NAMA", "JAWATAN", "JABATAN / SEKOLAH"]):
+                    cell.text = txt
+                    cell.paragraphs[0].runs[0].bold = True
+                for i, entry in enumerate(se_entries, 1):
+                    row = table.add_row().cells
+                    row[0].text = f"{i}."
+                    row[1].text = str(entry.get('nama', '') or '').upper()
+                    row[2].text = str(entry.get('jawatan', '') or '').upper()
+                    row[3].text = str(entry.get('jabatan', '') or '').upper()
+                    for cell in row:
+                        cell.paragraphs[0].runs[0].bold = True if cell.text else False
     else:
         # Fallback: plain line-by-line rendering
         lines = doc_text.split("\n")
@@ -923,7 +1085,12 @@ def _build_surat_html(f: dict) -> str:
             for i, item in enumerate(items):
                 sk_html += f'<p style="margin:2px 0">{i+1}. {item}</p>'
 
-    panggilan = _auto_panggilan(f.get('penerima_nama', ''))
+    # Penerima block — guna field 'penerima' baru, fallback ke penerima_nama lama
+    penerima_raw = f.get('penerima', '') or f.get('penerima_nama', '')
+    is_se = 'senarai edaran' in penerima_raw.lower()
+    penerima_line = "Rujuk Senarai Edaran" if is_se else penerima_raw
+    panggilan = "Tuan/Puan" if is_se else _auto_panggilan(penerima_raw)
+
     isi_raw = f.get('isi', '')
     # Isi paragraphs: numbered from 2, justified
     isi_paras = [_strip_para_num(p.strip()) for p in isi_raw.split('\n\n') if p.strip()] if isi_raw else []
@@ -938,10 +1105,7 @@ def _build_surat_html(f: dict) -> str:
 
     n = 'style="margin:6px 0;line-height:1.6"'
     # Ruj.Kami+Tarikh right-aligned, then address left — per template
-    penerima_lines = [
-        f.get("penerima_nama", ""), f.get("penerima_jawatan", ""),
-        f.get("penerima_organisasi", ""), f.get("penerima_alamat", ""),
-    ]
+    penerima_lines = [penerima_line, f.get("penerima_organisasi", ""), f.get("penerima_alamat", "")]
     penerima_html = "<br>".join(l for l in penerima_lines if l)
     rujukan_html = (
         f'Ruj. Kami &nbsp;: {f.get("rujukan","")}<br>'
@@ -976,6 +1140,57 @@ def _build_surat_html(f: dict) -> str:
         f'<p style="margin:2px 0">{f.get("penandatangan_jawatan","")}</p>'
         f'{sig_extra}'
         f'{sk_html}'
+        f'{_build_senarai_edaran_html(f) if is_se else ""}'
+        f'</div>'
+    )
+
+
+def _build_senarai_edaran_html(f: dict) -> str:
+    """Jana HTML halaman senarai edaran — ALL CAPS, BOLD."""
+    se_raw = f.get('senarai_edaran', '')
+    if not se_raw or not se_raw.strip():
+        return ""
+    entries = []
+    try:
+        data = json.loads(se_raw)
+        if isinstance(data, list):
+            entries = data
+    except Exception:
+        for line in se_raw.strip().splitlines():
+            line = line.strip()
+            if line:
+                entries.append({"nama": "", "jawatan": "", "jabatan": line})
+    if not entries:
+        return ""
+
+    has_nama = any(str(e.get("nama", "") or "").strip() for e in entries)
+
+    rows_html = ""
+    for i, entry in enumerate(entries, 1):
+        nama    = str(entry.get("nama", "") or "").upper()
+        jawatan = str(entry.get("jawatan", "") or "").upper()
+        jabatan = str(entry.get("jabatan", "") or "").upper()
+        nama_td = f'<td style="padding:5px 8px;font-weight:bold">{nama}</td>' if has_nama else ""
+        rows_html += (
+            f'<tr style="border-bottom:1px solid #ccc">'
+            f'<td style="padding:5px 8px;font-weight:bold;width:40px">{i}.</td>'
+            f'{nama_td}'
+            f'<td style="padding:5px 8px;font-weight:bold">{jawatan}</td>'
+            f'<td style="padding:5px 8px;font-weight:bold">{jabatan}</td>'
+            f'</tr>'
+        )
+
+    nama_th = '<th style="padding:5px 8px;text-align:left">NAMA</th>' if has_nama else ""
+    return (
+        f'<div style="margin-top:40px;border-top:2px solid #000;padding-top:16px;page-break-before:always">'
+        f'<p style="font-size:13pt;font-weight:bold;text-align:center;letter-spacing:2px;margin:0 0 16px 0">SENARAI EDARAN</p>'
+        f'<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:11pt">'
+        f'<thead><tr style="border-bottom:2px solid #000;background:#f0f0f0">'
+        f'<th style="padding:5px 8px;text-align:left;width:40px">BIL.</th>'
+        f'{nama_th}'
+        f'<th style="padding:5px 8px;text-align:left">JAWATAN</th>'
+        f'<th style="padding:5px 8px;text-align:left">JABATAN / SEKOLAH</th>'
+        f'</thead><tbody>{rows_html}</tbody></table>'
         f'</div>'
     )
 

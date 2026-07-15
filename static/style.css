@@ -717,6 +717,19 @@ textarea.ff-input { min-height: 52px; }
 }
 .ff-ahli-semua.active:hover { background: rgba(239,68,68,0.1); }
 .ff-ahli-row-semua .ff-ahli-nama { color: #94a3b8; font-style: italic; }
+
+/* Penerima field */
+.ff-penerima-hint { margin-top: 4px; font-size: 11px; color: #a5b4fc; }
+.ff-hint-badge { background: rgba(99,102,241,0.2); border: 1px solid #6366f1; border-radius: 4px; padding: 1px 6px; font-size: 11px; }
+
+/* Senarai Edaran form */
+.ff-se-list { display: flex; flex-direction: column; gap: 4px; }
+.ff-se-header { display: grid; grid-template-columns: 24px 1fr 1fr 1fr 26px; gap: 4px; padding: 0 2px; }
+.ff-se-col { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
+.ff-optional { font-weight: 400; text-transform: none; color: #64748b; }
+.ff-se-row { display: grid; grid-template-columns: 24px 1fr 1fr 1fr 26px; gap: 4px; align-items: center; }
+.ff-se-num { font-size: 11px; color: #94a3b8; text-align: right; padding-right: 2px; }
+.ff-se-row .ff-input { min-width: 0; font-size: 11px; padding: 4px 7px; }
 .review-all-good {
     padding: 10px 14px; font-size: 13px; color: #065f46;
     background: rgba(16,185,129,0.08);
