@@ -990,7 +990,7 @@ function _buildAnnotatedReview(data, docText) {
     // Corrected document section (legacy — from agent corrected_document field)
     if (data.corrected_document) {
         html += `<div class="da-section doc-preview-section review-doc-preview-section" style="background:var(--bg-secondary);border-radius:8px;padding:12px;margin-top:4px">`;
-        html += `<div class="da-section-title">📄 Dokumen Diperbetulkan</div>`;
+        html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button></div>`;
         html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview">${escapeHtml(data.corrected_document)}</pre>`;
         html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 Muat Turun (.docx)</button></div>`;
         html += '</div>';
@@ -2365,7 +2365,8 @@ document.getElementById('adminRefreshBtn').addEventListener('click', loadAdminSt
 
 async function openWordPreview() {
     const previewHtml = document.getElementById('docPreviewHtml');
-    const preview = document.getElementById('docPreview');
+    // Fall back to reviewer corrected-document preview if main preview not present
+    const preview = document.getElementById('docPreview') || document.getElementById('reviewDocPreview');
     const isHtmlMode = !!previewHtml;
 
     // Fetch active letterhead for current agent

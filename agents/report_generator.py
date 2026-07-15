@@ -464,7 +464,7 @@ def _build_report_html(f: dict) -> str:
     cadangan = f.get("cadangan", "").replace("\n", "<br>")
 
     TH = 'style="border:1px solid #000;padding:5px 8px;font-weight:bold"'
-    TC = 'style="border:1px solid #000;padding:5px 8px;vertical-align:top"'
+    TC = 'style="border:1px solid #000;padding:5px 8px;vertical-align:top;text-align:justify"'
     TL = 'style="border:1px solid #000;padding:5px 8px;width:20%"'
     TV = 'style="border:1px solid #000;padding:5px 8px;width:30%"'
 
@@ -490,9 +490,10 @@ def _build_report_html(f: dict) -> str:
         f'<tr><td colspan="4" {TH}>OBJEKTIF</td></tr>'
         f'<tr><td colspan="4" style="border:1px solid #000;padding:5px 8px;min-height:50px;vertical-align:top">{obj_html}</td></tr>'
         f'<tr><td colspan="4" {TH}>RUMUSAN / LAPORAN</td></tr>'
-        f'<tr><td colspan="4" style="border:1px solid #000;padding:5px 8px;min-height:70px;vertical-align:top">{rumusan}</td></tr>'
+        f'<tr><td colspan="4" style="border:1px solid #000;padding:5px 8px;min-height:70px;vertical-align:top;text-align:justify">{rumusan}</td></tr>'
         f'<tr><td colspan="4" {TH}>CADANGAN / TINDAKAN</td></tr>'
-        f'<tr><td colspan="4" style="border:1px solid #000;padding:5px 8px;min-height:70px;vertical-align:top">{cadangan}</td></tr>'
+        f'<tr><td colspan="4" style="border:1px solid #000;padding:5px 8px;min-height:70px;vertical-align:top;text-align:justify">{cadangan}</td></tr>'
+        f'<tbody style="page-break-inside:avoid">'
         f'<tr>'
         f'<td colspan="2" {TH}>DISEDIAKAN OLEH</td>'
         f'<td colspan="2" style="border:1px solid #000;padding:5px 8px;font-weight:bold;text-align:center">DISAHKAN OLEH</td>'
@@ -512,6 +513,7 @@ def _build_report_html(f: dict) -> str:
         f'ORGANISASI : {f.get("organisasi","")}'
         f'</td>'
         f'</tr>'
+        f'</tbody>'
         f'</table>'
         f'</div>'
     )
