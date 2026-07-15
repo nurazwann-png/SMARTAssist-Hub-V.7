@@ -1786,19 +1786,27 @@ function downloadDocumentPdf() {
     const html = previewHtml ? previewHtml.innerHTML : (preview ? `<pre style="font-family:Arial,sans-serif;font-size:12pt;white-space:pre-wrap">${preview.innerText}</pre>` : '');
     if (!html) return;
 
-    const win = window.open('', '_blank');
-    if (!win) { showToast('Sila benarkan pop-up untuk muat turun PDF.', false); return; }
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Dokumen</title>
+    // Use hidden iframe to avoid popup blocker
+    let iframe = document.getElementById('_pdfPrintFrame');
+    if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = '_pdfPrintFrame';
+        iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:0';
+        document.body.appendChild(iframe);
+    }
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Dokumen</title>
         <style>
             @page { size: A4; margin: 25.4mm; }
             body { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin: 0; color: #000; }
             table { border-collapse: collapse; width: 100%; }
             td, th { border: 1px solid #000; padding: 5px 8px; }
+            img { max-width: 100%; }
             @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
         </style></head><body>${html}</body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); win.close(); }, 600);
+    doc.close();
+    setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); }, 600);
 }
 
 function showEmailDialog() {
