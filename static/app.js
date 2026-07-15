@@ -2078,6 +2078,8 @@ fileInput.addEventListener('change', async () => {
 
     if (currentAgent === 'document_reviewer') {
         await handleReviewUpload(file);
+    } else if (currentAgent === 'letter_generator') {
+        await lgHandleLetterPdfUpload(file);
     } else {
         await handleDataUpload(file);
     }
@@ -2166,6 +2168,64 @@ async function sendReviewRequest(filename, docType) {
         const result = await res.json();
         typingIndicator.classList.remove('active');
         const info = getAgentInfo('document_reviewer');
+        let structured = null;
+        try { structured = JSON.parse(result.response); } catch (_) {}
+        addMessage(result.response, 'assistant', info.icon, info.name, structured);
+    } catch (err) {
+        typingIndicator.classList.remove('active');
+        addMessage(`Ralat: ${err.message}`, 'assistant', '⚠️', 'Sistem');
+    } finally { setProcessing(false); }
+}
+
+async function lgHandleLetterPdfUpload(file) {
+    // Had saiz 10MB — semak di frontend sebelum hantar
+    if (file.size > 10 * 1024 * 1024) {
+        addMessage('Fail terlalu besar (melebihi 10MB). Sila gunakan PDF yang lebih kecil.', 'assistant', '⚠️', 'Sistem');
+        return;
+    }
+    setProcessing(true);
+    addMessage(`📎 Menganalisis PDF: ${file.name}...`, 'user');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('session_id', sessionId);
+    try {
+        const res = await fetch('/api/letter/upload-pdf', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.ok) {
+            uploadBtn.classList.add('has-file');
+            fileIndicator.style.display = 'flex';
+            const pagesNote = data.pages_note || '';
+            fileIndicatorText.textContent = `📄 ${data.filename} (${data.char_count} aksara diekstrak${pagesNote})`;
+            canvasWelcome.style.display = 'none';
+            await lgSendPdfAnalysisRequest(file.name, data.analysis_summary, data.suggested_type, data.extracted_fields);
+        } else {
+            addMessage(data.error || 'Gagal memproses PDF.', 'assistant', '⚠️', 'Sistem');
+        }
+    } catch (err) {
+        addMessage(`Ralat muat naik: ${err.message}`, 'assistant', '⚠️', 'Sistem');
+    } finally { setProcessing(false); }
+}
+
+async function lgSendPdfAnalysisRequest(filename, summary, suggestedType, extractedFields) {
+    const fieldsInfo = extractedFields && Object.keys(extractedFields).length > 0
+        ? ` Maklumat berikut telah diekstrak: ${Object.entries(extractedFields).map(([k,v]) => `${k}: ${v}`).join(', ')}.`
+        : '';
+    const msg = currentLang === 'bm'
+        ? `Saya telah memuat naik PDF "${filename}".${fieldsInfo} ${summary || ''} Sila cadangkan jenis surat yang sesuai dan mulakan proses pengisian borang.`
+        : `I uploaded PDF "${filename}".${fieldsInfo} ${summary || ''} Please suggest a suitable letter type and begin the form.`;
+
+    setProcessing(true);
+    typingIndicator.classList.add('active');
+    canvasMessages.scrollTop = canvasMessages.scrollHeight;
+    try {
+        const res = await fetch('/api/agent-chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg, session_id: sessionId, agent: 'letter_generator', lang: currentLang }),
+        });
+        const result = await res.json();
+        typingIndicator.classList.remove('active');
+        const info = getAgentInfo('letter_generator');
         let structured = null;
         try { structured = JSON.parse(result.response); } catch (_) {}
         addMessage(result.response, 'assistant', info.icon, info.name, structured);
