@@ -1404,6 +1404,34 @@ textarea.ff-input { min-height: 52px; }
 }
 .doc-preview-expand-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
 
+/* Save button in inline pratonton title bar */
+.doc-preview-save-btn {
+    font-size: 13px; padding: 3px 10px; border-radius: 6px;
+    background: #f59e0b; border: 1px solid #d97706;
+    color: #fff; cursor: pointer; float: right; margin-top: -2px; margin-right: 6px;
+    transition: all 0.2s; display: none;
+}
+.doc-preview-save-btn.unsaved { animation: pulse-save 1s ease infinite alternate; }
+.doc-preview-save-btn.saved   { background: #16a34a; border-color: #15803d; }
+.doc-preview-save-btn:hover   { filter: brightness(1.1); }
+@keyframes pulse-save { from { opacity: 1; } to { opacity: 0.75; } }
+
+/* PDF & Save buttons in Word overlay toolbar */
+.word-preview-save-btn {
+    padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    background: #f59e0b; color: #fff; border: none; cursor: pointer; display: none;
+    transition: background 0.2s;
+}
+.word-preview-save-btn.unsaved { display: inline-flex; animation: pulse-save 1s ease infinite alternate; }
+.word-preview-save-btn.saved   { background: #16a34a; animation: none; }
+.word-preview-save-btn:hover   { filter: brightness(1.1); }
+.word-preview-pdf-btn {
+    padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    background: #dc2626; color: #fff; border: none; cursor: pointer;
+    transition: background 0.2s;
+}
+.word-preview-pdf-btn:hover { background: #b91c1c; }
+
 /* Mobile overrides */
 @media (max-width: 640px) {
     .nav-right { right: 12px; }

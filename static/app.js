@@ -990,9 +990,9 @@ function _buildAnnotatedReview(data, docText) {
     // Corrected document section (legacy — from agent corrected_document field)
     if (data.corrected_document) {
         html += `<div class="da-section doc-preview-section review-doc-preview-section" style="background:var(--bg-secondary);border-radius:8px;padding:12px;margin-top:4px">`;
-        html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button></div>`;
-        html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview">${escapeHtml(data.corrected_document)}</pre>`;
-        html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 Muat Turun (.docx)</button></div>`;
+        html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button></div>`;
+        html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview" oninput="onPreviewEdit()">${escapeHtml(data.corrected_document)}</pre>`;
+        html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 Muat Turun (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 Muat Turun (.pdf)</button></div>`;
         html += '</div>';
     }
 
@@ -1413,13 +1413,14 @@ function buildLetterHtml(data) {
 
     if (data.document_preview) {
         html += '<div class="da-section doc-preview-section">';
-        html += '<div class="da-section-title">\u{1F4C4} Pratonton Dokumen <span class="edit-hint">(boleh diedit)</span>'
-            + `<button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button></div>`;
+        html += '<div class="da-section-title">📄 Pratonton Dokumen <span class="edit-hint">(boleh diedit)</span>'
+            + `<button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button>`
+            + `<button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button></div>`;
         if (data.document_html) {
-            html += `<pre class="doc-preview" contenteditable="true" id="docPreview" style="display:none">${escapeHtml(data.document_preview)}</pre>`;
-            html += `<div class="doc-preview doc-preview-html" contenteditable="true" id="docPreviewHtml">${data.document_html}</div>`;
+            html += `<pre class="doc-preview" contenteditable="true" id="docPreview" style="display:none" oninput="onPreviewEdit()">${escapeHtml(data.document_preview)}</pre>`;
+            html += `<div class="doc-preview doc-preview-html" contenteditable="true" id="docPreviewHtml" oninput="onPreviewEdit()">${data.document_html}</div>`;
         } else {
-            html += `<pre class="doc-preview" contenteditable="true" id="docPreview">${escapeHtml(data.document_preview)}</pre>`;
+            html += `<pre class="doc-preview" contenteditable="true" id="docPreview" oninput="onPreviewEdit()">${escapeHtml(data.document_preview)}</pre>`;
         }
         html += '</div>';
     }
@@ -1453,7 +1454,8 @@ function buildLetterHtml(data) {
             : '⚠️ Sila semak semula dokumen yang telah dijana sebelum dimuat turun. Pastikan semua maklumat adalah tepat dan lengkap.';
         html += `<div class="doc-review-reminder">${remindMsg}</div>`;
         html += '<div class="doc-actions">';
-        html += `<button class="doc-action-btn download-btn" onclick="downloadDocument()">\u{1F4E5} Muat Turun (.docx)</button>`;
+        html += `<button class="doc-action-btn download-btn" onclick="downloadDocument()">📥 Muat Turun (.docx)</button>`;
+        html += `<button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 Muat Turun (.pdf)</button>`;
         html += '</div>';
     }
 
@@ -1715,6 +1717,88 @@ async function saveDocumentEdits(content) {
             body: JSON.stringify({ session_id: sessionId, content }),
         });
     } catch (_) {}
+}
+
+// Show save button in inline pratonton when user edits
+function onPreviewEdit() {
+    const btn = document.getElementById('docPreviewSaveBtn');
+    if (!btn) return;
+    btn.style.display = 'inline-flex';
+    btn.classList.add('unsaved');
+    btn.textContent = '💾 Simpan*';
+}
+
+// Save inline pratonton edits
+async function savePreviewEdits(btn) {
+    const previewHtml = document.getElementById('docPreviewHtml');
+    const preview = document.getElementById('docPreview') || document.getElementById('reviewDocPreview');
+    const content = previewHtml ? previewHtml.innerText : (preview ? preview.innerText : '');
+    await saveDocumentEdits(content);
+    if (btn) {
+        btn.textContent = '✅ Tersimpan';
+        btn.classList.remove('unsaved');
+        btn.classList.add('saved');
+        setTimeout(() => {
+            btn.textContent = '💾 Simpan';
+            btn.style.display = 'none';
+            btn.classList.remove('saved');
+        }, 2200);
+    }
+}
+
+// Sync overlay edits back to inline preview and show save button
+function onOverlayEdit() {
+    const editEl = document.getElementById('wordPreviewHtmlEdit');
+    const inlineHtml = document.getElementById('docPreviewHtml');
+    if (editEl && inlineHtml) inlineHtml.innerHTML = editEl.innerHTML;
+
+    const saveBtn = document.getElementById('overlaySaveBtn');
+    if (saveBtn) {
+        saveBtn.classList.add('unsaved');
+        saveBtn.textContent = '💾 Simpan*';
+    }
+}
+
+// Save overlay edits
+async function saveOverlayEdits(btn) {
+    const editEl = document.getElementById('wordPreviewHtmlEdit');
+    const previewText = document.getElementById('wordPreviewText');
+    const content = editEl ? editEl.innerText : (previewText ? previewText.innerText : '');
+    await saveDocumentEdits(content);
+    if (btn) {
+        btn.textContent = '✅ Tersimpan';
+        btn.classList.remove('unsaved');
+        btn.classList.add('saved');
+        setTimeout(() => {
+            btn.textContent = '💾 Simpan';
+            btn.classList.remove('saved', 'unsaved');
+        }, 2200);
+    }
+    // Also update inline save button state
+    const inlineSaveBtn = document.getElementById('docPreviewSaveBtn');
+    if (inlineSaveBtn) { inlineSaveBtn.style.display = 'none'; inlineSaveBtn.classList.remove('unsaved', 'saved'); }
+}
+
+// Download current document as PDF via print dialog
+function downloadDocumentPdf() {
+    const previewHtml = document.getElementById('docPreviewHtml') || document.getElementById('wordPreviewHtmlEdit');
+    const preview     = document.getElementById('docPreview') || document.getElementById('reviewDocPreview') || document.getElementById('wordPreviewText');
+    const html = previewHtml ? previewHtml.innerHTML : (preview ? `<pre style="font-family:Arial,sans-serif;font-size:12pt;white-space:pre-wrap">${preview.innerText}</pre>` : '');
+    if (!html) return;
+
+    const win = window.open('', '_blank');
+    if (!win) { showToast('Sila benarkan pop-up untuk muat turun PDF.', false); return; }
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Dokumen</title>
+        <style>
+            @page { size: A4; margin: 25.4mm; }
+            body { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin: 0; color: #000; }
+            table { border-collapse: collapse; width: 100%; }
+            td, th { border: 1px solid #000; padding: 5px 8px; }
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+        </style></head><body>${html}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 600);
 }
 
 function showEmailDialog() {
@@ -2409,6 +2493,8 @@ async function openWordPreview() {
         <div class="word-preview-toolbar">
             <div class="word-preview-title">📄 ${dict.word_preview}</div>
             <div class="word-preview-actions">
+                <button class="word-preview-save-btn" id="overlaySaveBtn" onclick="saveOverlayEdits(this)">💾 Simpan</button>
+                <button class="word-preview-pdf-btn" onclick="downloadDocumentPdf()">📄 PDF</button>
                 <button class="word-preview-dl-btn" onclick="downloadDocument()">📥 ${currentLang === 'bm' ? 'Muat Turun .docx' : 'Download .docx'}</button>
                 <button class="word-preview-close-btn" onclick="closeWordPreview()">${dict.word_close}</button>
             </div>
@@ -2446,15 +2532,17 @@ async function openWordPreview() {
             if (!scroll) return;
 
             if (numPages <= 1) {
-                scroll.innerHTML = `<div class="word-page"><div class="word-page-html-content">${_htmlContent}</div></div>`;
+                scroll.innerHTML = `<div class="word-page"><div class="word-page-html-content" contenteditable="true" id="wordPreviewHtmlEdit" spellcheck="false" oninput="onOverlayEdit()">${_htmlContent}</div></div>`;
             } else {
+                // Multi-page: page 1 is editable; pages 2+ are read-only overflow views
                 scroll.innerHTML = Array.from({ length: numPages }, (_, i) => {
                     const offsetPx = i * pageContentH;
                     const pageNum = `<div class="word-page-num">${i + 1} / ${numPages}</div>`;
+                    const editAttrs = i === 0 ? `contenteditable="true" id="wordPreviewHtmlEdit" spellcheck="false" oninput="onOverlayEdit()"` : '';
                     // Clip wrapper ensures content is cut at exactly pageContentH — no overlap between pages
                     return `<div class="word-page" style="overflow:hidden;max-height:297mm;min-height:297mm">
                         <div style="overflow:hidden;height:${pageContentH}px">
-                            <div class="word-page-html-content" style="position:relative;top:-${offsetPx}px">${_htmlContent}</div>
+                            <div class="word-page-html-content" ${editAttrs} style="position:relative;top:-${offsetPx}px">${_htmlContent}</div>
                         </div>
                         ${pageNum}
                     </div>`;
