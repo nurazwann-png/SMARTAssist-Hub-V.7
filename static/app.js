@@ -264,11 +264,14 @@ function openAgent(agentKey, existingSessionId) {
         `<button class="canvas-quick-btn" onclick="useQuickAction('${escapeAttr(q)}')">${escapeHtml(q)}</button>`
     ).join('');
 
-    const showUpload = agentKey === 'data_analysis' || agentKey === 'document_reviewer';
+    const showUpload = agentKey === 'data_analysis' || agentKey === 'document_reviewer' || agentKey === 'letter_generator';
     uploadBtn.style.display = showUpload ? '' : 'none';
     if (agentKey === 'document_reviewer') {
         fileInput.accept = '.pdf,.docx,.doc';
         uploadBtn.title = 'Muat naik PDF atau Word untuk semakan';
+    } else if (agentKey === 'letter_generator') {
+        fileInput.accept = '.pdf';
+        uploadBtn.title = 'Muat naik PDF untuk jana surat iringan';
     } else {
         fileInput.accept = '.csv,.xlsx,.xls';
         uploadBtn.title = 'Muat naik fail CSV/Excel';
