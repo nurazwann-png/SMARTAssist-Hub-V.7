@@ -70,6 +70,7 @@ from agents.letter_generator import (
     build_docx as lg_build_docx,
     send_email as lg_send_email,
     get_session_info as lg_get_session,
+    inject_pdf_context as lg_inject_pdf_context,
 )
 from agents.report_generator import (
     get_document as rg_get_document,
@@ -287,6 +288,105 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
         "text": text,
         "html": doc_html,   # rich HTML (DOCX) or PDF data-URI
         "is_pdf": ext == ".pdf",
+    })
+
+
+@app.post("/api/letter/upload-pdf")
+async def letter_upload_pdf(file: UploadFile = File(...), session_id: str = Form("default")):
+    """Ekstrak teks dari PDF dan pra-isi session letter_generator untuk jana surat iringan."""
+    import io as _io
+    fname = file.filename or ""
+    ext = _Path(fname).suffix.lower()
+
+    if ext != ".pdf":
+        return JSONResponse({"ok": False, "error": "Hanya fail PDF disokong. Sila muat naik fail .pdf."}, status_code=400)
+
+    raw = await file.read()
+
+    # Had saiz — 10MB
+    if len(raw) > 10 * 1024 * 1024:
+        return JSONResponse({"ok": False, "error": "Fail terlalu besar (melebihi 10MB). Sila muat naik PDF yang lebih kecil."}, status_code=400)
+
+    # Ekstrak teks dalam memori — tidak simpan ke disk
+    try:
+        import pdfplumber
+        with pdfplumber.open(_io.BytesIO(raw)) as pdf:
+            # Ambil maksimum 5 halaman pertama sahaja
+            pages_text = [p.extract_text() or "" for p in pdf.pages[:5]]
+            total_pages = len(pdf.pages)
+    except Exception as e:
+        err_lower = str(e).lower()
+        if "password" in err_lower or "encrypt" in err_lower:
+            return JSONResponse({"ok": False, "error": "PDF ini dilindungi kata laluan dan tidak dapat diproses."}, status_code=400)
+        return JSONResponse({"ok": False, "error": f"Gagal membaca PDF: {e}"}, status_code=500)
+
+    full_text = "\n".join(p for p in pages_text if p.strip())
+
+    if not full_text.strip():
+        return JSONResponse({
+            "ok": False,
+            "error": "PDF ini adalah PDF imbasan/imej. Teks tidak dapat diekstrak. Sila gunakan PDF yang mempunyai teks boleh pilih."
+        }, status_code=400)
+
+    # Had teks untuk LLM — ambil 4000 aksara pertama
+    text_for_llm = full_text[:4000]
+    pages_note = f" (hanya 5 halaman pertama daripada {total_pages} halaman dianalisis)" if total_pages > 5 else ""
+
+    # LLM analisis — ekstrak field dan cadangkan jenis surat
+    from backend.deepseek_client import chat_completion
+    analysis_prompt = f"""Analisis teks dari dokumen rasmi berikut dan ekstrak maklumat dalam format JSON.
+
+Kembalikan HANYA JSON ini tanpa sebarang teks lain:
+{{
+  "suggested_type": "surat atau memo",
+  "rujukan": "nombor rujukan rasmi jika ada (cth: KPM.600-1/2/3), atau null",
+  "tarikh": "tarikh dalam format D Bulan YYYY jika ada (cth: 10 Julai 2026), atau null",
+  "tajuk": "tajuk atau perkara utama dokumen jika ada, atau null",
+  "penerima_nama": "nama penerima jika ada (untuk surat), atau null",
+  "penerima_organisasi": "nama organisasi/jabatan penerima jika ada, atau null",
+  "analysis_summary": "ringkasan pendek 1-2 ayat dalam Bahasa Melayu tentang kandungan dokumen ini"
+}}
+
+Teks dokumen:
+{text_for_llm}"""
+
+    extracted = {}
+    analysis_summary = ""
+    suggested_type = "surat"
+
+    try:
+        raw_json = chat_completion(
+            messages=[{"role": "user", "content": analysis_prompt}],
+            temperature=0.1,
+            max_tokens=500
+        )
+        import re as _re
+        # Ekstrak JSON dari response (buang teks sekeliling jika ada)
+        json_match = _re.search(r'\{[\s\S]*\}', raw_json)
+        if json_match:
+            parsed = json.loads(json_match.group())
+            suggested_type = parsed.get("suggested_type", "surat")
+            if suggested_type not in ("surat", "memo"):
+                suggested_type = "surat"
+            analysis_summary = parsed.get("analysis_summary", "")
+            for k in ("rujukan", "tarikh", "tajuk", "penerima_nama", "penerima_organisasi"):
+                val = parsed.get(k)
+                if val and str(val).strip().lower() not in ("null", "none", ""):
+                    extracted[k] = str(val).strip()
+    except Exception:
+        pass  # Fallback: teruskan tanpa field pra-isi
+
+    # Inject ke session letter_generator
+    lg_inject_pdf_context(session_id, extracted, suggested_type)
+
+    return JSONResponse({
+        "ok": True,
+        "filename": fname,
+        "suggested_type": suggested_type,
+        "extracted_fields": extracted,
+        "analysis_summary": analysis_summary,
+        "char_count": len(full_text),
+        "pages_note": pages_note,
     })
 
 
