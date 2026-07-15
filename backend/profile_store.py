@@ -1,6 +1,11 @@
 """User profile storage — saves per-user profile data in PostgreSQL."""
 
+from datetime import datetime
 from backend.db import dict_cur, get_conn
+
+
+def _serial(row: dict) -> dict:
+    return {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row.items()}
 
 
 def get_profile(google_sub: str) -> dict:
@@ -11,7 +16,7 @@ def get_profile(google_sub: str) -> dict:
             (google_sub,)
         )
         row = cur.fetchone()
-        return dict(row) if row else {}
+        return _serial(dict(row)) if row else {}
 
 
 def save_profile(google_sub: str, email: str, data: dict) -> dict:
@@ -50,4 +55,4 @@ def save_profile(google_sub: str, email: str, data: dict) -> dict:
             (google_sub,)
         )
         row = cur.fetchone()
-        return dict(row) if row else {}
+        return _serial(dict(row)) if row else {}

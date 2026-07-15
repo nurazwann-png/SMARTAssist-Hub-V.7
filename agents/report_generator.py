@@ -609,13 +609,19 @@ def build_docx(session_id: str) -> bytes | None:
     # ── Header: letterhead image or fallback KPM text ──
     _lh_inserted = False
     try:
+        import io as _io
+        from PIL import Image as _PILImage
         from backend.letterhead_store import get_active_path_by_type
         _lh_path = get_active_path_by_type("logo")
         if _lh_path:
+            _img = _PILImage.open(str(_lh_path)).convert("RGBA")
+            _buf = _io.BytesIO()
+            _img.save(_buf, format="PNG")
+            _buf.seek(0)
             lh_para = doc.add_paragraph()
             lh_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
             lh_para.paragraph_format.space_after = Pt(6)
-            lh_para.add_run().add_picture(str(_lh_path), width=Cm(16))
+            lh_para.add_run().add_picture(_buf, width=Cm(16))
             _lh_inserted = True
     except Exception:
         pass

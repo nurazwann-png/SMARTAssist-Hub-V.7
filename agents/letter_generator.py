@@ -16,16 +16,18 @@ from backend.deepseek_client import chat_completion
 SURAT_FIELDS = {
     "doc_type": "surat",
     "fields": [
-        {"key": "rujukan", "label": "Nombor Rujukan", "example": "PPD.XXX/XXX/XX/XX ( )"},
+        {"key": "rujukan", "label": "Ruj. Kami (Nombor Rujukan)", "example": "PPD.XXX/XXX/XX/XX ( )"},
         {"key": "tarikh", "label": "Tarikh", "example": "10 Julai 2026"},
         {"key": "penerima_nama", "label": "Nama Penerima", "example": "YBhg. Dato'/Tuan/Puan"},
         {"key": "penerima_jawatan", "label": "Jawatan Penerima", "example": "Pengarah Pendidikan Negeri"},
         {"key": "penerima_organisasi", "label": "Nama Organisasi Penerima", "example": "Jabatan Pendidikan Negeri Selangor"},
         {"key": "penerima_alamat", "label": "Alamat Penerima", "example": "Aras 5, Blok E, 40000 Shah Alam, Selangor"},
-        {"key": "tajuk", "label": "Perkara / Tajuk Surat", "example": "Permohonan Peruntukan Khas"},
-        {"key": "isi", "label": "Isi Kandungan Utama", "example": "Penerangan tujuan surat"},
+        {"key": "tajuk", "label": "Perkara / Tajuk Surat (huruf besar)", "example": "PERMOHONAN PERUNTUKAN KHAS"},
+        {"key": "isi", "label": "Isi Kandungan Utama (pisahkan perenggan dengan baris kosong)", "example": "Penerangan tujuan surat.\n\nButiran lanjut."},
         {"key": "penandatangan_nama", "label": "Nama Penandatangan", "example": "Ahmad bin Ali"},
         {"key": "penandatangan_jawatan", "label": "Jawatan Penandatangan", "example": "Pegawai Pendidikan Daerah"},
+        {"key": "nama_pejabat", "label": "Nama Pejabat / Unit", "example": "Pejabat Pendidikan Daerah Dalat", "optional": True},
+        {"key": "nama_organisasi", "label": "Nama Organisasi Penandatangan", "example": "Kementerian Pendidikan Malaysia", "optional": True},
         {"key": "salinan_kepada", "label": "Salinan Kepada (s.k.)", "example": "Pengarah JPN, Ketua Unit ICT", "optional": True},
     ],
 }
@@ -44,6 +46,7 @@ MEMO_FIELDS = {
         {"key": "masa_acara", "label": "Masa Acara", "example": "8.00 pagi - 1.00 tengah hari"},
         {"key": "tempat_acara", "label": "Tempat Acara", "example": "Bilik Mesyuarat PPD Petaling Perdana"},
         {"key": "isi", "label": "Isi Kandungan", "example": "Butiran memo"},
+        {"key": "langkah_kerja", "label": "Langkah Kerja / Tindakan (pisahkan dengan baris baru)", "example": "Semak senarai hadir\nSediakan kertas kerja", "optional": True},
         {"key": "penandatangan_nama", "label": "Nama Penandatangan", "example": "Ahmad bin Ali"},
         {"key": "penandatangan_jawatan", "label": "Jawatan Penandatangan", "example": "Pegawai Pendidikan Daerah"},
         {"key": "nama_pejabat", "label": "Nama Pejabat", "example": "Pejabat Pendidikan Daerah Petaling Perdana"},
@@ -63,8 +66,8 @@ CARA KERJA:
 5. Pastikan tiada [PLACEHOLDER] yang belum diisi sebelum dokumen siap
 
 URUTAN SOALAN (ikut susunan ini):
-- Surat: rujukan → tarikh → penerima_nama → penerima_jawatan → penerima_organisasi → penerima_alamat → tajuk → (jana isi secara automatik) → penandatangan_nama → penandatangan_jawatan → salinan_kepada (pilihan)
-- Memo: rujukan → tarikh → pengerusi → penyelaras → ahli → urus_setia → tajuk → tarikh_acara → masa_acara → tempat_acara → (jana isi secara automatik) → penandatangan_nama → penandatangan_jawatan → nama_pejabat
+- Surat: rujukan → tarikh → penerima_nama → penerima_jawatan → penerima_organisasi → penerima_alamat → tajuk → (jana isi secara automatik) → penandatangan_nama → penandatangan_jawatan → nama_pejabat (pilihan) → nama_organisasi (pilihan) → salinan_kepada (pilihan)
+- Memo: rujukan → tarikh → pengerusi → penyelaras → ahli → urus_setia → tajuk → tarikh_acara → masa_acara → tempat_acara → (jana isi secara automatik) → langkah_kerja (tanya jika relevan) → penandatangan_nama → penandatangan_jawatan → nama_pejabat
 
 GAYA:
 - Bertanya seperti pembantu peribadi yang cekap — sopan, ringkas, dan spesifik
@@ -94,13 +97,13 @@ PHASES:
 - Phase 1: Kumpul maklumat secara berperingkat (satu field setiap giliran). JANGAN tanya "isi" — isi akan dijana automatik.
 - Phase 2: JANA ISI KANDUNGAN SECARA AUTOMATIK berdasarkan tajuk dan semua maklumat yang dikumpul. Simpan hasil dalam fields_collected dengan key "isi". Jika maklumat tidak mencukupi untuk menjana isi yang bermakna (cth: tajuk terlalu umum), tanya pengguna soalan spesifik untuk mendapat konteks tambahan (cth: "Boleh nyatakan tujuan utama dan jumlah yang dipohon?"). JANGAN minta pengguna tulis isi sendiri.
   * Untuk SURAT: tulis isi dengan bernombor perenggan (2., 3., 4. dst), bahasa formal, lengkap dan profesional.
-  * Untuk MEMO: field 'isi' WAJIB mengandungi SATU AYAT PENDEK SAHAJA tanpa sebarang newline — contoh: "Sukacita dimaklumkan bahawa mesyuarat akan diadakan seperti butiran berikut:". DILARANG KERAS memasukkan tarikh/masa/tempat, nombor perenggan (3., 4.), atau kandungan lain dalam 'isi'. Sistem akan papar tarikh_acara/masa_acara/tempat_acara secara berasingan.
+  * Untuk MEMO: field 'isi' WAJIB mengandungi SATU AYAT PENDEK SAHAJA tanpa sebarang newline — contoh: "Sukacita dimaklumkan bahawa mesyuarat akan diadakan seperti butiran berikut:". DILARANG KERAS memasukkan tarikh/masa/tempat, nombor perenggan (3., 4.), atau kandungan lain dalam 'isi'. Sistem akan papar tarikh_acara/masa_acara/tempat_acara secara berasingan. Field 'langkah_kerja' (PILIHAN) mengandungi langkah-langkah tindakan yang perlu diambil, SATU LANGKAH SETIAP BARIS (pisahkan dengan \n), contoh: "Semak senarai hadir\nSediakan kertas kerja\nHubungi peserta yang tidak hadir". Tanya tentang langkah_kerja hanya jika konteks memo memerlukan tindakan susulan.
 - Phase 3: Tunjukkan pratonton dokumen lengkap — SEMAK tiada [PLACEHOLDER] kekal
 - Phase 4: Dokumen disahkan dan sedia untuk dimuat turun / dihantar emel
 
 FIELD KEYS YANG WAJIB DIGUNAKAN (guna key tepat ini dalam fields_collected):
 Untuk surat: rujukan, tarikh, penerima_nama, penerima_jawatan, penerima_organisasi, penerima_alamat, tajuk, isi, penandatangan_nama, penandatangan_jawatan, salinan_kepada
-Untuk memo: rujukan, tarikh, pengerusi, penyelaras, ahli, urus_setia, tajuk, tarikh_acara, masa_acara, tempat_acara, isi, penandatangan_nama, penandatangan_jawatan, nama_pejabat
+Untuk memo: rujukan, tarikh, pengerusi, penyelaras, ahli, urus_setia, tajuk, tarikh_acara, masa_acara, tempat_acara, isi, langkah_kerja (pilihan), penandatangan_nama, penandatangan_jawatan, nama_pejabat
 
 FORMAT TEMPLATE YANG MESTI DIIKUTI:
 
@@ -227,6 +230,13 @@ def _build_document(doc_type: str, fields: dict) -> str:
     return _build_surat(fields)
 
 
+import re as _re
+
+def _strip_para_num(text: str) -> str:
+    """Remove leading paragraph numbers like '2.', '3. ', '2)\t' from AI-generated isi."""
+    return _re.sub(r'^\s*\d+[\.\)]\s*', '', text)
+
+
 def _auto_panggilan(nama: str) -> str:
     n = nama.upper()
     if any(t in n for t in ["TAN SRI", "TUN "]):
@@ -239,7 +249,9 @@ def _auto_panggilan(nama: str) -> str:
         return "Yang Dihormati Prof."
     if "DR." in n or " DR " in n:
         return "Yang Dihormati Dr."
-    if any(t in n for t in ["PUAN", "CIK", "DATIN"]):
+    if any(t in n for t in ["ENCIK ", "EN. ", "EN."]) or n.startswith("ENCIK") or n.startswith("EN."):
+        return "Tuan"
+    if any(t in n for t in ["PUAN ", "CIK ", "DATIN"]) or n.startswith("PUAN") or n.startswith("CIK"):
         return "Puan"
     return "Tuan/Puan"
 
@@ -553,7 +565,13 @@ def build_docx(session_id: str) -> bytes | None:
             lh_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
             lh_para.paragraph_format.space_before = Pt(0)
             lh_para.paragraph_format.space_after = Pt(4)
-            lh_para.add_run().add_picture(str(lh_path), width=Cm(17))
+            import io as _lh_io
+            from PIL import Image as _lh_PIL
+            _lh_img = _lh_PIL.open(str(lh_path)).convert("RGBA")
+            _lh_buf = _lh_io.BytesIO()
+            _lh_img.save(_lh_buf, format="PNG")
+            _lh_buf.seek(0)
+            lh_para.add_run().add_picture(_lh_buf, width=Cm(17))
             hr_para = header.add_paragraph()
             hr_para.paragraph_format.space_before = Pt(0)
             hr_para.paragraph_format.space_after = Pt(0)
@@ -621,7 +639,7 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
             tbl_borders.append(b)
         tbl_pr.append(tbl_borders)
 
-    def _p(text="", bold=False, align=WD_ALIGN_PARAGRAPH.LEFT, indent_cm=0, size=11):
+    def _p(text="", bold=False, align=WD_ALIGN_PARAGRAPH.LEFT, indent_cm=0, size=12):
         para = doc.add_paragraph()
         para.alignment = align
         para.paragraph_format.space_after = Pt(0)
@@ -636,12 +654,9 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
         return para
 
     if fields:
-        # Ruj/Tarikh right-aligned, then penerima address below
-        for line in [
-            f"No. Rujukan : {fields.get('rujukan', '')}",
-            f"Tarikh      : {fields.get('tarikh', '')}",
-        ]:
-            _p(line, align=WD_ALIGN_PARAGRAPH.RIGHT)
+        # Ruj. Kami + Tarikh right-aligned (per KPM format)
+        _p(f"Ruj. Kami : {fields.get('rujukan', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _p(f"Tarikh    : {fields.get('tarikh', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
 
         doc.add_paragraph("")
 
@@ -660,40 +675,54 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
         _p(f"{panggilan},")
         doc.add_paragraph("")
 
-        # Tajuk — LEFT, bold
-        _p(fields.get('tajuk', '').upper(), bold=True)
+        # Tajuk — LEFT, bold, uppercase (per template)
+        _p(fields.get('tajuk', '').upper(), bold=True, align=WD_ALIGN_PARAGRAPH.LEFT)
         doc.add_paragraph("")
 
-        # Body from doc_text starting from "Dengan hormatnya"
-        lines = doc_text.split("\n")
-        body_started = False
-        for line in lines:
-            stripped = line.strip()
-            if not body_started:
-                if "Dengan hormatnya" in stripped or "Dengan hormat" in stripped:
-                    body_started = True
-                else:
-                    continue
+        # Paragraph 1 — no indent (per template line 43)
+        _p("Dengan segala hormatnya perkara di atas adalah dirujuk.",
+           align=WD_ALIGN_PARAGRAPH.JUSTIFY)
+        doc.add_paragraph("")
 
-            if not stripped:
+        # Isi paragraphs numbered from 2. with hanging indent
+        isi_raw = fields.get('isi', '')
+        isi_paras = [_strip_para_num(p.strip()) for p in isi_raw.split('\n\n') if p.strip()] if isi_raw else []
+        for i, para_text in enumerate(isi_paras):
+            num_para = doc.add_paragraph()
+            num_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            num_para.paragraph_format.space_after = Pt(0)
+            num_para.paragraph_format.space_before = Pt(0)
+            run = num_para.add_run(f"{i+2}.\t{para_text.replace(chr(10), ' ')}")
+            run.font.name = "Arial"
+            run.font.size = Pt(12)
+            doc.add_paragraph("")
+
+        _p("Sekian, terima kasih.", align=WD_ALIGN_PARAGRAPH.JUSTIFY)
+        doc.add_paragraph("")
+        _p('"MALAYSIA MADANI"', bold=True)
+        doc.add_paragraph("")
+        _p('"BERKHIDMAT UNTUK NEGARA"', bold=True)
+        doc.add_paragraph("")
+        _p("Saya yang menjalankan amanah,")
+        doc.add_paragraph("")
+        doc.add_paragraph("")
+        doc.add_paragraph("")
+        _p(f"({fields.get('penandatangan_nama', '').upper()})", bold=True)
+        _p(fields.get('penandatangan_jawatan', ''))
+        if fields.get('nama_pejabat'):
+            _p(fields.get('nama_pejabat', ''))
+        if fields.get('nama_organisasi'):
+            _p(fields.get('nama_organisasi', ''))
+
+        _sk_skip_set = {"tiada", "none", "kosong", "tak ada", "tidak ada", "-", "–", "tiada s.k.", "tiada sk"}
+        sk = fields.get('salinan_kepada', '')
+        if sk and sk.strip().lower() not in _sk_skip_set:
+            sk_items = [s.strip() for s in sk.split(',') if s.strip() and s.strip().lower() not in _sk_skip_set]
+            if sk_items:
                 doc.add_paragraph("")
-                continue
-
-            is_bold = False
-            align = WD_ALIGN_PARAGRAPH.JUSTIFY
-            indent = 0
-
-            if stripped.startswith("Dengan hormatnya"):
-                indent = 1.27
-            elif stripped.startswith('"') and stripped.endswith('"'):
-                # "MALAYSIA MADANI" and "BERKHIDMAT UNTUK NEGARA" — left, bold
-                is_bold = True
-                align = WD_ALIGN_PARAGRAPH.LEFT
-            elif stripped.startswith("s.k.:") or stripped.startswith("(") or stripped == stripped.upper() and len(stripped) > 5 and stripped[0].isalpha():
-                is_bold = False
-                align = WD_ALIGN_PARAGRAPH.LEFT
-
-            _p(stripped, bold=is_bold, align=align, indent_cm=indent)
+                _p("s.k.:")
+                for i, item in enumerate(sk_items):
+                    _p(f"{i+1}. {item}")
     else:
         # Fallback: plain line-by-line rendering
         lines = doc_text.split("\n")
@@ -727,7 +756,12 @@ def _build_memo_html(f: dict) -> str:
     if logo_url:
         logo_block = f'<img src="{logo_url}" style="max-width:100%;max-height:120px;display:block;margin:0 auto 8px auto">'
     else:
-        logo_block = ""
+        org_name = f.get("nama_pejabat", "")
+        logo_block = (
+            f'<div style="text-align:center;padding:8px 0 4px 0">'
+            f'<div style="font-size:12pt;font-weight:bold;line-height:1.8">{org_name}</div>'
+            f'</div>'
+        ) if org_name else ""
 
     ahli_str = f.get('ahli', '')
     ahli_list = [a.strip() for a in ahli_str.split(',') if a.strip()] if ahli_str else []
@@ -758,18 +792,27 @@ def _build_memo_html(f: dict) -> str:
     )
 
     panggilan = _auto_panggilan(f.get('pengerusi', 'Tuan'))
-    isi = f.get('isi', '').replace('\n', '<br>')
+    isi = _strip_para_num(f.get('isi', '').split('\n')[0].strip()).replace('\n', '<br>')
     tarikh_acara = f.get('tarikh_acara', '')
     masa_acara = f.get('masa_acara', '')
     tempat_acara = f.get('tempat_acara', '')
+
+    # Langkah kerja — numbered paragraphs starting at 4
+    langkah_str = f.get('langkah_kerja', '')
+    langkah_list = [l.strip() for l in langkah_str.split('\n') if l.strip()] if langkah_str else []
 
     # Hanging indent style for numbered paragraphs
     hang = 'style="margin:6px 0;padding-left:2em;text-indent:-2em;line-height:1.6"'
     acara_indent = 'style="margin:2px 0 2px 4em;line-height:1.6"'
     normal = 'style="margin:6px 0;line-height:1.6"'
 
+    langkah_html = ''
+    for i, step in enumerate(langkah_list):
+        num = i + 4
+        langkah_html += f'<p {hang}>{num}.&nbsp;&nbsp;&nbsp;&nbsp;{step}</p>'
+
     return (
-        f'<div style="font-family:Arial,sans-serif;font-size:11pt;line-height:1.5;color:#000">'
+        f'<div style="font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;color:#000">'
         f'{logo_block}'
         f'<table style="width:100%;border-collapse:collapse;margin-bottom:12px">'
         f'<tr><td colspan="3" style="background:#000;color:#fff;text-align:center;font-weight:bold;'
@@ -783,7 +826,8 @@ def _build_memo_html(f: dict) -> str:
         f'<p {acara_indent}><b>Masa</b>&emsp;&emsp;: {masa_acara}</p>'
         f'<p {acara_indent}><b>Tempat</b>&emsp;: {tempat_acara}</p>'
         f'<p {hang}>3.&nbsp;&nbsp;&nbsp;&nbsp;Kehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.</p>'
-        f'<p {normal}>Sekian.</p>'
+        f'{langkah_html}'
+        f'<p {normal}>Sekian, terima kasih.</p>'
         f'<br>'
         f'<p {normal}><b>&ldquo;MALAYSIA MADANI&rdquo;</b></p>'
         f'<p {normal}><b>&ldquo;BERKHIDMAT UNTUK NEGARA&rdquo;</b></p>'
@@ -813,7 +857,13 @@ def _build_surat_html(f: dict) -> str:
     if lh_url:
         lh_block = f'<img src="{lh_url}" style="max-width:100%;max-height:150px;display:block;margin:0 auto">'
     else:
-        lh_block = '<div style="height:80px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:10pt;border:1px dashed #ccc">[Kepala Surat]</div>'
+        org_name = f.get("nama_pejabat", "")
+        lh_block = (
+            f'<div style="text-align:center;padding:12px 0 8px 0">'
+            f'<div style="font-size:13pt;font-weight:bold;text-transform:uppercase;line-height:1.8">'
+            f'{org_name or "NAMA ORGANISASI"}</div>'
+            f'</div>'
+        )
 
     sk = f.get("salinan_kepada", "")
     sk_html = ""
@@ -827,47 +877,56 @@ def _build_surat_html(f: dict) -> str:
 
     panggilan = _auto_panggilan(f.get('penerima_nama', ''))
     isi_raw = f.get('isi', '')
-    # Isi paragraphs: no indent, justify (matches Word format)
-    isi_paras = isi_raw.split('\n\n') if '\n\n' in isi_raw else [isi_raw]
+    # Isi paragraphs: numbered from 2, justified
+    isi_paras = [_strip_para_num(p.strip()) for p in isi_raw.split('\n\n') if p.strip()] if isi_raw else []
+    # Numbered paragraphs — no hanging indent, continuation wraps under number
+    n_para = 'style="margin:6px 0;line-height:1.6;text-align:justify"'
     isi_html = "".join(
-        f'<p style="margin:6px 0;line-height:1.6;text-align:justify">{p.replace(chr(10),"<br>")}</p>'
-        for p in isi_paras if p.strip()
+        f'<p {n_para}>2.&nbsp;&nbsp;&nbsp;&nbsp;{p.replace(chr(10), "<br>")}</p>'
+        if i == 0 else
+        f'<p {n_para}>{i+2}.&nbsp;&nbsp;&nbsp;&nbsp;{p.replace(chr(10), "<br>")}</p>'
+        for i, p in enumerate(isi_paras)
     )
 
     n = 'style="margin:6px 0;line-height:1.6"'
-    # Penerima (left) + Rujukan/Tarikh (right) — same table per KPM format
+    # Ruj.Kami+Tarikh right-aligned, then address left — per template
     penerima_lines = [
         f.get("penerima_nama", ""), f.get("penerima_jawatan", ""),
         f.get("penerima_organisasi", ""), f.get("penerima_alamat", ""),
     ]
     penerima_html = "<br>".join(l for l in penerima_lines if l)
     rujukan_html = (
-        f'No. Rujukan : {f.get("rujukan","")}<br>'
+        f'Ruj. Kami &nbsp;: {f.get("rujukan","")}<br>'
         f'Tarikh &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: {f.get("tarikh","")}'
     )
 
+    sig_extra = ""
+    if f.get("nama_pejabat"):
+        sig_extra += f'<p style="margin:2px 0">{f.get("nama_pejabat","")}</p>'
+    if f.get("nama_organisasi"):
+        sig_extra += f'<p style="margin:2px 0">{f.get("nama_organisasi","")}</p>'
+
     return (
-        f'<div style="font-family:Arial,sans-serif;font-size:11pt;line-height:1.5;color:#000">'
+        f'<div style="font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;color:#000">'
         f'{lh_block}'
         f'<hr style="border:none;border-top:2px solid #000;margin:8px 0 14px 0">'
-        f'<table style="width:100%;border:none;margin-bottom:14px">'
-        f'<tr>'
-        f'<td style="border:none;vertical-align:top;width:60%;line-height:1.8">{penerima_html}</td>'
-        f'<td style="border:none;text-align:right;vertical-align:top;line-height:1.8">{rujukan_html}</td>'
-        f'</tr></table>'
+        f'<p style="text-align:right;line-height:1.8;margin:0 0 10px 0">{rujukan_html}</p>'
+        f'<p style="line-height:1.8;margin:0 0 14px 0">{penerima_html}</p>'
         f'<p {n}>{panggilan},</p>'
-        f'<p style="margin:10px 0;font-weight:bold">{f.get("tajuk","").upper()}</p>'
-        f'<p style="margin:8px 0;line-height:1.6;text-align:justify">Dengan hormatnya perkara di atas adalah dirujuk.</p>'
+        f'<p style="margin:10px 0;font-weight:bold;text-align:left">{f.get("tajuk","").upper()}</p>'
+        f'<p style="margin:8px 0;line-height:1.6;text-align:justify">Dengan segala hormatnya perkara di atas adalah dirujuk.</p>'
         f'{isi_html}'
         f'<p {n}>Sekian, terima kasih.</p>'
         f'<br>'
         f'<p {n}><b>&ldquo;MALAYSIA MADANI&rdquo;</b></p>'
+        f'<br>'
         f'<p {n}><b>&ldquo;BERKHIDMAT UNTUK NEGARA&rdquo;</b></p>'
         f'<br>'
         f'<p {n}>Saya yang menjalankan amanah,</p>'
         f'<br><br><br>'
         f'<p {n}><b>({f.get("penandatangan_nama","").upper()})</b></p>'
         f'<p style="margin:2px 0">{f.get("penandatangan_jawatan","")}</p>'
+        f'{sig_extra}'
         f'{sk_html}'
         f'</div>'
     )
@@ -999,7 +1058,7 @@ def _build_memo_docx(doc, fields: dict):
                   align=WD_ALIGN_PARAGRAPH.JUSTIFY)
     p_dengan.paragraph_format.space_after = Pt(6)
 
-    isi = fields.get('isi', '').split('\n')[0].strip()
+    isi = _strip_para_num(fields.get('isi', '').split('\n')[0].strip())
     isi_para = doc.add_paragraph()
     isi_para.paragraph_format.space_after = Pt(6)
     isi_para.paragraph_format.space_before = Pt(0)
@@ -1024,8 +1083,22 @@ def _build_memo_docx(doc, fields: dict):
     r3 = p3.add_run("3.\tKehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.")
     r3.font.size = Pt(12); r3.font.name = "Arial"
 
+    langkah_str = fields.get('langkah_kerja', '')
+    langkah_list = [l.strip() for l in langkah_str.split('\n') if l.strip()] if langkah_str else []
+    for i, step in enumerate(langkah_list):
+        num = i + 4
+        lk_para = doc.add_paragraph()
+        lk_para.paragraph_format.space_after = Pt(6)
+        lk_para.paragraph_format.space_before = Pt(0)
+        lk_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        lk_para.paragraph_format.left_indent = Cm(1.27)
+        lk_para.paragraph_format.first_line_indent = Cm(-1.27)
+        lk_run = lk_para.add_run(f"{num}.\t{step}")
+        lk_run.font.size = Pt(12)
+        lk_run.font.name = "Arial"
+
     doc.add_paragraph("")
-    _p("Sekian.")
+    _p("Sekian, terima kasih.")
     doc.add_paragraph("")
     _p('"MALAYSIA MADANI"', bold=True)
     _p('"BERKHIDMAT UNTUK NEGARA"', bold=True)

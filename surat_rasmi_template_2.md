@@ -8,7 +8,8 @@
 <!--     (Insert letterhead image/logo here)      -->
 <!--                                              -->
 <!--  Letakkan imej kepala surat rasmi            -->
-<!--  organisasi di bahagian ini                  -->
+<!--  organisasi di bahagian ini                   -->
+<!--  letakkan sebagai header			 -->
 <!-- ============================================ -->
 
 ---
@@ -18,9 +19,15 @@
 
 | | |
 |:---|---:|
-| **[NAMA PENUH PENERIMA]** | No. Rujukan : [XXX.XXX-X/X/X/XXX(X)] |
-| [Jawatan Penerima] | Ruj. Kami   : [PPD.XXX/XXX/XX/XX ( )] |
-| [Nama Organisasi / Agensi] | Tarikh      : [XX BULAN 20XX] |
+
+
+			    | Ruj. Kami   : [PPD.XXX/XXX/XX/XX ( )]|
+			    | Tarikh      : [XX BULAN 20XX] |
+
+
+| **[NAMA PENUH PENERIMA]**|
+| [Jawatan Penerima] | 
+| [Nama Organisasi / Agensi] |
 | [Alamat Baris 1] | |
 | [Alamat Baris 2] | |
 | [Poskod, Bandar] | |
@@ -28,13 +35,14 @@
 
 ---
 
-[Panggilan Hormat],
+[Panggilan Hormat ikut salutation yang betul. En./Encik - tuan, Pn./Puan - Puan, tiada nama - tuan/puan],
+[Pastikan panggilan hormat diletakkan secara automatic mengikut maklumat yang diisi]
 
-**[TAJUK SURAT DALAM HURUF BESAR — TEBAL DAN TENGAH]**
+**[TAJUK SURAT DALAM HURUF BESAR — TEBAL DAN KIRI]**
 
-&emsp;Dengan hormatnya perkara di atas adalah dirujuk.
+Dengan segala hormatnya perkara di atas adalah dirujuk.
 
-2.&emsp;[Perenggan isi kandungan pertama. Nyatakan tujuan utama surat ini dengan jelas dan profesional. Teks hendaklah dalam saiz 12-14pt, jarak baris Single hingga 1.5, rata kiri dan kanan (justify).]
+2.&emsp;[Perenggan isi kandungan pertama. Nyatakan tujuan utama surat ini dengan jelas dan profesional. Teks hendaklah dalam saiz 11-12pt, jarak baris Single hingga 1.5, rata kiri dan kanan (justify).][sekiranya satu perenggan melebihi margin, mula di Bawah nombor]
 
 3.&emsp;[Perenggan isi kandungan kedua. Huraikan butiran lanjut, maklumat sokongan atau syarat-syarat yang berkaitan.]
 
@@ -45,6 +53,8 @@
 Sekian, terima kasih.
 
 **"MALAYSIA MADANI"**
+
+&nbsp;
 
 **"BERKHIDMAT UNTUK NEGARA"**
 
@@ -62,6 +72,7 @@ Saya yang menjalankan amanah,
 ---
 
 <!-- Jika surat melebihi satu muka surat, tambah penanda di sudut kanan bawah: -->
+<!-- Jika surat melebihi satu muka surat, tambah muka surat baru dan seterusnya: -->
 <!-- &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;...2) -->
 
 ---
@@ -75,12 +86,23 @@ s.k.:
 <!-- ============================================ -->
 <!-- NOTA FORMAT:                                  -->
 <!-- - Font: Arial                                 -->
-<!-- - Saiz: 12 - 14 pt                           -->
+<!-- - Saiz: 11 - 12 pt                           -->
 <!-- - Jarak: Single hingga 1.5                   -->
 <!-- - Teks: Sembang rata kiri dan kanan (Justify) -->
 <!-- - No. Rujukan & Tarikh: sebelah KANAN         -->
 <!-- - Nama & Alamat Penerima: sebelah KIRI        -->
-<!-- - Tajuk surat: HURUF BESAR, tebal, tengah     -->
+<!-- - Tajuk surat: HURUF BESAR, tebal, KIRI       -->
 <!-- - Perenggan bernombor bermula dari 2.          -->
 <!-- - Penanda sambungan (…2) di sudut kanan bawah -->
+<!-- - margin 2 cm top, bottom, left, right        -->
+<!-- - margin header 0.5 cm from top -->
 <!-- ============================================ -->
+
+
+
+
+
+
+
+
+

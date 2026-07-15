@@ -27,6 +27,11 @@ import json
 import threading
 from datetime import datetime, timezone
 
+
+def _serial(row: dict) -> dict:
+    """Convert datetime values to ISO strings for JSON serialisation."""
+    return {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row.items()}
+
 import psycopg2.extras
 
 from backend.db import dict_cur, get_conn
@@ -92,7 +97,7 @@ class SessionStore:
                     "created_at AS created, updated_at AS updated "
                     "FROM sessions ORDER BY updated_at DESC"
                 )
-            return [dict(r) for r in cur.fetchall()]
+            return [_serial(dict(r)) for r in cur.fetchall()]
 
     def get_meta(self, session_id: str) -> dict | None:
         with get_conn() as conn, dict_cur(conn) as cur:
@@ -103,7 +108,7 @@ class SessionStore:
                 (session_id,)
             )
             row = cur.fetchone()
-            return dict(row) if row else None
+            return _serial(dict(row)) if row else None
 
     def session_exists(self, session_id: str) -> bool:
         with get_conn() as conn, dict_cur(conn) as cur:

@@ -1690,8 +1690,8 @@ async function downloadReviewDocument() {
 }
 
 async function downloadDocument() {
-    const preview = document.getElementById('docPreview');
-    if (preview) await saveDocumentEdits(preview.innerText);
+    const previewHtml = document.getElementById('docPreviewHtml');
+    if (previewHtml) await saveDocumentEdits(previewHtml.innerText);
     const endpoint = currentAgent === 'report_generator' ? '/api/report/download' : '/api/document/download';
     try {
         const res = await fetch(`${endpoint}?session_id=${encodeURIComponent(sessionId)}`);
@@ -1718,8 +1718,8 @@ async function saveDocumentEdits(content) {
 }
 
 function showEmailDialog() {
-    const preview = document.getElementById('docPreview');
-    if (preview) saveDocumentEdits(preview.innerText);
+    const previewHtml = document.getElementById('docPreviewHtml');
+    if (previewHtml) saveDocumentEdits(previewHtml.innerText);
 
     const overlay = document.createElement('div');
     overlay.className = 'email-dialog-overlay';

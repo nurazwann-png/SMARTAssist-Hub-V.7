@@ -10,6 +10,7 @@
 <!--  1. Replace this section with your official  -->
 <!--     organisation letterhead                  -->
 <!--  2. Include logo, organisation name           -->
+<!-- 3. logo put as header with margin 0.5 from top -->
 <!-- ============================================ -->
 
 ---
@@ -34,7 +35,7 @@
 
 Tuan,
 
-Dengan segala hormatnya saya diarah merujuk kepada perkara di atas.
+Dengan segala hormatnya perkara di atas adalah dirujuk.
 
 2.&emsp;[Perenggan isi kandungan pertama.]
 

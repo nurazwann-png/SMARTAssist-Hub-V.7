@@ -16,6 +16,12 @@ _ALLOWED_EXT = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
 TYPES = ("letterhead", "logo")
 
 
+def _serial(row: dict) -> dict:
+    """Convert datetime values to ISO strings so JSONResponse can serialise them."""
+    from datetime import datetime
+    return {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row.items()}
+
+
 def _ensure_dir():
     _LH_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -40,7 +46,7 @@ def list_letterheads(lh_type: str | None = None) -> list[dict]:
                 "SELECT id, name, filename, original_name, type, is_active, "
                 "uploaded_at AS uploaded FROM letterheads ORDER BY uploaded_at DESC"
             )
-        return [dict(r) for r in cur.fetchall()]
+        return [_serial(dict(r)) for r in cur.fetchall()]
 
 
 def get_active_by_type(lh_type: str) -> dict | None:
@@ -54,7 +60,7 @@ def get_active_by_type(lh_type: str) -> dict | None:
         row = cur.fetchone()
     if not row:
         return None
-    entry = dict(row)
+    entry = _serial(dict(row))
     if not (_LH_DIR / entry["filename"]).exists():
         return None
     return entry
@@ -107,7 +113,7 @@ def add_letterhead(
             "uploaded_at AS uploaded FROM letterheads WHERE id = %s",
             (lh_id,)
         )
-        return dict(cur.fetchone())
+        return _serial(dict(cur.fetchone()))
 
 
 def set_active(lh_id: str, lh_type: str = "letterhead") -> bool:
