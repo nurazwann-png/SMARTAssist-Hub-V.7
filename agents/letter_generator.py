@@ -334,6 +334,32 @@ def _strip_para_num(text: str) -> str:
     return _re.sub(r'^\s*\d+[\.\)]\s*', '', text)
 
 
+# Matches sub-item prefixes: 3.1  3.1.2  I.  II.  a.  a)  A)
+_SUBITEM_RE = _re.compile(
+    r'^(\d+(?:\.\d+)+\.?\s+'
+    r'|[IVXivx]{1,5}\.\s+'
+    r'|[a-zA-Z][.)]\s+)',
+    _re.UNICODE
+)
+
+
+def _split_isi_lines(para_text: str):
+    """Split isi paragraph into list of (prefix, body, is_subitem) tuples."""
+    result = []
+    for raw in para_text.split('\n'):
+        line = raw.strip()
+        if not line:
+            continue
+        m = _SUBITEM_RE.match(line)
+        if m:
+            pfx = line[:m.end()].rstrip()
+            body = line[m.end():]
+            result.append((pfx, body, True))
+        else:
+            result.append((None, line, False))
+    return result
+
+
 def _auto_panggilan(nama: str) -> str:
     n = nama.upper()
     if any(t in n for t in ["TAN SRI", "TUN "]):
@@ -958,14 +984,34 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
         # Isi paragraphs numbered from 2. with hanging indent
         isi_raw = fields.get('isi', '')
         isi_paras = [_strip_para_num(p.strip()) for p in isi_raw.split('\n\n') if p.strip()] if isi_raw else []
+
+        def _add_isi_para(text, left_cm, hanging_cm, align=WD_ALIGN_PARAGRAPH.JUSTIFY):
+            p = doc.add_paragraph()
+            p.alignment = align
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.left_indent = Cm(left_cm)
+            p.paragraph_format.first_line_indent = Cm(-hanging_cm)
+            r = p.add_run(text)
+            r.font.name = "Arial"
+            r.font.size = Pt(12)
+            return p
+
         for i, para_text in enumerate(isi_paras):
-            num_para = doc.add_paragraph()
-            num_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            num_para.paragraph_format.space_after = Pt(0)
-            num_para.paragraph_format.space_before = Pt(0)
-            run = num_para.add_run(f"{i+2}.\t{para_text.replace(chr(10), ' ')}")
-            run.font.name = "Arial"
-            run.font.size = Pt(12)
+            lines = _split_isi_lines(para_text)
+            if not lines:
+                continue
+            # Main numbered paragraph — hanging indent at 1.25cm
+            _, first_body, _ = lines[0]
+            _add_isi_para(f"{i+2}.\t{first_body}", left_cm=1.25, hanging_cm=1.25)
+            # Sub/continuation lines
+            for pfx, body, is_sub in lines[1:]:
+                if is_sub:
+                    # Sub-item: indented further, hanging for its own prefix
+                    _add_isi_para(f"{pfx}\t{body}", left_cm=2.5, hanging_cm=1.25)
+                else:
+                    # Plain continuation — indent aligned with main text
+                    _add_isi_para(body, left_cm=1.25, hanging_cm=0)
             doc.add_paragraph("")
 
         _p("Sekian, terima kasih.", align=WD_ALIGN_PARAGRAPH.JUSTIFY)
@@ -1207,16 +1253,26 @@ def _build_surat_html(f: dict) -> str:
     panggilan = "Tuan/Puan" if is_se else _auto_panggilan(penerima_raw)
 
     isi_raw = f.get('isi', '')
-    # Isi paragraphs: numbered from 2, justified
     isi_paras = [_strip_para_num(p.strip()) for p in isi_raw.split('\n\n') if p.strip()] if isi_raw else []
-    # Numbered paragraphs — no hanging indent, continuation wraps under number
-    n_para = 'style="margin:6px 0;line-height:1.6;text-align:justify"'
-    isi_html = "".join(
-        f'<p {n_para}>2.&nbsp;&nbsp;&nbsp;&nbsp;{p.replace(chr(10), "<br>")}</p>'
-        if i == 0 else
-        f'<p {n_para}>{i+2}.&nbsp;&nbsp;&nbsp;&nbsp;{p.replace(chr(10), "<br>")}</p>'
-        for i, p in enumerate(isi_paras)
-    )
+    # Build isi HTML with hanging indent
+    _hi_main  = 'padding-left:1.4em;text-indent:-1.4em;margin:6px 0 0 0;line-height:1.6;text-align:justify'
+    _hi_sub   = 'padding-left:2.2em;text-indent:-2.2em;margin:2px 0 0 1.4em;line-height:1.6;text-align:justify'
+    _hi_cont  = 'margin:2px 0 0 1.4em;line-height:1.6;text-align:justify'
+    isi_html = ""
+    for i, para_text in enumerate(isi_paras):
+        lines = _split_isi_lines(para_text)
+        if not lines:
+            continue
+        # First line — main paragraph number
+        first_pfx, first_body, _ = lines[0]
+        first_text = f"{first_body}" if first_pfx else first_body
+        isi_html += f'<p style="{_hi_main}">{i+2}.&nbsp;&nbsp;{first_text}</p>'
+        for pfx, body, is_sub in lines[1:]:
+            if is_sub:
+                isi_html += f'<p style="{_hi_sub}">{pfx}&nbsp;&nbsp;{body}</p>'
+            else:
+                isi_html += f'<p style="{_hi_cont}">{body}</p>'
+        isi_html += '<p style="margin:0 0 4px 0"></p>'
 
     n = 'style="margin:6px 0;line-height:1.6"'
     # Ruj.Kami+Tarikh right-aligned, then address left — per template
