@@ -1220,8 +1220,9 @@ const _FIELD_DEFS = {
     'Nama Pegawai Yang Terlibat':             { type: 'pegawai-list', ph: '' },
     'Jawatan Pegawai Yang Terlibat':          { type: '_skip', ph: '' },
     'Objektif Program':                       { type: 'textarea', ph: 'Nyatakan objektif program...', rows: 3 },
-    'Isi Kandungan':                          { type: 'textarea', ph: 'Isi kandungan surat...', rows: 4 },
-    'Isi Kandungan Utama':                    { type: 'textarea', ph: 'Isi kandungan surat...', rows: 4 },
+    'Isi Kandungan':                          { type: 'textarea', ph: 'Isi kandungan surat...', rows: 6, expandable: true },
+    'Isi Kandungan Utama':                    { type: 'textarea', ph: 'Isi kandungan surat...', rows: 6, expandable: true },
+    'Isi Kandungan Utama (pisahkan perenggan dengan baris kosong)': { type: 'textarea', ph: 'Isi kandungan surat...', rows: 6, expandable: true },
     'Rumusan / Laporan Ringkas':              { type: 'textarea', ph: 'Rumusan program (pilihan — boleh dijana automatik)...', rows: 3 },
     'Cadangan / Tindakan Susulan':            { type: 'textarea', ph: 'Cadangan (pilihan — boleh dijana automatik)...', rows: 3 },
     'Nama Penyedia Laporan':                  { type: 'text',     ph: 'cth: Ahmad bin Ali' },
@@ -1311,7 +1312,9 @@ function _buildMissingFieldsForm(missingLabels) {
         if (isWide) {
             let widget = '';
             if (def.type === 'textarea') {
-                widget = `<textarea class="ff-input" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}" rows="${def.rows || 2}"></textarea>`;
+                const taClass = def.expandable ? 'ff-input ff-expandable' : 'ff-input';
+                const taOnInput = def.expandable ? ' oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'"' : '';
+                widget = `<textarea class="${taClass}" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}" rows="${def.rows || 2}"${taOnInput}></textarea>`;
             } else {
                 const addLabel = def.type === 'pegawai-list' ? '＋ Tambah Pegawai' : '＋ Tambah Ahli';
                 const namaPh  = def.type === 'pegawai-list' ? 'Nama pegawai' : 'Nama ahli';

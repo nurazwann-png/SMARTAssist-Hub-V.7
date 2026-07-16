@@ -678,7 +678,8 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 .ff-input:focus { outline: none; border-color: #6366f1; background: #fff; }
 .ff-input:disabled { opacity: 0.5; cursor: not-allowed; }
 .ff-date { cursor: pointer; }
-textarea.ff-input { min-height: 52px; }
+textarea.ff-input { min-height: 52px; overflow-y: hidden; }
+textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
 .ff-submit-row td { padding-top: 8px !important; }
 .ff-submit-btn {
     padding: 7px 16px; border: none; border-radius: 7px;
