@@ -207,9 +207,9 @@ async def upload(file: UploadFile = File(...), session_id: str = Form("default")
 
 
 def _text_to_review_html(text: str) -> str:
-    """Wrap extracted plain text (e.g. from a PDF) into simple paragraph HTML so
-    the document reviewer can show the same editable, badge-annotated preview it
-    gives Word uploads. Each line becomes a <p> so inline issue-badges map per line."""
+    """Fallback: wrap extracted plain text into simple paragraph HTML when the
+    layout-aware PDF reconstruction is unavailable. Each line becomes a <p> so
+    inline issue-badges map per line."""
     import html as _html
     parts = ['<div style="font-family:Arial,sans-serif;font-size:12pt;line-height:1.6;color:#000">']
     for ln in text.split("\n"):
@@ -220,6 +220,60 @@ def _text_to_review_html(text: str) -> str:
             parts.append(f'<p style="margin:6px 0">{_html.escape(s)}</p>')
     parts.append('</div>')
     return "".join(parts)
+
+
+def _pdf_page_lines(page):
+    """Reconstruct a PDF page's lines with alignment/bold/spacing from word
+    positions, so the reviewer preview keeps the uploaded letter's format
+    (right/centre alignment, bold headings, paragraph spacing)."""
+    import statistics
+    words = page.extract_words(use_text_flow=False, keep_blank_chars=False,
+                               extra_attrs=["fontname"])
+    if not words:
+        return []
+    groups = {}
+    for w in words:
+        groups.setdefault(round(w["top"]), []).append(w)
+    body_left = min(w["x0"] for w in words)
+    right_edge = max(w["x1"] for w in words)
+    tops = sorted(groups)
+    deltas = [b - a for a, b in zip(tops, tops[1:])]
+    pitch = statistics.median(deltas) if deltas else 16.0
+    out = []
+    prev_top = None
+    for top in tops:
+        ws = sorted(groups[top], key=lambda w: w["x0"])
+        x0 = min(w["x0"] for w in ws); x1 = max(w["x1"] for w in ws)
+        left_gap = x0 - body_left; right_gap = right_edge - x1
+        align = "left" if left_gap < 15 else ("right" if right_gap < 15 else "center")
+        bold = sum(1 for w in ws if "Bold" in (w.get("fontname") or "")) >= max(1, len(ws) // 2)
+        blanks = 0
+        if prev_top is not None and pitch:
+            blanks = min(2, max(0, round((top - prev_top) / pitch) - 1))
+        prev_top = top
+        out.append({
+            "text": " ".join(w["text"] for w in ws),
+            "align": align, "bold": bold, "blanks": blanks,
+        })
+    return out
+
+
+def _pdf_to_review_html(pdf) -> str:
+    """Build editable, format-preserving review HTML from an open pdfplumber PDF."""
+    import html as _html
+    parts = ['<div style="font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;color:#000">']
+    any_line = False
+    for page in pdf.pages:
+        for ln in _pdf_page_lines(page):
+            any_line = True
+            for _ in range(ln["blanks"]):
+                parts.append('<p style="margin:0;line-height:1.4">&nbsp;</p>')
+            body = _html.escape(ln["text"])
+            if ln["bold"]:
+                body = f"<b>{body}</b>"
+            parts.append(f'<p style="margin:2px 0;text-align:{ln["align"]}">{body}</p>')
+    parts.append("</div>")
+    return "".join(parts) if any_line else ""
 
 
 @app.post("/api/review/upload")
@@ -242,12 +296,15 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
             import pdfplumber
             with pdfplumber.open(_io.BytesIO(raw)) as pdf:
                 pages = [p.extract_text() or "" for p in pdf.pages]
+                # Reconstruct layout (alignment, bold, spacing) so the editable
+                # preview keeps the uploaded letter's format instead of flattening
+                # it to plain left-aligned paragraphs.
+                doc_html = _pdf_to_review_html(pdf)
             text = "\n".join(p for p in pages if p.strip())
             doc_type = "PDF"
-            # Build editable HTML from the extracted text so the PDF gets the
-            # same annotated/editable review flow (and corrected-.docx download)
-            # as a Word upload, instead of a read-only iframe embed.
-            doc_html = _text_to_review_html(text) if text.strip() else None
+            # Fallback to plain-text HTML only if layout reconstruction found nothing.
+            if not doc_html and text.strip():
+                doc_html = _text_to_review_html(text)
         elif ext in (".docx", ".doc"):
             # mammoth for rich HTML preview (preserves tables, bold, etc.)
             import mammoth
