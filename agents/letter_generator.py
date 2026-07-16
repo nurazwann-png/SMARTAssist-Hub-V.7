@@ -801,52 +801,58 @@ def build_docx(session_id: str) -> bytes | None:
             for p in reg_header.paragraphs:
                 p.clear()
 
-            # Footer: ..{PAGE+1}/- on every page
-            def _add_page_cont_footer(ftr):
-                ftr.is_linked_to_previous = False
-                para = ftr.paragraphs[0]
-                para.clear()
-                para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                para.paragraph_format.space_before = Pt(0)
-                para.paragraph_format.space_after = Pt(0)
-                p = para._p
+            def _r(*kids):
+                r = _OxmlElement('w:r')
+                for k in kids: r.append(k)
+                return r
 
-                def _r(*kids):
-                    r = _OxmlElement('w:r')
-                    for k in kids: r.append(k)
-                    return r
+            def _rpr():
+                rpr = _OxmlElement('w:rPr')
+                for tag in ('w:sz', 'w:szCs'):
+                    el = _OxmlElement(tag); el.set(_qn('w:val'), '20'); rpr.append(el)
+                return rpr
 
-                def _rpr():
-                    rpr = _OxmlElement('w:rPr')
-                    for tag in ('w:sz', 'w:szCs'):
-                        el = _OxmlElement(tag); el.set(_qn('w:val'), '20'); rpr.append(el)
-                    return rpr
+            def _fc(typ, dirty=False):
+                fc = _OxmlElement('w:fldChar'); fc.set(_qn('w:fldCharType'), typ)
+                if dirty: fc.set(_qn('w:dirty'), 'true')
+                return fc
 
-                def _fc(typ, dirty=False):
-                    fc = _OxmlElement('w:fldChar'); fc.set(_qn('w:fldCharType'), typ)
-                    if dirty: fc.set(_qn('w:dirty'), 'true')
-                    return fc
+            def _instr(s):
+                it = _OxmlElement('w:instrText'); it.set(_qn('xml:space'), 'preserve'); it.text = s; return it
 
-                def _instr(s):
-                    it = _OxmlElement('w:instrText'); it.set(_qn('xml:space'), 'preserve'); it.text = s; return it
+            def _t(s):
+                t = _OxmlElement('w:t'); t.set(_qn('xml:space'), 'preserve'); t.text = s; return t
 
-                def _t(s):
-                    t = _OxmlElement('w:t'); t.set(_qn('xml:space'), 'preserve'); t.text = s; return t
+            # Page 1 footer: ..{PAGE+1}/- right-aligned
+            fp_ftr = section.first_page_footer
+            fp_ftr.is_linked_to_previous = False
+            para1 = fp_ftr.paragraphs[0]
+            para1.clear()
+            para1.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            para1.paragraph_format.space_before = Pt(0)
+            para1.paragraph_format.space_after = Pt(0)
+            p1 = para1._p
+            p1.append(_r(_rpr(), _t('..')))
+            p1.append(_r(_fc('begin', dirty=True)))
+            p1.append(_r(_instr(' = ')))
+            p1.append(_r(_fc('begin'))); p1.append(_r(_instr(' PAGE ')))
+            p1.append(_r(_fc('separate'))); p1.append(_r(_t('1'))); p1.append(_r(_fc('end')))
+            p1.append(_r(_instr(r' + 1 \# "0" ')))
+            p1.append(_r(_fc('separate'))); p1.append(_r(_t('2'))); p1.append(_r(_fc('end')))
+            p1.append(_r(_rpr(), _t('/-')))
 
-                # ".." prefix
-                p.append(_r(_rpr(), _t('..')))
-                # { = { PAGE } + 1 \# "0" }
-                p.append(_r(_fc('begin', dirty=True)))
-                p.append(_r(_instr(' = ')))
-                p.append(_r(_fc('begin'))); p.append(_r(_instr(' PAGE ')))
-                p.append(_r(_fc('separate'))); p.append(_r(_t('1'))); p.append(_r(_fc('end')))
-                p.append(_r(_instr(r' + 1 \# "0" ')))
-                p.append(_r(_fc('separate'))); p.append(_r(_t('2'))); p.append(_r(_fc('end')))
-                # "/-" suffix
-                p.append(_r(_rpr(), _t('/-')))
-
-            _add_page_cont_footer(section.first_page_footer)
-            _add_page_cont_footer(section.footer)
+            # Pages 2+ footer: centred page number { PAGE }
+            reg_ftr = section.footer
+            reg_ftr.is_linked_to_previous = False
+            para2 = reg_ftr.paragraphs[0]
+            para2.clear()
+            para2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            para2.paragraph_format.space_before = Pt(0)
+            para2.paragraph_format.space_after = Pt(0)
+            p2 = para2._p
+            p2.append(_r(_fc('begin', dirty=True)))
+            p2.append(_r(_instr(' PAGE ')))
+            p2.append(_r(_fc('separate'))); p2.append(_r(_t('2'))); p2.append(_r(_fc('end')))
     except Exception:
         pass
 
