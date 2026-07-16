@@ -393,6 +393,225 @@ Teks dokumen:
     })
 
 
+def _render_html_to_pdf(html_content: str) -> bytes:
+    """Render the document-preview HTML into a PDF using reportlab.
+
+    Supports the subset of HTML the app produces: <img> (letterhead), <hr>,
+    <p style="..."> with text-align / margin / padding-left / text-indent /
+    font-weight / line-height, inline <b>/<i>/<u>/<br>, headings, lists and
+    tables. Mirrors the on-screen preview so the PDF matches the .docx output.
+    """
+    import io as _io
+    import re as _re
+    import base64 as _b64
+    from bs4 import BeautifulSoup, NavigableString
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER, TA_JUSTIFY
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Image as RLImage,
+        Table, TableStyle, HRFlowable,
+    )
+    from reportlab.lib.styles import ParagraphStyle
+
+    FONT_PT = 12.0
+    MARGIN = 25.4 * mm
+    CONTENT_W = A4[0] - 2 * MARGIN
+
+    def _css_len(val, font_pt=FONT_PT):
+        if not val:
+            return 0.0
+        m = _re.match(r'^\s*(-?[\d.]+)\s*(em|rem|px|pt)?\s*$', val)
+        if not m:
+            return 0.0
+        num = float(m.group(1)); unit = m.group(2) or 'px'
+        if unit in ('em', 'rem'):
+            return num * font_pt
+        if unit == 'px':
+            return num * 0.75
+        return num
+
+    def _parse_style(s):
+        d = {}
+        for part in (s or '').split(';'):
+            if ':' in part:
+                k, v = part.split(':', 1)
+                d[k.strip().lower()] = v.strip()
+        return d
+
+    def _margin_tb(val):
+        toks = (val or '').split()
+        v = [_css_len(t) for t in toks]
+        if not v:
+            return 0.0, 0.0
+        if len(v) == 1:
+            return v[0], v[0]
+        if len(v) == 2:
+            return v[0], v[0]
+        if len(v) == 3:
+            return v[0], v[2]
+        return v[0], v[2]
+
+    def _esc(t):
+        return t.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+    def _inline(node):
+        out = []
+        for c in node.children:
+            if isinstance(c, NavigableString):
+                out.append(_esc(str(c)))
+            else:
+                nm = (c.name or '').lower()
+                inner = _inline(c)
+                if nm in ('b', 'strong'):
+                    out.append(f'<b>{inner}</b>')
+                elif nm in ('i', 'em'):
+                    out.append(f'<i>{inner}</i>')
+                elif nm == 'u':
+                    out.append(f'<u>{inner}</u>')
+                elif nm == 'br':
+                    out.append('<br/>')
+                else:
+                    out.append(inner)
+        return ''.join(out)
+
+    def _para_style(st, default_size=FONT_PT, bold_default=False):
+        align = {'right': TA_RIGHT, 'center': TA_CENTER,
+                 'justify': TA_JUSTIFY, 'left': TA_LEFT}.get(
+            st.get('text-align', 'left'), TA_LEFT)
+        lh = st.get('line-height', '')
+        leading = (float(lh) * default_size) if _re.match(r'^[\d.]+$', lh or '') else default_size * 1.4
+        bold = bold_default or st.get('font-weight', '') in ('bold', '700')
+        mt, mb = _margin_tb(st.get('margin', ''))
+        return ParagraphStyle(
+            'p',
+            fontName='Helvetica-Bold' if bold else 'Helvetica',
+            fontSize=default_size,
+            leading=leading,
+            alignment=align,
+            leftIndent=_css_len(st.get('padding-left', '0')),
+            firstLineIndent=_css_len(st.get('text-indent', '0')),
+            spaceBefore=mt,
+            spaceAfter=mb,
+        )
+
+    def _make_image(img):
+        src = img.get('src', '') or ''
+        raw = None
+        try:
+            if src.startswith('data:'):
+                b64 = src.split(',', 1)[1]
+                raw = _b64.b64decode(b64)
+            elif '/api/letterhead/image/' in src:
+                from backend.letterhead_store import _LH_DIR
+                fn = src.rsplit('/', 1)[-1]
+                p = _LH_DIR / fn
+                if p.exists():
+                    raw = p.read_bytes()
+            if not raw:
+                return None
+            from PIL import Image as _PIL
+            bio = _io.BytesIO(raw)
+            im = _PIL.open(bio)
+            iw, ih = im.size
+            # Normalise to PNG so reportlab always reads it
+            png = _io.BytesIO()
+            im.convert('RGBA').save(png, format='PNG')
+            png.seek(0)
+            max_h = 150 * 0.75  # 150px cap, matches preview max-height
+            ratio = iw / ih if ih else 1
+            h = min(max_h, ih * 0.75)
+            w = h * ratio
+            if w > CONTENT_W:
+                w = CONTENT_W
+                h = w / ratio
+            rl = RLImage(png, width=w, height=h)
+            rl.hAlign = 'CENTER'
+            return rl
+        except Exception:
+            return None
+
+    def _make_table(tbl):
+        rows = []
+        for tr in tbl.find_all('tr'):
+            cells = tr.find_all(['td', 'th'])
+            if cells:
+                rows.append([Paragraph(_inline(c) or '&nbsp;',
+                             _para_style(_parse_style(c.get('style', '')), 11.0,
+                                         bold_default=(c.name == 'th'))) for c in cells])
+        if not rows:
+            return None
+        t = Table(rows, hAlign='LEFT', colWidths=[CONTENT_W / len(rows[0])] * len(rows[0]))
+        t.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 0.75, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        return t
+
+    flow = []
+
+    def _walk(node):
+        for c in node.children:
+            if isinstance(c, NavigableString):
+                continue
+            nm = (c.name or '').lower()
+            if nm == 'img':
+                el = _make_image(c)
+                if el:
+                    flow.append(el)
+            elif nm == 'hr':
+                flow.append(HRFlowable(width='100%', thickness=1.5,
+                                       color=colors.black, spaceBefore=4, spaceAfter=8))
+            elif nm == 'br':
+                flow.append(Spacer(1, FONT_PT))
+            elif nm == 'p':
+                txt = _inline(c).strip()
+                st = _parse_style(c.get('style', ''))
+                if not txt:
+                    mt, mb = _margin_tb(st.get('margin', ''))
+                    flow.append(Spacer(1, max(6.0, mt + mb)))
+                else:
+                    flow.append(Paragraph(txt, _para_style(st)))
+            elif nm in ('h1', 'h2', 'h3', 'h4'):
+                size = {'h1': 18, 'h2': 15, 'h3': 13, 'h4': 12}[nm]
+                st = _parse_style(c.get('style', ''))
+                flow.append(Paragraph(_inline(c) or '&nbsp;',
+                                      _para_style(st, size, bold_default=True)))
+            elif nm in ('ul', 'ol'):
+                ordered = nm == 'ol'
+                for i, li in enumerate(c.find_all('li', recursive=False), 1):
+                    bullet = f'{i}.' if ordered else '•'
+                    ps = ParagraphStyle('li', fontName='Helvetica', fontSize=FONT_PT,
+                                        leading=FONT_PT * 1.4, leftIndent=18,
+                                        firstLineIndent=-12, spaceAfter=2)
+                    flow.append(Paragraph(f'{bullet}&nbsp;&nbsp;{_inline(li)}', ps))
+            elif nm == 'table':
+                el = _make_table(c)
+                if el:
+                    flow.append(el)
+            elif nm in ('div', 'body', 'html', 'span', 'section', 'article'):
+                _walk(c)
+            else:
+                _walk(c)
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+    root = soup.body or soup
+    _walk(root)
+    if not flow:
+        flow.append(Paragraph('&nbsp;', ParagraphStyle('e', fontName='Helvetica', fontSize=FONT_PT)))
+
+    out = _io.BytesIO()
+    doc = SimpleDocTemplate(out, pagesize=A4, leftMargin=MARGIN, rightMargin=MARGIN,
+                            topMargin=MARGIN, bottomMargin=MARGIN)
+    doc.build(flow)
+    return out.getvalue()
+
+
 @app.post("/api/export/pdf")
 async def export_pdf(request: Request):
     """Convert HTML content to PDF and return as direct download (no print dialog)."""
@@ -408,31 +627,15 @@ async def export_pdf(request: Request):
         if not html_content.strip():
             return JSONResponse({"ok": False, "error": "Tiada kandungan HTML."}, status_code=400)
 
-        full_html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<style>
-@page {{ size: A4; margin: 25.4mm; }}
-body {{ font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin: 0; color: #000; }}
-table {{ border-collapse: collapse; width: 100%; }}
-td, th {{ border: 1px solid #000; padding: 5px 8px; font-size: 11pt; }}
-pre {{ white-space: pre-wrap; font-family: Arial, sans-serif; font-size: 12pt; }}
-img {{ max-width: 100%; }}
-h1,h2,h3 {{ font-family: Arial, sans-serif; }}
-</style></head><body>{html_content}</body></html>"""
-
-        import io as _io
-        from xhtml2pdf import pisa
-        pdf_buffer = _io.BytesIO()
-        result = pisa.CreatePDF(_io.StringIO(full_html), dest=pdf_buffer, encoding='utf-8')
-        if result.err:
-            return JSONResponse({"ok": False, "error": "Gagal hasilkan PDF."}, status_code=500)
-        pdf_bytes = pdf_buffer.getvalue()
+        pdf_bytes = _render_html_to_pdf(html_content)
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
