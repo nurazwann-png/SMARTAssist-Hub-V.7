@@ -206,6 +206,22 @@ async def upload(file: UploadFile = File(...), session_id: str = Form("default")
     return JSONResponse(result)
 
 
+def _text_to_review_html(text: str) -> str:
+    """Wrap extracted plain text (e.g. from a PDF) into simple paragraph HTML so
+    the document reviewer can show the same editable, badge-annotated preview it
+    gives Word uploads. Each line becomes a <p> so inline issue-badges map per line."""
+    import html as _html
+    parts = ['<div style="font-family:Arial,sans-serif;font-size:12pt;line-height:1.6;color:#000">']
+    for ln in text.split("\n"):
+        s = ln.strip()
+        if not s:
+            parts.append('<p style="margin:6px 0">&nbsp;</p>')
+        else:
+            parts.append(f'<p style="margin:6px 0">{_html.escape(s)}</p>')
+    parts.append('</div>')
+    return "".join(parts)
+
+
 @app.post("/api/review/upload")
 async def review_upload(file: UploadFile = File(...), session_id: str = Form("default")):
     """Extract text from PDF or DOCX and store in document reviewer session."""
@@ -228,7 +244,10 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
                 pages = [p.extract_text() or "" for p in pdf.pages]
             text = "\n".join(p for p in pages if p.strip())
             doc_type = "PDF"
-            doc_html = None  # client uses URL.createObjectURL on the uploaded file
+            # Build editable HTML from the extracted text so the PDF gets the
+            # same annotated/editable review flow (and corrected-.docx download)
+            # as a Word upload, instead of a read-only iframe embed.
+            doc_html = _text_to_review_html(text) if text.strip() else None
         elif ext in (".docx", ".doc"):
             # mammoth for rich HTML preview (preserves tables, bold, etc.)
             import mammoth
@@ -286,8 +305,10 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
         "char_count": len(text),
         "preview": text[:300],
         "text": text,
-        "html": doc_html,   # rich HTML (DOCX) or PDF data-URI
-        "is_pdf": ext == ".pdf",
+        "html": doc_html,   # rich HTML (DOCX) or paragraph HTML (PDF)
+        # Only fall back to the read-only PDF iframe if we could not build HTML;
+        # when HTML is available the PDF uses the same editable path as Word.
+        "is_pdf": ext == ".pdf" and doc_html is None,
     })
 
 
