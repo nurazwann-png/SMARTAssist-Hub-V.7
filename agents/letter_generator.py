@@ -849,36 +849,45 @@ def build_docx(session_id: str) -> bytes | None:
             def _t(s):
                 t = _OxmlElement('w:t'); t.set(_qn('xml:space'), 'preserve'); t.text = s; return t
 
-            # Page 1 footer: ..{PAGE+1}/- right-aligned
-            fp_ftr = section.first_page_footer
-            fp_ftr.is_linked_to_previous = False
-            para1 = fp_ftr.paragraphs[0]
-            para1.clear()
-            para1.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            para1.paragraph_format.space_before = Pt(0)
-            para1.paragraph_format.space_after = Pt(0)
-            p1 = para1._p
-            p1.append(_r(_rpr(), _t('..')))
-            p1.append(_r(_fc('begin', dirty=True)))
-            p1.append(_r(_instr(' = ')))
-            p1.append(_r(_fc('begin'))); p1.append(_r(_instr(' PAGE ')))
-            p1.append(_r(_fc('separate'))); p1.append(_r(_t('1'))); p1.append(_r(_fc('end')))
-            p1.append(_r(_instr(r' + 1 \# "0" ')))
-            p1.append(_r(_fc('separate'))); p1.append(_r(_t('2'))); p1.append(_r(_fc('end')))
-            p1.append(_r(_rpr(), _t('/-')))
+            # Estimate if document will be multi-page (>1 page needs footer)
+            _sess_fields = session.get("fields", {}) if session else {}
+            _isi_raw_est = _sess_fields.get('isi', '')
+            _isi_paras_est = [_strip_para_num(p.strip()) for p in _isi_raw_est.split('\n\n') if p.strip()] if _isi_raw_est else []
+            _total_isi_lines_est = sum(len(_split_isi_lines(p)) for p in _isi_paras_est)
+            _is_multipage = _total_isi_lines_est > 8
 
-            # Pages 2+ footer: centred page number { PAGE }
-            reg_ftr = section.footer
-            reg_ftr.is_linked_to_previous = False
-            para2 = reg_ftr.paragraphs[0]
-            para2.clear()
-            para2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            para2.paragraph_format.space_before = Pt(0)
-            para2.paragraph_format.space_after = Pt(0)
-            p2 = para2._p
-            p2.append(_r(_fc('begin', dirty=True)))
-            p2.append(_r(_instr(' PAGE ')))
-            p2.append(_r(_fc('separate'))); p2.append(_r(_t('2'))); p2.append(_r(_fc('end')))
+            # Page 1 footer: ..{PAGE+1}/- right-aligned — only for multi-page docs
+            if _is_multipage:
+                fp_ftr = section.first_page_footer
+                fp_ftr.is_linked_to_previous = False
+                para1 = fp_ftr.paragraphs[0]
+                para1.clear()
+                para1.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                para1.paragraph_format.space_before = Pt(0)
+                para1.paragraph_format.space_after = Pt(0)
+                p1 = para1._p
+                p1.append(_r(_rpr(), _t('..')))
+                p1.append(_r(_fc('begin', dirty=True)))
+                p1.append(_r(_instr(' = ')))
+                p1.append(_r(_fc('begin'))); p1.append(_r(_instr(' PAGE ')))
+                p1.append(_r(_fc('separate'))); p1.append(_r(_t('1'))); p1.append(_r(_fc('end')))
+                p1.append(_r(_instr(r' + 1 \# "0" ')))
+                p1.append(_r(_fc('separate'))); p1.append(_r(_t('2'))); p1.append(_r(_fc('end')))
+                p1.append(_r(_rpr(), _t('/-')))
+
+            # Pages 2+ footer: centred page number { PAGE } — only for multi-page docs
+            if _is_multipage:
+                reg_ftr = section.footer
+                reg_ftr.is_linked_to_previous = False
+                para2 = reg_ftr.paragraphs[0]
+                para2.clear()
+                para2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                para2.paragraph_format.space_before = Pt(0)
+                para2.paragraph_format.space_after = Pt(0)
+                p2 = para2._p
+                p2.append(_r(_fc('begin', dirty=True)))
+                p2.append(_r(_instr(' PAGE ')))
+                p2.append(_r(_fc('separate'))); p2.append(_r(_t('2'))); p2.append(_r(_fc('end')))
     except Exception:
         pass
 
@@ -997,21 +1006,25 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
             r.font.size = Pt(12)
             return p
 
+        total_isi_lines = sum(len(_split_isi_lines(p)) for p in isi_paras)
+
         for i, para_text in enumerate(isi_paras):
             lines = _split_isi_lines(para_text)
             if not lines:
                 continue
-            # Main numbered paragraph — hanging indent at 1.25cm
             _, first_body, _ = lines[0]
-            _add_isi_para(f"{i+2}.\t{first_body}", left_cm=1.25, hanging_cm=1.25)
-            # Sub/continuation lines
-            for pfx, body, is_sub in lines[1:]:
-                if is_sub:
-                    # Sub-item: indented further, hanging for its own prefix
-                    _add_isi_para(f"{pfx}\t{body}", left_cm=2.5, hanging_cm=1.25)
-                else:
-                    # Plain continuation — indent aligned with main text
-                    _add_isi_para(body, left_cm=1.25, hanging_cm=0)
+            has_children = len(lines) > 1
+            if has_children:
+                # Has sub-items/continuations — use hanging indent
+                _add_isi_para(f"{i+2}.\t{first_body}", left_cm=1.25, hanging_cm=1.25)
+                for pfx, body, is_sub in lines[1:]:
+                    if is_sub:
+                        _add_isi_para(f"{pfx}\t{body}", left_cm=2.5, hanging_cm=1.25)
+                    else:
+                        _add_isi_para(body, left_cm=1.25, hanging_cm=0)
+            else:
+                # Plain paragraph — no hanging indent
+                _add_isi_para(f"{i+2}.\t{first_body}", left_cm=0, hanging_cm=0)
             doc.add_paragraph("")
 
         _p("Sekian, terima kasih.", align=WD_ALIGN_PARAGRAPH.JUSTIFY)
@@ -1265,13 +1278,17 @@ def _build_surat_html(f: dict) -> str:
             continue
         # First line — main paragraph number
         first_pfx, first_body, _ = lines[0]
-        first_text = f"{first_body}" if first_pfx else first_body
-        isi_html += f'<p style="{_hi_main}">{i+2}.&nbsp;&nbsp;{first_text}</p>'
-        for pfx, body, is_sub in lines[1:]:
-            if is_sub:
-                isi_html += f'<p style="{_hi_sub}">{pfx}&nbsp;&nbsp;{body}</p>'
-            else:
-                isi_html += f'<p style="{_hi_cont}">{body}</p>'
+        has_children = len(lines) > 1
+        if has_children:
+            isi_html += f'<p style="{_hi_main}">{i+2}.&nbsp;&nbsp;{first_body}</p>'
+            for pfx, body, is_sub in lines[1:]:
+                if is_sub:
+                    isi_html += f'<p style="{_hi_sub}">{pfx}&nbsp;&nbsp;{body}</p>'
+                else:
+                    isi_html += f'<p style="{_hi_cont}">{body}</p>'
+        else:
+            _plain = 'margin:6px 0;line-height:1.6;text-align:justify'
+            isi_html += f'<p style="{_plain}">{i+2}.&nbsp;&nbsp;&nbsp;&nbsp;{first_body}</p>'
         isi_html += '<p style="margin:0 0 4px 0"></p>'
 
     n = 'style="margin:6px 0;line-height:1.6"'
