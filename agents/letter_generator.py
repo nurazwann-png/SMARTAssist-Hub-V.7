@@ -27,7 +27,7 @@ SURAT_FIELDS = {
         {"key": "penandatangan_nama", "label": "Nama Penandatangan", "example": "Ahmad bin Ali"},
         {"key": "penandatangan_jawatan", "label": "Jawatan Penandatangan", "example": "Pegawai Pendidikan Daerah"},
         {"key": "pegawai_dihubungi", "label": "Pegawai Untuk Dihubungi", "example": "Puan Farah binti Zainudin, 084-123456", "optional": True},
-        {"key": "nama_pejabat", "label": "Nama Pejabat / Unit", "example": "Pejabat Pendidikan Daerah Dalat", "optional": True},
+        {"key": "nama_pejabat", "label": "Nama Pejabat / Unit", "example": "Pejabat Pendidikan Daerah Dalat"},
         {"key": "nama_organisasi", "label": "Nama Organisasi Penandatangan", "example": "Kementerian Pendidikan Malaysia", "optional": True},
         {"key": "salinan_kepada", "label": "Salinan Kepada (s.k.)", "example": "Pengarah JPN, Ketua Unit ICT", "optional": True},
     ],
@@ -242,21 +242,43 @@ def inject_pdf_context(session_id: str, fields: dict, doc_type: str) -> None:
     field_map = dict(fields)
     if "isi_pemakluman" in field_map:
         field_map["isi"] = field_map.pop("isi_pemakluman")
+
+    # Simpan rujukan & tarikh dari PDF sebagai rujukan_asal/tarikh_asal (untuk ayat pemakluman)
+    # Kosongkan rujukan supaya pengguna isi sendiri Ruj. Kami mereka
+    rujukan_asal = str(field_map.get("rujukan", "") or "").strip()
+    tarikh_asal  = str(field_map.get("tarikh", "") or "").strip()
+    if rujukan_asal:
+        session["fields"]["rujukan_asal"] = rujukan_asal
+    if tarikh_asal:
+        session["fields"]["tarikh_asal"] = tarikh_asal
+    # Jangan pra-isi rujukan & tarikh — pengguna perlu isi Ruj. Kami & tarikh surat baharu mereka
+    field_map.pop("rujukan", None)
+    field_map.pop("tarikh", None)
+
     for k, v in field_map.items():
         if v and str(v).strip():
             session["fields"][k] = str(v).strip()
+
+    # Bina ayat wajib pemakluman dan prepend ke isi
+    ref_part  = f"No. Ruj: {rujukan_asal}" if rujukan_asal else "surat tersebut"
+    date_part = f", bertarikh {tarikh_asal}" if tarikh_asal else ""
+    ayat_wajib = f"Merujuk kepada surat {ref_part}{date_part}, adalah dimaklumkan perkara berikut untuk makluman dan tindakan pihak tuan/puan."
+
     # Fallback: jana isi asas dari tajuk jika isi_pemakluman tiada
     if not session["fields"].get("isi"):
         tajuk = session["fields"].get("tajuk", "")
-        rujukan = session["fields"].get("rujukan", "")
-        rujukan_text = f" (Ruj: {rujukan})" if rujukan else ""
         fallback_isi = (
-            f"Adalah dimaklumkan bahawa pihak kami telah menerima surat{rujukan_text} "
-            f"berkenaan {tajuk.replace('PEMAKLUMAN: ', '') if tajuk else 'perkara di atas'}. "
+            f"Adalah dimaklumkan bahawa pihak kami telah menerima surat berkenaan "
+            f"{tajuk.replace('PEMAKLUMAN: ', '') if tajuk else 'perkara di atas'}. "
             f"Sehubungan dengan itu, perkara ini dimaklumkan kepada pihak tuan/puan untuk "
             f"makluman dan tindakan selanjutnya."
         )
         session["fields"]["isi"] = fallback_isi
+
+    # Prepend ayat wajib ke isi (hanya jika belum ada)
+    isi_semasa = session["fields"].get("isi", "")
+    if "Merujuk kepada surat" not in isi_semasa:
+        session["fields"]["isi"] = ayat_wajib + "\n\n" + isi_semasa
     # Flag untuk beritahu AI bahawa ada konteks dari PDF (surat pemakluman)
     session["pdf_context"] = True
     session["is_pemakluman"] = True
@@ -271,7 +293,20 @@ def _get_field_schema(doc_type: str) -> list[dict]:
 
 def _find_missing_fields(doc_type: str, collected: dict) -> list[dict]:
     schema = _get_field_schema(doc_type)
-    return [f for f in schema if not f.get("optional") and (f["key"] not in collected or not collected[f["key"]])]
+    base = [f for f in schema if not f.get("optional") and (f["key"] not in collected or not collected[f["key"]])]
+    # When penerima is missing, inject penerima_organisasi/penerima_alamat right after it
+    # so the form renders them as hideable fields (JS shows/hides based on penerima value)
+    if doc_type == "surat" and any(f["key"] == "penerima" for f in base):
+        extras = [f for f in schema if f["key"] in ("penerima_organisasi", "penerima_alamat")
+                  and not collected.get(f["key"])]
+        if extras:
+            result = []
+            for f in base:
+                result.append(f)
+                if f["key"] == "penerima":
+                    result.extend(extras)
+            return result
+    return base
 
 
 def _has_placeholders(text: str) -> list[str]:
@@ -513,12 +548,14 @@ Pengguna telah memuat naik dokumen PDF rasmi. Sistem telah menganalisis dokumen 
 
 PERATURAN WAJIB — JANGAN LANGGAR:
 1. Field "isi" TELAH DIJANA AUTOMATIK dari kandungan PDF. JANGAN tanya pengguna untuk isi kandungan surat. JANGAN minta pengguna tulis atau masukkan isi. Gunakan terus nilai "isi" yang telah ada.
-2. Field "tajuk", "rujukan", "tarikh", "penerima", "penerima_organisasi" jika sudah ada — JANGAN tanya semula.
+2. Field "tajuk", "penerima", "penerima_organisasi" jika sudah ada — JANGAN tanya semula.
 3. Ini adalah SURAT PEMAKLUMAN. Tajuk MESTI bermula dengan "PEMAKLUMAN:".
+4. Field "rujukan" dan "tarikh" TIDAK ADA dalam fields_collected kerana pengguna perlu isi Ruj. Kami dan tarikh surat baharu mereka sendiri. WAJIB tanya kedua-dua field ini.
 
 Field yang MASIH PERLU ditanya daripada pengguna (hanya yang belum ada nilai):
+- Nombor rujukan surat baharu (rujukan) — Ruj. Kami pengguna, BUKAN rujukan surat asal PDF
+- Tarikh surat baharu (tarikh) — tarikh surat baharu yang akan dijana, BUKAN tarikh surat asal PDF
 - Penerima (penerima) — nama/jawatan/organisasi penerima jika belum ada
-- Alamat penerima (penerima_alamat) — jika belum ada
 - Nama penandatangan (penandatangan_nama) — jika belum ada
 - Jawatan penandatangan (penandatangan_jawatan) — jika belum ada
 - Pegawai untuk dihubungi (pegawai_dihubungi) — nama dan nombor telefon pegawai hubungan
@@ -631,9 +668,24 @@ Status sesi semasa:
             parsed["ready_to_save"] = True
             session["document"] = doc_text
 
+    # form_extras: optional fields that should appear in the form but don't block generation
+    form_extras: list[str] = []
+    if session.get("doc_type") == "surat":
+        import re as _re
+        penerima_val = str(session["fields"].get("penerima", "") or "").strip()
+        is_specific_penerima = penerima_val and not _re.search(
+            r'senarai\s*edaran|^semua|^rujuk|^\s*sk\b|^\s*smk\b', penerima_val, _re.IGNORECASE
+        )
+        if is_specific_penerima:
+            surat_schema = _get_field_schema("surat")
+            for f in surat_schema:
+                if f["key"] in ("penerima_organisasi", "penerima_alamat") and not (session["fields"].get(f["key"])):
+                    form_extras.append(f["label"])
+
     parsed["fields_status"] = {
         "collected": session["fields"],
         "missing": [f["label"] for f in _find_missing_fields(session["doc_type"], session["fields"])] if session["doc_type"] else [],
+        "form_extras": form_extras,
     }
 
     _save_session(session_id, session)

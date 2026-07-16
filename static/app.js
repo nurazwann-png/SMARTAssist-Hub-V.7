@@ -1475,6 +1475,9 @@ function _submitFieldsForm(fid) {
     if (!form) return;
     const parts = [];
     form.querySelectorAll('[data-label]').forEach(el => {
+        // Skip fields inside hidden rows
+        const parentRow = el.closest('tr[id*="_hide_"], tr[style*="display: none"], tr[style*="display:none"]');
+        if (parentRow && parentRow.style.display === 'none') return;
         if (el.classList.contains('ff-se-list')) {
             // Senarai Edaran — serialize as JSON
             const entries = [];
@@ -1522,7 +1525,10 @@ function _submitFieldsForm(fid) {
 // ═══════════════════════════════════════════════════
 
 function buildLetterHtml(data) {
-    const hasMissingFields = data.fields_status && data.fields_status.missing && data.fields_status.missing.length > 0;
+    const missingLabels = data.fields_status?.missing || [];
+    const extraLabels = data.fields_status?.form_extras || [];
+    const allFormLabels = [...missingLabels, ...extraLabels];
+    const hasMissingFields = allFormLabels.length > 0;
     let html = `<div class="message-bubble structured-response${hasMissingFields ? ' has-form' : ''}">`;
 
     if (!hasMissingFields) {
@@ -1532,7 +1538,7 @@ function buildLetterHtml(data) {
     // Maklumat terkumpul disembunyikan — bekerja di belakang tabir
 
     if (hasMissingFields) {
-        html += _buildMissingFieldsForm(data.fields_status.missing);
+        html += _buildMissingFieldsForm(allFormLabels);
     }
 
     if (data.document_preview) {
