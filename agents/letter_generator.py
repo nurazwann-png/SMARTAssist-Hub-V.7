@@ -754,42 +754,99 @@ def build_docx(session_id: str) -> bytes | None:
         section.left_margin = Cm(2)
         section.right_margin = Cm(2)
 
-    # Insert letterhead into Word header section (surat only)
+    # Insert letterhead + page-continuation footer (surat only)
     _doc_type_check = session.get("doc_type", "surat") if session else "surat"
     try:
         from backend.letterhead_store import get_active_path_by_type
         from docx.oxml.ns import qn as _qn
         from docx.oxml import OxmlElement as _OxmlElement
         lh_path = get_active_path_by_type("letterhead") if _doc_type_check != "memo" else None
-        if lh_path:
+        if _doc_type_check != "memo":
             section = doc.sections[0]
             section.header_distance = Cm(0.5)
-            header = section.header
-            for p in header.paragraphs:
+            # First-page header differs from subsequent pages
+            section.different_first_page_header_footer = True
+
+            if lh_path:
+                # Page 1 header — letterhead + horizontal rule
+                import io as _lh_io
+                from PIL import Image as _lh_PIL
+                _lh_img = _lh_PIL.open(str(lh_path)).convert("RGBA")
+                _lh_buf = _lh_io.BytesIO()
+                _lh_img.save(_lh_buf, format="PNG")
+                _lh_buf.seek(0)
+                fp_header = section.first_page_header
+                for p in fp_header.paragraphs:
+                    p.clear()
+                lh_para = fp_header.paragraphs[0]
+                lh_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                lh_para.paragraph_format.space_before = Pt(0)
+                lh_para.paragraph_format.space_after = Pt(4)
+                lh_para.add_run().add_picture(_lh_buf, width=Cm(17))
+                hr_para = fp_header.add_paragraph()
+                hr_para.paragraph_format.space_before = Pt(0)
+                hr_para.paragraph_format.space_after = Pt(0)
+                pPr = hr_para._p.get_or_add_pPr()
+                pBdr = _OxmlElement('w:pBdr')
+                bottom = _OxmlElement('w:bottom')
+                bottom.set(_qn('w:val'), 'single')
+                bottom.set(_qn('w:sz'), '6')
+                bottom.set(_qn('w:space'), '1')
+                bottom.set(_qn('w:color'), '000000')
+                pBdr.append(bottom)
+                pPr.append(pBdr)
+
+            # Pages 2+ header — empty
+            reg_header = section.header
+            for p in reg_header.paragraphs:
                 p.clear()
-            lh_para = header.paragraphs[0]
-            lh_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            lh_para.paragraph_format.space_before = Pt(0)
-            lh_para.paragraph_format.space_after = Pt(4)
-            import io as _lh_io
-            from PIL import Image as _lh_PIL
-            _lh_img = _lh_PIL.open(str(lh_path)).convert("RGBA")
-            _lh_buf = _lh_io.BytesIO()
-            _lh_img.save(_lh_buf, format="PNG")
-            _lh_buf.seek(0)
-            lh_para.add_run().add_picture(_lh_buf, width=Cm(17))
-            hr_para = header.add_paragraph()
-            hr_para.paragraph_format.space_before = Pt(0)
-            hr_para.paragraph_format.space_after = Pt(0)
-            pPr = hr_para._p.get_or_add_pPr()
-            pBdr = _OxmlElement('w:pBdr')
-            bottom = _OxmlElement('w:bottom')
-            bottom.set(_qn('w:val'), 'single')
-            bottom.set(_qn('w:sz'), '6')
-            bottom.set(_qn('w:space'), '1')
-            bottom.set(_qn('w:color'), '000000')
-            pBdr.append(bottom)
-            pPr.append(pBdr)
+
+            # Footer: ..{PAGE+1}/- on every page
+            def _add_page_cont_footer(ftr):
+                ftr.is_linked_to_previous = False
+                para = ftr.paragraphs[0]
+                para.clear()
+                para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                para.paragraph_format.space_before = Pt(0)
+                para.paragraph_format.space_after = Pt(0)
+                p = para._p
+
+                def _r(*kids):
+                    r = _OxmlElement('w:r')
+                    for k in kids: r.append(k)
+                    return r
+
+                def _rpr():
+                    rpr = _OxmlElement('w:rPr')
+                    for tag in ('w:sz', 'w:szCs'):
+                        el = _OxmlElement(tag); el.set(_qn('w:val'), '20'); rpr.append(el)
+                    return rpr
+
+                def _fc(typ, dirty=False):
+                    fc = _OxmlElement('w:fldChar'); fc.set(_qn('w:fldCharType'), typ)
+                    if dirty: fc.set(_qn('w:dirty'), 'true')
+                    return fc
+
+                def _instr(s):
+                    it = _OxmlElement('w:instrText'); it.set(_qn('xml:space'), 'preserve'); it.text = s; return it
+
+                def _t(s):
+                    t = _OxmlElement('w:t'); t.set(_qn('xml:space'), 'preserve'); t.text = s; return t
+
+                # ".." prefix
+                p.append(_r(_rpr(), _t('..')))
+                # { = { PAGE } + 1 \# "0" }
+                p.append(_r(_fc('begin', dirty=True)))
+                p.append(_r(_instr(' = ')))
+                p.append(_r(_fc('begin'))); p.append(_r(_instr(' PAGE ')))
+                p.append(_r(_fc('separate'))); p.append(_r(_t('1'))); p.append(_r(_fc('end')))
+                p.append(_r(_instr(r' + 1 \# "0" ')))
+                p.append(_r(_fc('separate'))); p.append(_r(_t('2'))); p.append(_r(_fc('end')))
+                # "/-" suffix
+                p.append(_r(_rpr(), _t('/-')))
+
+            _add_page_cont_footer(section.first_page_footer)
+            _add_page_cont_footer(section.footer)
     except Exception:
         pass
 
