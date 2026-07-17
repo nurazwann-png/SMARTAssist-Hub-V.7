@@ -570,7 +570,7 @@
                 </g>
             </svg>
             <div class="kpm-avatar-label">WANN</div>
-            <div class="kpm-avatar-sublabel">Ejen Sokongan KPM</div>
+            <div class="kpm-avatar-sublabel" data-i18n="kpm_avatar_sub">Ejen Sokongan KPM</div>
         </div>
 
         <div class="kpm-bubble-window">
@@ -603,7 +603,7 @@
                 <span></span><span></span><span></span>
             </div>
             <div class="kpm-bubble-input-row">
-                <input type="text" class="kpm-bubble-input" id="kpmBubbleInput" placeholder="Taip soalan anda..." autocomplete="off" onkeydown="if(event.key==='Enter')sendKpmBubbleMsg()"/>
+                <input type="text" class="kpm-bubble-input" id="kpmBubbleInput" placeholder="Taip soalan anda..." data-i18n-placeholder="kpm_input_ph" autocomplete="off" onkeydown="if(event.key==='Enter')sendKpmBubbleMsg()"/>
                 <button class="kpm-bubble-send" onclick="sendKpmBubbleMsg()">&#9658;</button>
             </div>
         </div>
@@ -681,12 +681,12 @@
             <div class="work-panel" id="workPanel">
                 <div class="work-panel-header">
                     <span class="work-panel-icon" id="workPanelIcon">&#128196;</span>
-                    <span class="work-panel-title" id="workPanelTitle">Ruang Kerja</span>
+                    <span class="work-panel-title" id="workPanelTitle" data-i18n="work_panel_title">Ruang Kerja</span>
                 </div>
                 <div class="work-panel-content" id="workPanelContent">
                     <div class="work-panel-empty" id="workPanelEmpty">
                         <div class="work-panel-empty-icon">&#10022;</div>
-                        <p>Borang dan pratonton dokumen yang dijana ejen akan dipaparkan di sini.</p>
+                        <p data-i18n="work_panel_empty">Borang dan pratonton dokumen yang dijana ejen akan dipaparkan di sini.</p>
                     </div>
                 </div>
             </div>
@@ -752,6 +752,6 @@
     </div>
 
 
-    <script src="/static/app.js?v=82"></script>
+    <script src="/static/app.js?v=83"></script>
 </body>
 </html>
