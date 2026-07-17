@@ -1881,27 +1881,28 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
    ═══════════════════════════════════════ */
 .kpm-bubble-overlay {
     position: fixed; inset: 0; z-index: 9000;
-    display: flex; align-items: flex-end; justify-content: flex-end;
-    padding: 24px 32px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
     pointer-events: none;
 }
 .kpm-bubble-overlay.active { pointer-events: auto; }
 .kpm-bubble-window {
-    width: 380px; max-width: calc(100vw - 48px);
-    max-height: 560px; min-height: 360px;
+    width: 80vw; height: 80vh;
+    max-width: 960px;
     background: var(--bg-secondary);
     border: 1px solid rgba(248, 113, 113, 0.35);
     border-radius: 20px;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(248,113,113,0.1);
+    box-shadow: 0 16px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(248,113,113,0.1);
     display: flex; flex-direction: column;
     overflow: hidden;
-    transform: translateY(30px) scale(0.95);
+    transform: scale(0.92);
     opacity: 0;
-    transition: transform 0.28s cubic-bezier(.34,1.56,.64,1), opacity 0.22s ease;
+    transition: transform 0.3s cubic-bezier(.34,1.4,.64,1), opacity 0.22s ease;
     pointer-events: auto;
 }
 .kpm-bubble-overlay.open .kpm-bubble-window {
-    transform: translateY(0) scale(1);
+    transform: scale(1);
     opacity: 1;
 }
 .kpm-bubble-header {
