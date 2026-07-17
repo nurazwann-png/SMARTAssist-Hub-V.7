@@ -2574,10 +2574,16 @@ let _kpmReady = false;
 
 function openKpmBubble() {
     const overlay = document.getElementById('kpmChatBubble');
+    const avatar = document.getElementById('kpmAvatar');
     if (!overlay) return;
     overlay.style.display = 'flex';
     requestAnimationFrame(() => {
         overlay.classList.add('active', 'open');
+        if (avatar) {
+            avatar.classList.remove('av-out');
+            void avatar.offsetWidth; // reflow
+            avatar.classList.add('av-in');
+        }
     });
     document.getElementById('kpmBubbleInput').focus();
     if (!_kpmReady) {
@@ -2589,12 +2595,19 @@ function openKpmBubble() {
 
 function closeKpmBubble() {
     const overlay = document.getElementById('kpmChatBubble');
+    const avatar = document.getElementById('kpmAvatar');
     if (!overlay) return;
+    if (avatar) {
+        avatar.classList.remove('av-in');
+        void avatar.offsetWidth;
+        avatar.classList.add('av-out');
+    }
     overlay.classList.remove('open');
     setTimeout(() => {
         overlay.style.display = 'none';
         overlay.classList.remove('active');
-    }, 300);
+        if (avatar) avatar.classList.remove('av-out');
+    }, 420);
 }
 
 function _appendKpmMsg(text, role) {

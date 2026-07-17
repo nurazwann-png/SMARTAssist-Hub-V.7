@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMARTAssist Hub</title>
-    <link rel="stylesheet" href="/static/style.css?v=39">
+    <link rel="stylesheet" href="/static/style.css?v=40">
     <script src="/static/chart.min.js"></script>
 </head>
 <body>
@@ -370,141 +370,206 @@
         <div class="kpm-avatar-wrap" id="kpmAvatar">
             <svg class="kpm-avatar-svg" viewBox="0 0 160 220" xmlns="http://www.w3.org/2000/svg">
                 <defs>
-                    <radialGradient id="av-body-grad" cx="50%" cy="40%" r="55%">
-                        <stop offset="0%" stop-color="#7f1d1d"/>
-                        <stop offset="100%" stop-color="#1c0404"/>
+                    <!-- Colourful gradients -->
+                    <linearGradient id="av-body-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#1e1b4b"/>
+                        <stop offset="50%" stop-color="#3b0764"/>
+                        <stop offset="100%" stop-color="#1e1b4b"/>
+                    </linearGradient>
+                    <linearGradient id="av-chest-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#7c3aed"/>
+                        <stop offset="100%" stop-color="#2563eb"/>
+                    </linearGradient>
+                    <linearGradient id="av-head-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#1e1b4b"/>
+                        <stop offset="100%" stop-color="#0f172a"/>
+                    </linearGradient>
+                    <linearGradient id="av-visor-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.35"/>
+                        <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.15"/>
+                    </linearGradient>
+                    <linearGradient id="av-eye-l-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#38bdf8"/>
+                        <stop offset="100%" stop-color="#6366f1"/>
+                    </linearGradient>
+                    <linearGradient id="av-eye-r-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#f472b6"/>
+                        <stop offset="100%" stop-color="#fb923c"/>
+                    </linearGradient>
+                    <linearGradient id="av-shoulder-l" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#7c3aed"/>
+                        <stop offset="100%" stop-color="#db2777"/>
+                    </linearGradient>
+                    <linearGradient id="av-shoulder-r" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#0891b2"/>
+                        <stop offset="100%" stop-color="#7c3aed"/>
+                    </linearGradient>
+                    <radialGradient id="av-halo-grad" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.5"/>
+                        <stop offset="50%" stop-color="#2563eb" stop-opacity="0.2"/>
+                        <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
                     </radialGradient>
-                    <radialGradient id="av-face-grad" cx="50%" cy="40%" r="55%">
-                        <stop offset="0%" stop-color="#3b0a0a"/>
-                        <stop offset="100%" stop-color="#150202"/>
-                    </radialGradient>
-                    <radialGradient id="av-eye-grad" cx="50%" cy="30%" r="70%">
-                        <stop offset="0%" stop-color="#ff6b6b"/>
-                        <stop offset="100%" stop-color="#dc2626"/>
-                    </radialGradient>
-                    <radialGradient id="av-glow-r" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="#dc2626" stop-opacity="0.6"/>
-                        <stop offset="100%" stop-color="#dc2626" stop-opacity="0"/>
-                    </radialGradient>
-                    <filter id="av-glow" x="-30%" y="-30%" width="160%" height="160%">
-                        <feGaussianBlur stdDeviation="3" result="blur"/>
+                    <filter id="av-glow" x="-40%" y="-40%" width="180%" height="180%">
+                        <feGaussianBlur stdDeviation="3.5" result="blur"/>
                         <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
                     </filter>
-                    <filter id="av-soft" x="-20%" y="-20%" width="140%" height="140%">
-                        <feGaussianBlur stdDeviation="1.5" result="blur"/>
+                    <filter id="av-glow-sm" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="2" result="blur"/>
                         <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
                     </filter>
                     <filter id="av-shadow">
-                        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#dc2626" flood-opacity="0.4"/>
+                        <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#7c3aed" flood-opacity="0.5"/>
                     </filter>
                 </defs>
 
-                <!-- Shadow ellipse below -->
-                <ellipse cx="80" cy="210" rx="36" ry="8" fill="#dc2626" opacity="0.18">
-                    <animate attributeName="rx" values="36;28;36" dur="3s" repeatCount="indefinite"/>
-                    <animate attributeName="opacity" values="0.18;0.08;0.18" dur="3s" repeatCount="indefinite"/>
+                <!-- Ground shadow -->
+                <ellipse cx="80" cy="212" rx="38" ry="7" fill="#7c3aed" opacity="0.2">
+                    <animate attributeName="rx" values="38;28;38" dur="3s" repeatCount="indefinite"/>
+                    <animate attributeName="opacity" values="0.2;0.08;0.2" dur="3s" repeatCount="indefinite"/>
                 </ellipse>
 
-                <!-- Body group — floats up and down -->
-                <g id="av-body-group">
+                <!-- Floating body group -->
+                <g>
                     <animateTransform attributeName="transform" type="translate"
-                        values="0,0;0,-10;0,0" dur="3s" repeatCount="indefinite" calcMode="spline"
-                        keySplines="0.45 0 0.55 1; 0.45 0 0.55 1"/>
+                        values="0,0;0,-11;0,0" dur="3s" repeatCount="indefinite" calcMode="spline"
+                        keySplines="0.45 0 0.55 1;0.45 0 0.55 1"/>
 
-                    <!-- Glow halo behind body -->
-                    <ellipse cx="80" cy="130" rx="52" ry="55" fill="url(#av-glow-r)" opacity="0.5">
-                        <animate attributeName="opacity" values="0.5;0.25;0.5" dur="2.4s" repeatCount="indefinite"/>
+                    <!-- Outer halo -->
+                    <ellipse cx="80" cy="128" rx="58" ry="60" fill="url(#av-halo-grad)">
+                        <animate attributeName="rx" values="58;50;58" dur="2.6s" repeatCount="indefinite"/>
+                        <animate attributeName="ry" values="60;52;60" dur="2.6s" repeatCount="indefinite"/>
                     </ellipse>
 
-                    <!-- Cloak/robe body -->
-                    <path d="M42 120 Q30 150 28 190 Q54 202 80 202 Q106 202 132 190 Q130 150 118 120 Q105 108 80 108 Q55 108 42 120Z"
-                          fill="url(#av-body-grad)" stroke="#f87171" stroke-width="1.2" opacity="0.95"/>
+                    <!-- ── BODY / ROBE ── -->
+                    <path d="M42 120 Q28 152 26 192 Q52 204 80 204 Q108 204 134 192 Q132 152 118 120 Q104 108 80 108 Q56 108 42 120Z"
+                          fill="url(#av-body-grad)" stroke="url(#av-chest-grad)" stroke-width="1.4"/>
+                    <!-- Robe sheen left -->
+                    <path d="M55 118 Q46 148 44 188" stroke="#a78bfa" stroke-width="0.8" fill="none" opacity="0.35"/>
+                    <!-- Robe sheen right -->
+                    <path d="M105 118 Q114 148 116 188" stroke="#38bdf8" stroke-width="0.8" fill="none" opacity="0.35"/>
+                    <!-- Centre trim -->
+                    <path d="M80 116 L80 197" stroke="url(#av-chest-grad)" stroke-width="1" stroke-dasharray="4 5" opacity="0.5"/>
 
-                    <!-- Robe centre line detail -->
-                    <path d="M80 118 L80 195" stroke="#fca5a5" stroke-width="0.7" stroke-dasharray="3 4" opacity="0.4"/>
+                    <!-- Chest panel -->
+                    <rect x="60" y="132" width="40" height="32" rx="7"
+                          fill="#0f172a" stroke="url(#av-chest-grad)" stroke-width="1.2" filter="url(#av-glow-sm)"/>
+                    <!-- Chest grid lines -->
+                    <line x1="60" y1="142" x2="100" y2="142" stroke="#7c3aed" stroke-width="0.5" opacity="0.4"/>
+                    <line x1="60" y1="152" x2="100" y2="152" stroke="#7c3aed" stroke-width="0.5" opacity="0.4"/>
+                    <line x1="75" y1="132" x2="75" y2="164" stroke="#7c3aed" stroke-width="0.5" opacity="0.4"/>
+                    <line x1="85" y1="132" x2="85" y2="164" stroke="#7c3aed" stroke-width="0.5" opacity="0.4"/>
+                    <!-- KPM badge -->
+                    <rect x="65" y="145" width="30" height="13" rx="3"
+                          fill="url(#av-chest-grad)" filter="url(#av-glow-sm)" opacity="0.9"/>
+                    <text x="80" y="155" text-anchor="middle" font-size="7.5" font-family="Arial"
+                          font-weight="900" fill="#fff" letter-spacing="1">KPM</text>
 
-                    <!-- KPM emblem on chest -->
-                    <rect x="67" y="140" width="26" height="18" rx="4"
-                          fill="#7f1d1d" stroke="#f87171" stroke-width="1" filter="url(#av-glow)"/>
-                    <text x="80" y="153" text-anchor="middle" font-size="8" font-family="Arial"
-                          font-weight="bold" fill="#fca5a5">KPM</text>
+                    <!-- ── NECK ── -->
+                    <rect x="71" y="103" width="18" height="13" rx="5"
+                          fill="#1e1b4b" stroke="#a78bfa" stroke-width="0.8"/>
+                    <!-- Neck rings -->
+                    <rect x="71" y="107" width="18" height="2" rx="1" fill="#7c3aed" opacity="0.5"/>
+                    <rect x="71" y="111" width="18" height="2" rx="1" fill="#7c3aed" opacity="0.5"/>
 
-                    <!-- Neck -->
-                    <rect x="71" y="104" width="18" height="12" rx="4" fill="#3b0a0a" stroke="#f87171" stroke-width="0.8"/>
+                    <!-- ── HEAD ── -->
+                    <ellipse cx="80" cy="87" rx="35" ry="37"
+                             fill="url(#av-head-grad)" stroke="url(#av-shoulder-l)" stroke-width="1.5"
+                             filter="url(#av-shadow)"/>
+                    <!-- Head side accents -->
+                    <path d="M46 80 Q44 87 46 94" stroke="#7c3aed" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.7"/>
+                    <path d="M114 80 Q116 87 114 94" stroke="#f472b6" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.7"/>
 
-                    <!-- Head -->
-                    <ellipse cx="80" cy="88" rx="34" ry="36" fill="url(#av-face-grad)"
-                             stroke="#f87171" stroke-width="1.5" filter="url(#av-shadow)"/>
-
-                    <!-- Helmet top ridge -->
-                    <path d="M56 68 Q80 48 104 68" fill="none" stroke="#f87171" stroke-width="2.5"
+                    <!-- Helmet crest -->
+                    <path d="M55 66 Q80 44 105 66" fill="none" stroke="url(#av-shoulder-l)" stroke-width="3"
                           stroke-linecap="round" filter="url(#av-glow)"/>
-                    <path d="M62 64 Q80 50 98 64" fill="none" stroke="#fca5a5" stroke-width="1" opacity="0.5"/>
-
-                    <!-- Visor/face plate -->
-                    <rect x="56" y="72" width="48" height="28" rx="8" fill="#0a0000" opacity="0.7"/>
-                    <rect x="57" y="73" width="46" height="26" rx="7"
-                          fill="none" stroke="#f87171" stroke-width="0.8" opacity="0.6"/>
-
-                    <!-- Eyes — left -->
-                    <ellipse class="av-eye-l" cx="68" cy="86" rx="7" ry="7" fill="url(#av-eye-grad)" filter="url(#av-glow)">
-                        <animate attributeName="ry" values="7;7;7;0.5;7;7" dur="4s" repeatCount="indefinite"/>
-                    </ellipse>
-                    <ellipse cx="68" cy="86" rx="3.5" ry="3.5" fill="#fff" opacity="0.9">
-                        <animate attributeName="ry" values="3.5;3.5;3.5;0.3;3.5;3.5" dur="4s" repeatCount="indefinite"/>
-                    </ellipse>
-                    <ellipse cx="68" cy="86" rx="1.5" ry="1.5" fill="#ff0000" opacity="0.8">
-                        <animate attributeName="ry" values="1.5;1.5;1.5;0.2;1.5;1.5" dur="4s" repeatCount="indefinite"/>
-                    </ellipse>
-
-                    <!-- Eyes — right -->
-                    <ellipse class="av-eye-r" cx="92" cy="86" rx="7" ry="7" fill="url(#av-eye-grad)" filter="url(#av-glow)">
-                        <animate attributeName="ry" values="7;7;7;0.5;7;7" dur="4s" repeatCount="indefinite"/>
-                    </ellipse>
-                    <ellipse cx="92" cy="86" rx="3.5" ry="3.5" fill="#fff" opacity="0.9">
-                        <animate attributeName="ry" values="3.5;3.5;3.5;0.3;3.5;3.5" dur="4s" repeatCount="indefinite"/>
-                    </ellipse>
-                    <ellipse cx="92" cy="86" rx="1.5" ry="1.5" fill="#ff0000" opacity="0.8">
-                        <animate attributeName="ry" values="1.5;1.5;1.5;0.2;1.5;1.5" dur="4s" repeatCount="indefinite"/>
-                    </ellipse>
-
-                    <!-- Mouth indicator bar -->
-                    <rect x="66" y="96" width="28" height="2.5" rx="1.2" fill="#f87171" opacity="0.5"/>
-
-                    <!-- Shoulder pads -->
-                    <ellipse cx="44" cy="118" rx="14" ry="10" fill="#7f1d1d" stroke="#f87171" stroke-width="1" filter="url(#av-soft)"/>
-                    <ellipse cx="116" cy="118" rx="14" ry="10" fill="#7f1d1d" stroke="#f87171" stroke-width="1" filter="url(#av-soft)"/>
-
-                    <!-- Arms -->
-                    <path d="M44 122 Q28 138 30 158" stroke="#3b0a0a" stroke-width="12"
-                          stroke-linecap="round" fill="none"/>
-                    <path d="M44 122 Q28 138 30 158" stroke="#f87171" stroke-width="1.2"
-                          stroke-linecap="round" fill="none" opacity="0.5"/>
-                    <path d="M116 122 Q132 138 130 158" stroke="#3b0a0a" stroke-width="12"
-                          stroke-linecap="round" fill="none"/>
-                    <path d="M116 122 Q132 138 130 158" stroke="#f87171" stroke-width="1.2"
-                          stroke-linecap="round" fill="none" opacity="0.5"/>
-
-                    <!-- Hands -->
-                    <ellipse cx="30" cy="161" rx="8" ry="9" fill="#3b0a0a" stroke="#f87171" stroke-width="1"/>
-                    <ellipse cx="130" cy="161" rx="8" ry="9" fill="#3b0a0a" stroke="#f87171" stroke-width="1"/>
-
-                    <!-- Floating particles -->
-                    <circle cx="28" cy="95" r="2.5" fill="#f87171" opacity="0.7">
-                        <animate attributeName="cy" values="95;80;95" dur="2.8s" repeatCount="indefinite"/>
-                        <animate attributeName="opacity" values="0.7;0;0.7" dur="2.8s" repeatCount="indefinite"/>
+                    <path d="M80 44 L80 57" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+                    <circle cx="80" cy="42" r="4" fill="#f472b6" filter="url(#av-glow)">
+                        <animate attributeName="r" values="4;5.5;4" dur="1.8s" repeatCount="indefinite"/>
+                        <animate attributeName="fill" values="#f472b6;#fb923c;#f472b6" dur="2.4s" repeatCount="indefinite"/>
                     </circle>
-                    <circle cx="135" cy="100" r="2" fill="#fca5a5" opacity="0.6">
-                        <animate attributeName="cy" values="100;85;100" dur="3.2s" repeatCount="indefinite"/>
-                        <animate attributeName="opacity" values="0.6;0;0.6" dur="3.2s" repeatCount="indefinite"/>
+
+                    <!-- Visor background -->
+                    <rect x="54" y="71" width="52" height="30" rx="9"
+                          fill="url(#av-visor-grad)" stroke="url(#av-eye-l-grad)" stroke-width="1" opacity="0.9"/>
+                    <!-- Visor scan line -->
+                    <rect x="54" y="82" width="52" height="1.5" fill="#38bdf8" opacity="0.2">
+                        <animate attributeName="y" values="71;100;71" dur="2.2s" repeatCount="indefinite"/>
+                        <animate attributeName="opacity" values="0.3;0;0.3" dur="2.2s" repeatCount="indefinite"/>
+                    </rect>
+
+                    <!-- ── LEFT EYE (blue/cyan) ── -->
+                    <ellipse cx="68" cy="85" rx="8" ry="8" fill="url(#av-eye-l-grad)" filter="url(#av-glow)">
+                        <animate attributeName="ry" values="8;8;8;0.4;8" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.3;0.6;0.65;1"/>
+                    </ellipse>
+                    <ellipse cx="68" cy="85" rx="4" ry="4" fill="#e0f2fe" opacity="0.95">
+                        <animate attributeName="ry" values="4;4;4;0.2;4" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.3;0.6;0.65;1"/>
+                    </ellipse>
+                    <ellipse cx="70" cy="83" rx="1.5" ry="1.5" fill="#fff" opacity="0.8"/>
+
+                    <!-- ── RIGHT EYE (pink/orange) ── -->
+                    <ellipse cx="92" cy="85" rx="8" ry="8" fill="url(#av-eye-r-grad)" filter="url(#av-glow)">
+                        <animate attributeName="ry" values="8;8;8;0.4;8" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.3;0.6;0.65;1"/>
+                    </ellipse>
+                    <ellipse cx="92" cy="85" rx="4" ry="4" fill="#fce7f3" opacity="0.95">
+                        <animate attributeName="ry" values="4;4;4;0.2;4" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.3;0.6;0.65;1"/>
+                    </ellipse>
+                    <ellipse cx="94" cy="83" rx="1.5" ry="1.5" fill="#fff" opacity="0.8"/>
+
+                    <!-- Mouth / speaker grill -->
+                    <rect x="64" y="96" width="32" height="3" rx="1.5" fill="#0f172a" opacity="0.8"/>
+                    <rect x="67" y="97" width="5" height="1" rx="0.5" fill="#38bdf8" opacity="0.7"/>
+                    <rect x="74" y="97" width="5" height="1" rx="0.5" fill="#a78bfa" opacity="0.7"/>
+                    <rect x="81" y="97" width="5" height="1" rx="0.5" fill="#f472b6" opacity="0.7"/>
+                    <rect x="88" y="97" width="5" height="1" rx="0.5" fill="#fb923c" opacity="0.7"/>
+
+                    <!-- ── SHOULDERS ── -->
+                    <ellipse cx="43" cy="117" rx="15" ry="11"
+                             fill="#0f172a" stroke="url(#av-shoulder-l)" stroke-width="1.5" filter="url(#av-glow-sm)"/>
+                    <ellipse cx="43" cy="117" rx="8" ry="6" fill="url(#av-shoulder-l)" opacity="0.6"/>
+                    <ellipse cx="117" cy="117" rx="15" ry="11"
+                             fill="#0f172a" stroke="url(#av-shoulder-r)" stroke-width="1.5" filter="url(#av-glow-sm)"/>
+                    <ellipse cx="117" cy="117" rx="8" ry="6" fill="url(#av-shoulder-r)" opacity="0.6"/>
+
+                    <!-- ── ARMS ── -->
+                    <path d="M43 122 Q27 140 29 162" stroke="#1e1b4b" stroke-width="13" stroke-linecap="round" fill="none"/>
+                    <path d="M43 122 Q27 140 29 162" stroke="url(#av-shoulder-l)" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.7"/>
+                    <path d="M117 122 Q133 140 131 162" stroke="#1e1b4b" stroke-width="13" stroke-linecap="round" fill="none"/>
+                    <path d="M117 122 Q133 140 131 162" stroke="url(#av-shoulder-r)" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.7"/>
+
+                    <!-- ── HANDS ── -->
+                    <ellipse cx="29" cy="164" rx="9" ry="10" fill="#0f172a" stroke="url(#av-shoulder-l)" stroke-width="1.2"/>
+                    <ellipse cx="131" cy="164" rx="9" ry="10" fill="#0f172a" stroke="url(#av-shoulder-r)" stroke-width="1.2"/>
+
+                    <!-- ── PARTICLES ── -->
+                    <!-- purple -->
+                    <circle cx="25" cy="100" r="3" fill="#a78bfa">
+                        <animate attributeName="cy" values="100;78;100" dur="2.9s" repeatCount="indefinite"/>
+                        <animate attributeName="opacity" values="0.8;0;0.8" dur="2.9s" repeatCount="indefinite"/>
+                        <animate attributeName="r" values="3;1.5;3" dur="2.9s" repeatCount="indefinite"/>
                     </circle>
-                    <circle cx="45" cy="75" r="1.5" fill="#dc2626" opacity="0.5">
-                        <animate attributeName="cy" values="75;60;75" dur="2.5s" repeatCount="indefinite"/>
-                        <animate attributeName="opacity" values="0.5;0;0.5" dur="2.5s" repeatCount="indefinite"/>
+                    <!-- cyan -->
+                    <circle cx="137" cy="105" r="2.5" fill="#38bdf8">
+                        <animate attributeName="cy" values="105;83;105" dur="3.3s" repeatCount="indefinite"/>
+                        <animate attributeName="opacity" values="0.7;0;0.7" dur="3.3s" repeatCount="indefinite"/>
+                    </circle>
+                    <!-- pink -->
+                    <circle cx="48" cy="72" r="2" fill="#f472b6">
+                        <animate attributeName="cy" values="72;55;72" dur="2.6s" repeatCount="indefinite"/>
+                        <animate attributeName="opacity" values="0.6;0;0.6" dur="2.6s" repeatCount="indefinite"/>
+                    </circle>
+                    <!-- orange -->
+                    <circle cx="115" cy="70" r="2" fill="#fb923c">
+                        <animate attributeName="cy" values="70;52;70" dur="3s" repeatCount="indefinite"/>
+                        <animate attributeName="opacity" values="0.6;0;0.6" dur="3s" repeatCount="indefinite"/>
+                    </circle>
+                    <!-- green -->
+                    <circle cx="80" cy="32" r="1.8" fill="#4ade80">
+                        <animate attributeName="cy" values="32;18;32" dur="2.3s" repeatCount="indefinite"/>
+                        <animate attributeName="opacity" values="0.7;0;0.7" dur="2.3s" repeatCount="indefinite"/>
                     </circle>
                 </g>
             </svg>
-            <div class="kpm-avatar-label">ARIA</div>
+            <div class="kpm-avatar-label">WANN</div>
             <div class="kpm-avatar-sublabel">Ejen Sokongan KPM</div>
         </div>
 
@@ -687,6 +752,6 @@
     </div>
 
 
-    <script src="/static/app.js?v=79"></script>
+    <script src="/static/app.js?v=80"></script>
 </body>
 </html>

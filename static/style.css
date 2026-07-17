@@ -1979,27 +1979,45 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
 .kpm-bubble-send:hover { transform: scale(1.08); box-shadow: 0 0 12px rgba(220,38,38,0.5); }
 
 /* KPM Avatar */
+@keyframes kpm-av-blink-in {
+    0%   { opacity: 0; transform: scale(0.4) translateX(60px); filter: blur(12px) brightness(3); }
+    40%  { opacity: 1; transform: scale(1.08) translateX(-6px); filter: blur(0) brightness(1.4); }
+    65%  { transform: scale(0.96) translateX(3px); filter: brightness(1); }
+    85%  { transform: scale(1.02) translateX(-2px); }
+    100% { opacity: 1; transform: scale(1) translateX(0); filter: none; }
+}
+@keyframes kpm-av-blink-out {
+    0%   { opacity: 1; transform: scale(1); filter: none; }
+    30%  { opacity: 1; transform: scale(1.06); filter: brightness(1.6) blur(1px); }
+    100% { opacity: 0; transform: scale(0.3) translateX(80px); filter: blur(14px) brightness(0.2); }
+}
 .kpm-avatar-wrap {
     display: flex; flex-direction: column; align-items: center;
     justify-content: flex-end; padding-bottom: 32px;
     flex-shrink: 0;
-    transform: translateX(40px) scale(0.8);
     opacity: 0;
-    transition: transform 0.4s cubic-bezier(.34,1.4,.64,1) 0.15s, opacity 0.3s ease 0.15s;
+    pointer-events: none;
 }
-.kpm-bubble-overlay.open .kpm-avatar-wrap {
-    transform: translateX(0) scale(1);
-    opacity: 1;
+.kpm-avatar-wrap.av-in {
+    animation: kpm-av-blink-in 0.55s cubic-bezier(.34,1.4,.64,1) 0.1s both;
+    opacity: 1; pointer-events: auto;
+}
+.kpm-avatar-wrap.av-out {
+    animation: kpm-av-blink-out 0.4s ease-in both;
+    pointer-events: none;
 }
 .kpm-avatar-svg {
     width: 160px; height: 220px;
-    filter: drop-shadow(0 0 18px rgba(220,38,38,0.45));
+    filter: drop-shadow(0 0 22px rgba(139,92,246,0.5)) drop-shadow(0 0 10px rgba(220,38,38,0.4));
 }
 .kpm-avatar-label {
     margin-top: 10px;
-    font-size: 15px; font-weight: 800; letter-spacing: 3px;
-    color: #f87171;
-    text-shadow: 0 0 12px rgba(248,113,113,0.7);
+    font-size: 16px; font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(90deg, #f87171, #a78bfa, #38bdf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    filter: drop-shadow(0 0 8px rgba(167,139,250,0.6));
 }
 .kpm-avatar-sublabel {
     font-size: 11px; color: var(--text-secondary);
