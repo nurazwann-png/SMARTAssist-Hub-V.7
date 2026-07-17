@@ -831,19 +831,47 @@ def _layout_html_to_docx_bytes(html_content: str) -> bytes:
     return buf.getvalue()
 
 
+def _pdf_to_word_editable_bytes(raw_pdf) -> bytes:
+    """Convert a PDF to an editable .docx that keeps the PDF's layout, using
+    pdf2docx (reconstructs text, fonts, alignment and positioning via tables/
+    text blocks — no page images, so the result stays editable)."""
+    import io as _io, os as _os, tempfile as _tmp, logging as _log
+    from pdf2docx import Converter
+    _log.getLogger("pdf2docx").setLevel(_log.ERROR)  # silence verbose INFO output
+
+    fd, tmp_path = _tmp.mkstemp(suffix=".docx")
+    _os.close(fd)
+    cv = Converter(stream=raw_pdf)
+    try:
+        cv.convert(tmp_path)
+    finally:
+        cv.close()
+    with open(tmp_path, "rb") as f:
+        data = f.read()
+    try:
+        _os.remove(tmp_path)
+    except OSError:
+        pass
+    return data
+
+
 @app.post("/api/review/pdf-to-word")
 async def review_pdf_to_word(file: UploadFile = File(...)):
-    """Convert an uploaded PDF to .docx, preserving layout (alignment, bold,
-    spacing) via the same reconstruction used for the review preview."""
+    """Convert an uploaded PDF to an editable .docx that matches the PDF's layout.
+    Uses pdf2docx; falls back to the paragraph reconstruction if that fails."""
     import io as _io
     try:
         raw = await file.read()
-        import pdfplumber
-        with pdfplumber.open(_io.BytesIO(raw)) as pdf:
-            html = _pdf_to_review_html(pdf)
-        if not html:
-            return JSONResponse({"error": "Teks tidak dapat diekstrak dari PDF ini."}, status_code=400)
-        docx_bytes = _layout_html_to_docx_bytes(html)
+        try:
+            docx_bytes = _pdf_to_word_editable_bytes(raw)
+        except Exception:
+            # Fallback: reconstruct from the layout HTML
+            import pdfplumber
+            with pdfplumber.open(_io.BytesIO(raw)) as pdf:
+                html = _pdf_to_review_html(pdf)
+            if not html:
+                return JSONResponse({"error": "Teks tidak dapat diekstrak dari PDF ini."}, status_code=400)
+            docx_bytes = _layout_html_to_docx_bytes(html)
         return Response(
             content=docx_bytes,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
