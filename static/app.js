@@ -16,6 +16,7 @@ let _reviewDocText = null;
 let _reviewDocHtml      = null;
 let _reviewIsPdf        = false;
 let _reviewPdfObjectUrl = null;
+let _reviewPdfImages    = [];
 
 // ── i18n ──
 const I18N = {
@@ -958,8 +959,15 @@ function _buildAnnotatedReview(data, docText) {
     html += `<button class="rev-close-btn" onclick="toggleRevExpand(this.closest('.rev-annotated').querySelector('.rev-expand-btn'))">✕ Tutup Pratonton</button>`;
 
     if (isPdf) {
-        const pdfSrc = _reviewPdfObjectUrl || '';
-        html += `<iframe class="rev-pdf-embed" src="${escapeAttr(pdfSrc)}" title="Pratonton PDF"></iframe>`;
+        if (_reviewPdfImages && _reviewPdfImages.length) {
+            // Faithful PDF preview: each page rendered as an image
+            _reviewPdfImages.forEach((src, i) => {
+                html += `<img class="rev-pdf-page" src="${src}" alt="Halaman PDF ${i + 1}" loading="lazy">`;
+            });
+        } else {
+            const pdfSrc = _reviewPdfObjectUrl || '';
+            html += `<iframe class="rev-pdf-embed" src="${escapeAttr(pdfSrc)}" title="Pratonton PDF"></iframe>`;
+        }
     } else if (docxNode) {
         html += `<div class="rev-html-doc" id="${docxPlaceholderId}" contenteditable="true" spellcheck="false" oninput="onDocEdit(this.closest('.rev-annotated'))"></div>`;
     } else {
@@ -2263,7 +2271,8 @@ async function handleReviewUpload(file) {
             _reviewDocText = data.text || null;
             _reviewDocHtml = data.html || null;
             _reviewIsPdf   = data.is_pdf || false;
-            // For PDF: create a blob URL from the original file (avoids huge base64 in response)
+            _reviewPdfImages = data.pdf_images || [];
+            // For PDF: create a blob URL from the original file (used for download)
             if (_reviewIsPdf) {
                 if (_reviewPdfObjectUrl) URL.revokeObjectURL(_reviewPdfObjectUrl);
                 _reviewPdfObjectUrl = URL.createObjectURL(file);

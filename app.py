@@ -258,6 +258,20 @@ def _pdf_page_lines(page):
     return out
 
 
+def _pdf_to_page_images(pdf, resolution=150):
+    """Render each PDF page to a PNG data-URI. This gives a preview that is a
+    pixel-faithful image of the uploaded PDF and displays reliably in any browser
+    (plain <img>), avoiding the blob/iframe PDF-viewer that renders blank."""
+    import io as _io2, base64 as _b64
+    out = []
+    for page in pdf.pages:
+        im = page.to_image(resolution=resolution)
+        buf = _io2.BytesIO()
+        im.save(buf, format="PNG")
+        out.append("data:image/png;base64," + _b64.b64encode(buf.getvalue()).decode("ascii"))
+    return out
+
+
 def _pdf_to_review_html(pdf) -> str:
     """Build editable review HTML from an open pdfplumber PDF, following the
     uploaded file's own layout as closely as possible: per-line alignment
@@ -293,21 +307,23 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
     text = ""
     doc_html = None   # rich HTML for visual preview
     doc_type = "Dokumen"
+    pdf_images = []   # per-page PNG data-URIs for faithful PDF preview
 
     try:
         if ext == ".pdf":
             import pdfplumber
             with pdfplumber.open(_io.BytesIO(raw)) as pdf:
                 pages = [p.extract_text() or "" for p in pdf.pages]
-                # Reconstruct layout (alignment, bold, spacing) so the editable
-                # preview keeps the uploaded letter's format instead of flattening
-                # it to plain left-aligned paragraphs.
-                doc_html = _pdf_to_review_html(pdf)
+                # Render each page to an image so the preview is pixel-faithful to
+                # the uploaded PDF and displays reliably (plain <img>, not an
+                # iframe/blob PDF viewer which renders blank in-app).
+                try:
+                    pdf_images = _pdf_to_page_images(pdf)
+                except Exception:
+                    pdf_images = []
             text = "\n".join(p for p in pages if p.strip())
             doc_type = "PDF"
-            # Fallback to plain-text HTML only if layout reconstruction found nothing.
-            if not doc_html and text.strip():
-                doc_html = _text_to_review_html(text)
+            doc_html = None
         elif ext in (".docx", ".doc"):
             # mammoth for rich HTML preview (preserves tables, bold, etc.)
             import mammoth
@@ -368,10 +384,9 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
         "char_count": len(text),
         "preview": text[:300],
         "text": text,
-        "html": doc_html,   # rich HTML (DOCX) or paragraph HTML (PDF)
-        # Only fall back to the read-only PDF iframe if we could not build HTML;
-        # when HTML is available the PDF uses the same editable path as Word.
+        "html": doc_html,   # rich HTML (DOCX); None for PDF (shown as page images)
         "is_pdf": ext == ".pdf" and doc_html is None,
+        "pdf_images": pdf_images,   # per-page PNG data-URIs for faithful PDF preview
     })
 
 

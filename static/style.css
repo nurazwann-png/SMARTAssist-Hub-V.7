@@ -1034,6 +1034,17 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
 }
 .rev-split-layout.rev-split-expanded .rev-pdf-embed { height: 100vh; }
 
+/* Faithful PDF preview rendered as per-page images */
+.rev-pdf-page {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin: 0 auto 12px auto;
+    border: 1px solid var(--border-color, #ccc);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    background: #fff;
+}
+
 .rev-spacer { height: 0.7em; }
 
 /* ── Betulkan button ── */
