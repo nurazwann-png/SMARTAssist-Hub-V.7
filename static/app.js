@@ -675,7 +675,8 @@ function addMessage(content, role, agentIcon, agentName, structured) {
         if (document.getElementById('reportImgGrid')) _refreshReportImages();
 
         // Add agent text to chat panel
-        const chatText = hasMissing ? '' : (structured.message || content || '');
+        const _rawChatMsg = structured.message || '';
+        const chatText = hasMissing ? '' : (_rawChatMsg.trim().startsWith('{') ? '' : _rawChatMsg);
         const chatDiv = document.createElement('div');
         chatDiv.className = `message ${role}`;
         let chatHtml = '';
@@ -1687,7 +1688,10 @@ function buildLetterHtml(data) {
     let html = `<div class="message-bubble structured-response${hasMissingFields ? ' has-form' : ''}">`;
 
     if (!hasMissingFields) {
-        html += `<div class="da-message">${escapeHtml(data.message || '')}</div>`;
+        // Guard: never show raw JSON in the message area
+        const _rawMsg = data.message || '';
+        const _safeMsg = _rawMsg.trim().startsWith('{') ? '' : _rawMsg;
+        if (_safeMsg) html += `<div class="da-message">${escapeHtml(_safeMsg)}</div>`;
     }
 
     // Maklumat terkumpul disembunyikan — bekerja di belakang tabir
