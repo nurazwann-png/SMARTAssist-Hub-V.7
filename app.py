@@ -647,6 +647,21 @@ def _render_html_to_pdf(html_content: str) -> bytes:
             spaceAfter=mb,
         )
 
+    def _css_to_pt(val):
+        """Convert a CSS length string (cm/mm/pt/px/in) to reportlab points."""
+        if not val:
+            return None
+        m = _re.match(r'([\d.]+)\s*(cm|mm|pt|px|in)', val.strip())
+        if not m:
+            return None
+        n, u = float(m.group(1)), m.group(2)
+        if u == 'cm': return n * 28.35
+        if u == 'mm': return n * 2.835
+        if u == 'pt': return n
+        if u == 'px': return n * 0.75
+        if u == 'in': return n * 72
+        return None
+
     def _make_image(img):
         src = img.get('src', '') or ''
         raw = None
@@ -670,13 +685,20 @@ def _render_html_to_pdf(html_content: str) -> bytes:
             png = _io.BytesIO()
             im.convert('RGBA').save(png, format='PNG')
             png.seek(0)
-            max_h = 150 * 0.75  # 150px cap, matches preview max-height
-            ratio = iw / ih if ih else 1
-            h = min(max_h, ih * 0.75)
-            w = h * ratio
-            if w > CONTENT_W:
-                w = CONTENT_W
-                h = w / ratio
+            # Respect explicit CSS width/height on the <img> (e.g. width:6.71cm)
+            st = _parse_style(img.get('style', ''))
+            fixed_w = _css_to_pt(st.get('width', ''))
+            fixed_h = _css_to_pt(st.get('height', ''))
+            if fixed_w and fixed_h:
+                w, h = fixed_w, fixed_h
+            else:
+                max_h = 150 * 0.75  # 150px cap fallback
+                ratio = iw / ih if ih else 1
+                h = min(max_h, ih * 0.75)
+                w = h * ratio
+                if w > CONTENT_W:
+                    w = CONTENT_W
+                    h = w / ratio
             rl = RLImage(png, width=w, height=h)
             rl.hAlign = 'CENTER'
             return rl
@@ -684,24 +706,59 @@ def _render_html_to_pdf(html_content: str) -> bytes:
             return None
 
     def _make_table(tbl):
-        rows = []
+        # First pass: determine total column count across all rows
+        num_cols = 1
         for tr in tbl.find_all('tr'):
             cells = tr.find_all(['td', 'th'])
-            if cells:
-                rows.append([Paragraph(_inline(c) or '&nbsp;',
-                             _para_style(_parse_style(c.get('style', '')), 11.0,
-                                         bold_default=(c.name == 'th'))) for c in cells])
+            total = sum(int(c.get('colspan', 1)) for c in cells)
+            if total > num_cols:
+                num_cols = total
+
+        rows = []
+        span_cmds = []
+        row_idx = 0
+        for tr in tbl.find_all('tr'):
+            cells = tr.find_all(['td', 'th'])
+            if not cells:
+                continue
+            row_data = []
+            col_idx = 0
+            for c in cells:
+                cs = int(c.get('colspan', 1))
+                rs = int(c.get('rowspan', 1))
+                st = _parse_style(c.get('style', ''))
+                bold_default = c.name == 'th' or st.get('font-weight', '') in ('bold', '700')
+                para = Paragraph(_inline(c) or '&nbsp;',
+                                 _para_style(st, 10.0, bold_default=bold_default))
+                row_data.append(para)
+                if cs > 1 or rs > 1:
+                    span_cmds.append(('SPAN', (col_idx, row_idx),
+                                      (col_idx + cs - 1, row_idx + rs - 1)))
+                # Pad placeholder cells for spanned columns
+                for _ in range(cs - 1):
+                    row_data.append(Paragraph('', _para_style({})))
+                    col_idx += 1
+                col_idx += 1
+            # Pad row to num_cols
+            while len(row_data) < num_cols:
+                row_data.append(Paragraph('', _para_style({})))
+            rows.append(row_data)
+            row_idx += 1
+
         if not rows:
             return None
-        t = Table(rows, hAlign='LEFT', colWidths=[CONTENT_W / len(rows[0])] * len(rows[0]))
-        t.setStyle(TableStyle([
+
+        col_w = CONTENT_W / num_cols
+        t = Table(rows, hAlign='LEFT', colWidths=[col_w] * num_cols)
+        style_cmds = [
             ('GRID', (0, 0), (-1, -1), 0.75, colors.black),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('LEFTPADDING', (0, 0), (-1, -1), 5),
             ('RIGHTPADDING', (0, 0), (-1, -1), 5),
             ('TOPPADDING', (0, 0), (-1, -1), 3),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ]))
+        ] + span_cmds
+        t.setStyle(TableStyle(style_cmds))
         return t
 
     flow = []
