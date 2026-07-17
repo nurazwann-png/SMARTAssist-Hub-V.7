@@ -1977,3 +1977,31 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
     transition: transform 0.15s, box-shadow 0.15s;
 }
 .kpm-bubble-send:hover { transform: scale(1.08); box-shadow: 0 0 12px rgba(220,38,38,0.5); }
+
+/* KPM Avatar */
+.kpm-avatar-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: flex-end; padding-bottom: 32px;
+    flex-shrink: 0;
+    transform: translateX(40px) scale(0.8);
+    opacity: 0;
+    transition: transform 0.4s cubic-bezier(.34,1.4,.64,1) 0.15s, opacity 0.3s ease 0.15s;
+}
+.kpm-bubble-overlay.open .kpm-avatar-wrap {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+}
+.kpm-avatar-svg {
+    width: 160px; height: 220px;
+    filter: drop-shadow(0 0 18px rgba(220,38,38,0.45));
+}
+.kpm-avatar-label {
+    margin-top: 10px;
+    font-size: 15px; font-weight: 800; letter-spacing: 3px;
+    color: #f87171;
+    text-shadow: 0 0 12px rgba(248,113,113,0.7);
+}
+.kpm-avatar-sublabel {
+    font-size: 11px; color: var(--text-secondary);
+    letter-spacing: 0.5px; margin-top: 3px;
+}
