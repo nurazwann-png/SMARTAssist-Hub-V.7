@@ -1075,6 +1075,18 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
 }
 .rev-hl-num.wajib    { background: #ef4444; }
 .rev-hl-num.cadangan { background: #f59e0b; }
+/* Flash a highlight when navigated to from its annotation */
+.rev-hl.hl-flash { animation: revHlFlash 1.6s ease-out; z-index: 5; }
+@keyframes revHlFlash {
+    0%, 100% { filter: none; }
+    15%      { filter: brightness(1.4) drop-shadow(0 0 6px rgba(99,102,241,0.9)); }
+    30%      { filter: none; }
+    45%      { filter: brightness(1.4) drop-shadow(0 0 6px rgba(99,102,241,0.9)); }
+    60%      { filter: none; }
+}
+/* Annotation number acts as a link to the PDF highlight */
+.rev-badge.ann-num.clickable { cursor: pointer; }
+.rev-badge.ann-num.clickable:hover { filter: brightness(1.15); transform: scale(1.08); }
 
 .rev-spacer { height: 0.7em; }
 

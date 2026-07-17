@@ -878,8 +878,10 @@ function _buildAnnColumn(issues) {
             const fixPrompt = escapeAttr(issue.suggestion
                 ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
                 : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`);
+            const badgeNav = issue.highlight ? ` onclick="scrollToPdfHighlight(${issue.num})"` : '';
+            const badgeCls = issue.highlight ? `${bCls} ann-num clickable` : `${bCls} ann-num`;
             html += `<div class="rev-ann-item" id="annItem_${issue.num}">`;
-            html += `<span class="rev-badge ${bCls} ann-num">${issue.num}</span>`;
+            html += `<span class="rev-badge ${badgeCls}"${badgeNav} title="${issue.highlight ? 'Pergi ke lokasi dalam PDF' : ''}">${issue.num}</span>`;
             html += `<div class="rev-ann-body">`;
             if (issue.category) html += `<div class="rev-ann-cat">${escapeHtml(issue.category)}</div>`;
             if (issue.location) html += `<div class="rev-ann-loc">📍 ${escapeHtml(issue.location)}</div>`;
@@ -981,7 +983,7 @@ function _buildAnnotatedReview(data, docText) {
                     const cls = iss.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
                     const st = `left:${(h.x * 100).toFixed(2)}%;top:${(h.y * 100).toFixed(2)}%;`
                              + `width:${(h.w * 100).toFixed(2)}%;height:${(h.h * 100).toFixed(2)}%`;
-                    html += `<div class="rev-hl ${cls}" style="${st}" onclick="scrollToAnnotation(${iss.num})" title="Isu ${iss.num}">`
+                    html += `<div class="rev-hl ${cls}" id="revHl_${iss.num}" style="${st}" onclick="scrollToAnnotation(${iss.num})" title="Isu ${iss.num}">`
                           + `<span class="rev-hl-num ${cls}">${iss.num}</span></div>`;
                 });
                 html += `</div>`;
@@ -1062,6 +1064,33 @@ function scrollToAnnotation(num) {
         col.scrollTop = targetTop;
     } else {
         item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+// Reverse of scrollToAnnotation: from an annotation, jump to its highlight on
+// the PDF page image and flash it.
+function scrollToPdfHighlight(num) {
+    const hl = document.getElementById(`revHl_${num}`);
+    if (!hl) return;
+    const page = hl.closest('.rev-doc-page');
+    if (page) {
+        const targetTop = hl.getBoundingClientRect().top
+                        - page.getBoundingClientRect().top
+                        + page.scrollTop - 48;
+        page.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+    } else {
+        hl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    // Flash the box to draw the eye
+    document.querySelectorAll('.rev-hl.hl-flash').forEach(el => el.classList.remove('hl-flash'));
+    void hl.offsetWidth;   // restart animation
+    hl.classList.add('hl-flash');
+    setTimeout(() => hl.classList.remove('hl-flash'), 1600);
+    // Keep the matching annotation marked active
+    const item = document.getElementById(`annItem_${num}`);
+    if (item) {
+        document.querySelectorAll('.rev-ann-item.ann-active').forEach(el => el.classList.remove('ann-active'));
+        item.classList.add('ann-active');
     }
 }
 
