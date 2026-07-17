@@ -2661,6 +2661,15 @@ function openKpmBubble() {
     }
 }
 
+function closeKpmBubbleWithFarewell() {
+    if (!_kpmReady) { closeKpmBubble(); return; }
+    const farewell = currentLang === 'en'
+        ? `Thank you for using SMARTAssist Hub KPM Support. Have a great day! 😊`
+        : `Terima kasih kerana menggunakan khidmat SMARTAssist Hub Sokongan KPM. Semoga hari tuan/puan menyenangkan! 😊`;
+    _appendKpmMsg(farewell, 'bot');
+    setTimeout(() => closeKpmBubble(), 2000);
+}
+
 function closeKpmBubble() {
     const overlay = document.getElementById('kpmChatBubble');
     const avatar = document.getElementById('kpmAvatar');
