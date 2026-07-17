@@ -2560,8 +2560,95 @@ applyLanguage(currentLang);
 
 // Agent cards
 document.querySelectorAll('.agent-card').forEach(card => {
-    card.addEventListener('click', () => openAgent(card.dataset.agent));
+    card.addEventListener('click', () => {
+        if (card.dataset.agent === 'kpm_support') openKpmBubble();
+        else openAgent(card.dataset.agent);
+    });
 });
+
+// ═══════════════════════════════════════
+//  KPM SUPPORT CHAT BUBBLE
+// ═══════════════════════════════════════
+let _kpmSessionId = null;
+let _kpmReady = false;
+
+function openKpmBubble() {
+    const overlay = document.getElementById('kpmChatBubble');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => {
+        overlay.classList.add('active', 'open');
+    });
+    document.getElementById('kpmBubbleInput').focus();
+    if (!_kpmReady) {
+        _kpmSessionId = 'sess_kpm_' + Date.now();
+        _kpmReady = true;
+        _sendKpmIntro();
+    }
+}
+
+function closeKpmBubble() {
+    const overlay = document.getElementById('kpmChatBubble');
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    setTimeout(() => {
+        overlay.style.display = 'none';
+        overlay.classList.remove('active');
+    }, 300);
+}
+
+function _appendKpmMsg(text, role) {
+    const msgs = document.getElementById('kpmBubbleMessages');
+    if (!msgs) return;
+    const div = document.createElement('div');
+    div.className = 'kpm-bubble-msg ' + role;
+    // Convert newlines to <br> and escape HTML
+    div.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function _sendKpmIntro() {
+    const typing = document.getElementById('kpmBubbleTyping');
+    typing.style.display = 'flex';
+    try {
+        const res = await fetch('/api/agent-chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: '__INTRO__', agent: 'kpm_support', session_id: _kpmSessionId, lang: currentLang }),
+        });
+        const data = await res.json();
+        typing.style.display = 'none';
+        _appendKpmMsg(data.response || '', 'bot');
+    } catch {
+        typing.style.display = 'none';
+        _appendKpmMsg('Salam! Saya Sokongan KPM. Apa yang boleh saya bantu?', 'bot');
+    }
+}
+
+async function sendKpmBubbleMsg() {
+    const input = document.getElementById('kpmBubbleInput');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    _appendKpmMsg(text, 'user');
+    const typing = document.getElementById('kpmBubbleTyping');
+    typing.style.display = 'flex';
+    document.getElementById('kpmBubbleMessages').scrollTop = 99999;
+    try {
+        const res = await fetch('/api/agent-chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, agent: 'kpm_support', session_id: _kpmSessionId, lang: currentLang }),
+        });
+        const data = await res.json();
+        typing.style.display = 'none';
+        _appendKpmMsg(data.response || '', 'bot');
+    } catch {
+        typing.style.display = 'none';
+        _appendKpmMsg('Maaf, ralat berlaku. Sila cuba lagi.', 'bot');
+    }
+}
 
 // ═══════════════════════════════════════
 //  LETTERHEAD SETTINGS PAGE

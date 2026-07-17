@@ -1875,3 +1875,105 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
     background: linear-gradient(135deg, #6366f1, #8b5cf6);
     color: #fff; border-style: solid;
 }
+
+/* ═══════════════════════════════════════
+   KPM SUPPORT CHAT BUBBLE (homepage)
+   ═══════════════════════════════════════ */
+.kpm-bubble-overlay {
+    position: fixed; inset: 0; z-index: 9000;
+    display: flex; align-items: flex-end; justify-content: flex-end;
+    padding: 24px 32px;
+    pointer-events: none;
+}
+.kpm-bubble-overlay.active { pointer-events: auto; }
+.kpm-bubble-window {
+    width: 380px; max-width: calc(100vw - 48px);
+    max-height: 560px; min-height: 360px;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(248, 113, 113, 0.35);
+    border-radius: 20px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(248,113,113,0.1);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    transform: translateY(30px) scale(0.95);
+    opacity: 0;
+    transition: transform 0.28s cubic-bezier(.34,1.56,.64,1), opacity 0.22s ease;
+    pointer-events: auto;
+}
+.kpm-bubble-overlay.open .kpm-bubble-window {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+.kpm-bubble-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px 12px;
+    background: rgba(127,29,29,0.25);
+    border-bottom: 1px solid rgba(248,113,113,0.18);
+    flex-shrink: 0;
+}
+.kpm-bubble-header-info { display: flex; align-items: center; gap: 10px; }
+.kpm-bubble-icon { display: flex; align-items: center; flex-shrink: 0; }
+.kpm-bubble-title { font-size: 14px; font-weight: 700; color: #fca5a5; }
+.kpm-bubble-subtitle { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+.kpm-bubble-close {
+    background: none; border: none; color: var(--text-secondary);
+    font-size: 16px; cursor: pointer; padding: 4px 6px; border-radius: 6px;
+    transition: color 0.15s, background 0.15s; line-height: 1;
+}
+.kpm-bubble-close:hover { color: #fca5a5; background: rgba(248,113,113,0.1); }
+.kpm-bubble-messages {
+    flex: 1; overflow-y: auto; padding: 14px 14px 6px;
+    display: flex; flex-direction: column; gap: 10px;
+    scrollbar-width: thin; scrollbar-color: rgba(248,113,113,0.2) transparent;
+}
+.kpm-bubble-msg { max-width: 88%; line-height: 1.5; font-size: 13px; }
+.kpm-bubble-msg.bot {
+    align-self: flex-start;
+    background: rgba(127,29,29,0.22);
+    border: 1px solid rgba(248,113,113,0.18);
+    border-radius: 4px 14px 14px 14px;
+    padding: 9px 13px; color: var(--text-primary);
+}
+.kpm-bubble-msg.user {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #7f1d1d, #991b1b);
+    border-radius: 14px 4px 14px 14px;
+    padding: 9px 13px; color: #fff;
+}
+.kpm-bubble-typing {
+    padding: 6px 14px 2px; display: flex; gap: 5px; align-items: center;
+}
+.kpm-bubble-typing span {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(248,113,113,0.6);
+    animation: kpm-dot-bounce 1.2s infinite;
+}
+.kpm-bubble-typing span:nth-child(2) { animation-delay: .2s; }
+.kpm-bubble-typing span:nth-child(3) { animation-delay: .4s; }
+@keyframes kpm-dot-bounce {
+    0%,80%,100% { transform: translateY(0); opacity: 0.5; }
+    40% { transform: translateY(-6px); opacity: 1; }
+}
+.kpm-bubble-input-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px 14px;
+    border-top: 1px solid rgba(248,113,113,0.12);
+    flex-shrink: 0;
+}
+.kpm-bubble-input {
+    flex: 1; background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(248,113,113,0.25); border-radius: 20px;
+    color: var(--text-primary); font-size: 13px;
+    padding: 9px 14px; outline: none;
+    transition: border-color 0.2s;
+}
+.kpm-bubble-input:focus { border-color: rgba(248,113,113,0.6); }
+.kpm-bubble-input::placeholder { color: var(--text-secondary); }
+.kpm-bubble-send {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+    border: none; color: #fff; font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.kpm-bubble-send:hover { transform: scale(1.08); box-shadow: 0 0 12px rgba(220,38,38,0.5); }

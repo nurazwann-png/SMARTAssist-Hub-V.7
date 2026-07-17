@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMARTAssist Hub</title>
-    <link rel="stylesheet" href="/static/style.css?v=35">
+    <link rel="stylesheet" href="/static/style.css?v=36">
     <script src="/static/chart.min.js"></script>
 </head>
 <body>
@@ -363,6 +363,44 @@
 
     </div>
 
+    <!-- ═══ KPM Support Chat Bubble (homepage overlay) ═══ -->
+    <div id="kpmChatBubble" class="kpm-bubble-overlay" style="display:none;">
+        <div class="kpm-bubble-window">
+            <div class="kpm-bubble-header">
+                <div class="kpm-bubble-header-info">
+                    <span class="kpm-bubble-icon">
+                        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
+                          <defs>
+                            <radialGradient id="bg-kb" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#3b0a0a"/><stop offset="70%" stop-color="#1c0404"/><stop offset="100%" stop-color="#080101"/></radialGradient>
+                            <filter id="glow-kb"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                          </defs>
+                          <circle cx="40" cy="40" r="38" fill="url(#bg-kb)"/>
+                          <circle cx="40" cy="40" r="37.5" stroke="#f87171" stroke-width="1.5" opacity="0.85" filter="url(#glow-kb)"/>
+                          <path d="M40 12 L58 20 V36 C58 50 40 60 40 60 C40 60 22 50 22 36 V20 Z" fill="#1c0404" stroke="#f87171" stroke-width="2" stroke-linejoin="round" filter="url(#glow-kb)"/>
+                          <path d="M30 30 C30 30 34 28 40 30 C46 28 50 30 50 30 V44 C50 44 46 42 40 44 C34 42 30 44 30 44 Z" fill="#3b0a0a" stroke="#fca5a5" stroke-width="1.4" stroke-linejoin="round"/>
+                          <line x1="40" y1="30" x2="40" y2="44" stroke="#fca5a5" stroke-width="1.2" opacity="0.8"/>
+                          <rect x="32" y="48" width="16" height="8" rx="2" fill="#7f1d1d" stroke="#f87171" stroke-width="1" filter="url(#glow-kb)"/>
+                          <text x="40" y="55" text-anchor="middle" font-size="6" font-family="Arial" font-weight="bold" fill="#fca5a5">KPM</text>
+                        </svg>
+                    </span>
+                    <div>
+                        <div class="kpm-bubble-title" data-i18n="agent_kpm_name">Sokongan KPM</div>
+                        <div class="kpm-bubble-subtitle" data-i18n="agent_kpm_desc">Bantuan sistem EMIS, APDM, DTP dan polisi KPM</div>
+                    </div>
+                </div>
+                <button class="kpm-bubble-close" onclick="closeKpmBubble()" title="Tutup">&#10005;</button>
+            </div>
+            <div class="kpm-bubble-messages" id="kpmBubbleMessages"></div>
+            <div class="kpm-bubble-typing" id="kpmBubbleTyping" style="display:none;">
+                <span></span><span></span><span></span>
+            </div>
+            <div class="kpm-bubble-input-row">
+                <input type="text" class="kpm-bubble-input" id="kpmBubbleInput" placeholder="Taip soalan anda..." autocomplete="off" onkeydown="if(event.key==='Enter')sendKpmBubbleMsg()"/>
+                <button class="kpm-bubble-send" onclick="sendKpmBubbleMsg()">&#9658;</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ═══ Agent Canvas (one per agent, created dynamically) ═══ -->
     <div class="agent-canvas" id="agentCanvas" style="display:none;">
 
@@ -506,6 +544,6 @@
     </div>
 
 
-    <script src="/static/app.js?v=77"></script>
+    <script src="/static/app.js?v=79"></script>
 </body>
 </html>
