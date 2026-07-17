@@ -2639,12 +2639,27 @@ async function _sendKpmIntro() {
     }
 }
 
+const _KPM_FAREWELL_RE = /\b(terima\s*kasih|thank\s*you|thanks|bye|goodbye|selamat\s*tinggal|jumpa\s*lagi|tq\b|ok\s*terima|sudah\s*selesai|dah\s*selesai|habis\s*dah|itu\s*sahaja|that'?s?\s*all)\b/i;
+
 async function sendKpmBubbleMsg() {
     const input = document.getElementById('kpmBubbleInput');
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
     _appendKpmMsg(text, 'user');
+
+    // Farewell detection — reply locally then auto-close
+    if (_KPM_FAREWELL_RE.test(text)) {
+        const farewell = currentLang === 'en'
+            ? `Thank you for using SMARTAssist Hub KPM Support. Have a great day! 😊`
+            : `Terima kasih kerana menggunakan khidmat SMARTAssist Hub Sokongan KPM. Semoga hari tuan/puan menyenangkan! 😊`;
+        setTimeout(() => {
+            _appendKpmMsg(farewell, 'bot');
+            setTimeout(() => closeKpmBubble(), 2000);
+        }, 600);
+        return;
+    }
+
     const typing = document.getElementById('kpmBubbleTyping');
     typing.style.display = 'flex';
     document.getElementById('kpmBubbleMessages').scrollTop = 99999;
