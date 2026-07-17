@@ -855,6 +855,34 @@ def _pdf_to_word_editable_bytes(raw_pdf) -> bytes:
     return data
 
 
+@app.get("/api/review/download-word")
+async def review_download_word(session_id: str = "default"):
+    """Native-download endpoint: convert the session's uploaded PDF to an
+    editable .docx and return it as an attachment. Triggered by a direct link
+    click so the browser downloads it without a JS-gesture/blob workaround."""
+    raw = _REVIEW_PDF_CACHE.get(session_id)
+    if not raw:
+        return JSONResponse({"error": "Tiada fail PDF dimuat naik untuk sesi ini."}, status_code=404)
+    import io as _io
+    try:
+        try:
+            docx_bytes = _pdf_to_word_editable_bytes(raw)
+        except Exception:
+            import pdfplumber
+            with pdfplumber.open(_io.BytesIO(raw)) as pdf:
+                html = _pdf_to_review_html(pdf)
+            docx_bytes = _layout_html_to_docx_bytes(html) if html else None
+        if not docx_bytes:
+            return JSONResponse({"error": "Teks tidak dapat diekstrak dari PDF ini."}, status_code=400)
+        return Response(
+            content=docx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": 'attachment; filename="dokumen.docx"'},
+        )
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
 @app.post("/api/review/pdf-to-word")
 async def review_pdf_to_word(file: UploadFile = File(...)):
     """Convert an uploaded PDF to an editable .docx that matches the PDF's layout.

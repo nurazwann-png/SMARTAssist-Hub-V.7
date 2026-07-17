@@ -1133,37 +1133,20 @@ async function downloadUploadedPdf(fmt) {
         addMessage('Tiada fail PDF untuk dimuat turun.', 'assistant', '⚠️', 'Sistem');
         return;
     }
+    const a = document.createElement('a');
     if (fmt === 'pdf') {
-        const a = document.createElement('a');
         a.href = _reviewPdfObjectUrl;
         a.download = 'dokumen.pdf';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        return;
-    }
-    // Word: send the PDF to the server for conversion
-    try {
-        const pdfBlob = await (await fetch(_reviewPdfObjectUrl)).blob();
-        const fd = new FormData();
-        fd.append('file', pdfBlob, 'dokumen.pdf');
-        const res = await fetch('/api/review/pdf-to-word', { method: 'POST', body: fd });
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || res.statusText);
-        }
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
+    } else {
+        // Word: native browser download from the GET endpoint (uses the
+        // server-cached PDF). Direct link click keeps the user-gesture context,
+        // so the browser downloads reliably.
+        a.href = `/api/review/download-word?session_id=${encodeURIComponent(sessionId)}`;
         a.download = 'dokumen.docx';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (e) {
-        addMessage('Gagal menukar PDF ke Word: ' + e.message, 'assistant', '⚠️', 'Sistem');
     }
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
 }
 
 async function downloadEditedDoc(btn) {
