@@ -959,10 +959,13 @@ function _buildAnnotatedReview(data, docText) {
     html += `<span class="rev-doc-label">📄 Pratonton Dokumen</span>`;
     html += `<div class="rev-header-btns">`;
     html += `<button class="rev-expand-btn" onclick="toggleRevExpand(this)">⛶ Kembangkan</button>`;
-    if (!isPdf) {
+    if (isPdf) {
+        html += `<button class="rev-download-btn" onclick="downloadUploadedPdf('word')">📥 Word</button>`;
+        html += `<button class="rev-download-btn" onclick="downloadUploadedPdf('pdf')">📄 PDF</button>`;
+    } else {
         html += `<button class="rev-save-btn" onclick="saveDocEdit(this)" style="display:none">💾 Simpan</button>`;
+        html += `<button class="rev-download-btn" onclick="downloadEditedDoc(this)">📥 Muat Turun</button>`;
     }
-    html += `<button class="rev-download-btn" onclick="downloadEditedDoc(this)">📥 Muat Turun</button>`;
     html += `</div></div>`;
 
     // ── Split layout: doc (left) + annotations (right) ──
@@ -1121,6 +1124,45 @@ function saveDocEdit(btn) {
         btn.classList.remove('unsaved');
         btn.classList.add('saved');
         setTimeout(() => { btn.textContent = '💾 Simpan'; btn.classList.remove('saved'); }, 2200);
+    }
+}
+
+// Download the uploaded PDF as the original PDF, or converted to Word (.docx)
+async function downloadUploadedPdf(fmt) {
+    if (!_reviewPdfObjectUrl) {
+        addMessage('Tiada fail PDF untuk dimuat turun.', 'assistant', '⚠️', 'Sistem');
+        return;
+    }
+    if (fmt === 'pdf') {
+        const a = document.createElement('a');
+        a.href = _reviewPdfObjectUrl;
+        a.download = 'dokumen.pdf';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        return;
+    }
+    // Word: send the PDF to the server for conversion
+    try {
+        const pdfBlob = await (await fetch(_reviewPdfObjectUrl)).blob();
+        const fd = new FormData();
+        fd.append('file', pdfBlob, 'dokumen.pdf');
+        const res = await fetch('/api/review/pdf-to-word', { method: 'POST', body: fd });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || res.statusText);
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'dokumen.docx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+        addMessage('Gagal menukar PDF ke Word: ' + e.message, 'assistant', '⚠️', 'Sistem');
     }
 }
 

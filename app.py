@@ -790,6 +790,69 @@ async def export_pdf(request: Request):
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
+def _layout_html_to_docx_bytes(html_content: str) -> bytes:
+    """Convert reconstruction HTML (paragraphs with text-align + <b>) to a .docx,
+    preserving per-paragraph alignment and bold. Used to export an uploaded PDF
+    as Word."""
+    import io as _io2, re as _re2
+    from bs4 import BeautifulSoup as _BS
+    from docx import Document as _DocxDoc
+    from docx.shared import Pt as _Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH as _WD
+
+    soup = _BS(html_content, "html.parser")
+    doc = _DocxDoc()
+    style = doc.styles["Normal"]
+    style.font.name = "Arial"
+    style.font.size = _Pt(12)
+    align_map = {"left": _WD.LEFT, "right": _WD.RIGHT, "center": _WD.CENTER, "justify": _WD.JUSTIFY}
+
+    blocks = soup.find_all(["p", "h1", "h2", "h3", "h4", "li"])
+    for el in blocks:
+        text = el.get_text(separator=" ").strip()
+        st = el.get("style") or ""
+        if not text:
+            doc.add_paragraph("")  # preserve blank-line spacing
+            continue
+        if el.name in ("h1", "h2", "h3", "h4"):
+            para = doc.add_heading(text, level=int(el.name[1]))
+        elif el.name == "li":
+            para = doc.add_paragraph(text, style="List Bullet")
+        else:
+            para = doc.add_paragraph()
+            m = _re2.search(r"text-align:\s*(left|right|center|justify)", st)
+            if m:
+                para.alignment = align_map.get(m.group(1))
+            is_bold = bool(el.find(["b", "strong"])) or "font-weight:bold" in st.replace(" ", "")
+            run = para.add_run(text)
+            run.bold = is_bold
+    buf = _io2.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+@app.post("/api/review/pdf-to-word")
+async def review_pdf_to_word(file: UploadFile = File(...)):
+    """Convert an uploaded PDF to .docx, preserving layout (alignment, bold,
+    spacing) via the same reconstruction used for the review preview."""
+    import io as _io
+    try:
+        raw = await file.read()
+        import pdfplumber
+        with pdfplumber.open(_io.BytesIO(raw)) as pdf:
+            html = _pdf_to_review_html(pdf)
+        if not html:
+            return JSONResponse({"error": "Teks tidak dapat diekstrak dari PDF ini."}, status_code=400)
+        docx_bytes = _layout_html_to_docx_bytes(html)
+        return Response(
+            content=docx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": 'attachment; filename="dokumen.docx"'},
+        )
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
 @app.post("/api/review/download-edited")
 async def review_download_edited(request: Request):
     """Convert edited HTML doc back to DOCX and return as download."""
