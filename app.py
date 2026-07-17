@@ -258,43 +258,23 @@ def _pdf_page_lines(page):
     return out
 
 
-import re as _re_mod
-
-# Reference/date block of a KPM letter (Ruj. Kami, Ruj. Tuan, Rujukan, Tarikh,
-# No. Tel/Faks, Fail Kami). These are right-aligned in standard KPM format.
-_REF_LINE_RE = _re_mod.compile(
-    r'^(ruj\.?\s*(kami|tuan)?|rujukan|tarikh|no\.?\s*(tel|telefon|faks?|fax)|fail\s*kami)\b',
-    _re_mod.IGNORECASE,
-)
-
-
 def _pdf_to_review_html(pdf) -> str:
-    """Build editable review HTML from an open pdfplumber PDF, normalised to the
-    standard KPM letter format: the letterhead (before the reference block) keeps
-    its centred alignment, the Ruj./Tarikh reference block is right-aligned, and
-    everything after it (recipient, tajuk, body, motto, signature) is left-aligned."""
+    """Build editable review HTML from an open pdfplumber PDF, following the
+    uploaded file's own layout as closely as possible: per-line alignment
+    (left/right/centre), bold and paragraph spacing are taken directly from the
+    PDF's word positions, without any KPM-format normalisation."""
     import html as _html
     parts = ['<div style="font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;color:#000">']
     any_line = False
-    seen_ref = False
     for page in pdf.pages:
         for ln in _pdf_page_lines(page):
             any_line = True
-            s = ln["text"].strip()
-            is_ref = bool(_REF_LINE_RE.match(s)) and (":" in s)
-            if is_ref:
-                align = "right"
-                seen_ref = True
-            elif not seen_ref:
-                align = ln["align"]      # letterhead: preserve (usually centre)
-            else:
-                align = "left"           # body onward: standard KPM left
             for _ in range(ln["blanks"]):
                 parts.append('<p style="margin:0;line-height:1.4">&nbsp;</p>')
             body = _html.escape(ln["text"])
             if ln["bold"]:
                 body = f"<b>{body}</b>"
-            parts.append(f'<p style="margin:2px 0;text-align:{align}">{body}</p>')
+            parts.append(f'<p style="margin:2px 0;text-align:{ln["align"]}">{body}</p>')
     parts.append("</div>")
     return "".join(parts) if any_line else ""
 
