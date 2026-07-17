@@ -419,7 +419,7 @@ def _build_report_html(f: dict) -> str:
         pass
 
     if logo_url:
-        logo_block = f'<img src="{logo_url}" style="max-width:100%;max-height:100px;display:block;margin:0 auto">'
+        logo_block = f'<img src="{logo_url}" style="width:6.71cm;height:3.77cm;display:block;margin:0 auto">'
     else:
         logo_block = '<div style="height:60px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:10pt;border:1px dashed #ccc">[Logo]</div>'
 
@@ -623,7 +623,7 @@ def build_docx(session_id: str) -> bytes | None:
             lh_para = doc.add_paragraph()
             lh_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
             lh_para.paragraph_format.space_after = Pt(6)
-            lh_para.add_run().add_picture(_buf, width=Cm(16))
+            lh_para.add_run().add_picture(_buf, width=Cm(6.71), height=Cm(3.77))
             _lh_inserted = True
     except Exception:
         pass
