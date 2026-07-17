@@ -258,6 +258,55 @@ def _pdf_page_lines(page):
     return out
 
 
+# In-memory cache of the most recent uploaded PDF bytes per session, so the
+# review step can locate each issue's text and highlight it on the page images.
+_REVIEW_PDF_CACHE = {}
+
+
+def _locate_issue_boxes(raw_pdf, issues):
+    """Attach a normalised highlight box {page,x,y,w,h} to each issue whose
+    verbatim `petikan` text can be found in the uploaded PDF."""
+    import io as _io3
+    import pdfplumber
+    try:
+        pdf = pdfplumber.open(_io3.BytesIO(raw_pdf))
+    except Exception:
+        return
+    try:
+        pages = pdf.pages
+        for issue in issues:
+            petikan = (issue.get("petikan") or "").strip()
+            if not petikan:
+                continue
+            words = petikan.split()
+            attempts = [petikan] + [" ".join(words[:n]) for n in (6, 4, 3) if n < len(words)]
+            found = None
+            for attempt in attempts:
+                for pi, page in enumerate(pages):
+                    try:
+                        res = page.search(attempt, case=False)
+                    except Exception:
+                        res = []
+                    if res:
+                        r = res[0]
+                        W = page.width or 1.0
+                        H = page.height or 1.0
+                        found = {
+                            "page": pi,
+                            "x": round(r["x0"] / W, 4),
+                            "y": round(r["top"] / H, 4),
+                            "w": round((r["x1"] - r["x0"]) / W, 4),
+                            "h": round((r["bottom"] - r["top"]) / H, 4),
+                        }
+                        break
+                if found:
+                    break
+            if found:
+                issue["highlight"] = found
+    finally:
+        pdf.close()
+
+
 def _pdf_to_page_images(pdf, resolution=150):
     """Render each PDF page to a PNG data-URI. This gives a preview that is a
     pixel-faithful image of the uploaded PDF and displays reliably in any browser
@@ -308,6 +357,7 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
     doc_html = None   # rich HTML for visual preview
     doc_type = "Dokumen"
     pdf_images = []   # per-page PNG data-URIs for faithful PDF preview
+    _REVIEW_PDF_CACHE.pop(session_id, None)   # clear any previous upload
 
     try:
         if ext == ".pdf":
@@ -324,6 +374,8 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
             text = "\n".join(p for p in pages if p.strip())
             doc_type = "PDF"
             doc_html = None
+            # Cache raw bytes so the review step can locate & highlight issues
+            _REVIEW_PDF_CACHE[session_id] = raw
         elif ext in (".docx", ".doc"):
             # mammoth for rich HTML preview (preserves tables, bold, etc.)
             import mammoth
@@ -1211,6 +1263,17 @@ async def agent_chat(req: AgentChatRequest, request: Request):
     structured = None
     if agent in ("data_analysis", "letter_generator", "report_generator", "document_reviewer"):
         structured = _parse_agent_json(output)
+
+    # For an uploaded PDF under review, locate each issue's text and attach a
+    # highlight box so the frontend can mark the errors on the page images.
+    if agent == "document_reviewer" and structured and structured.get("issues"):
+        raw_pdf = _REVIEW_PDF_CACHE.get(req.session_id)
+        if raw_pdf:
+            try:
+                _locate_issue_boxes(raw_pdf, structured["issues"])
+                output = json.dumps(structured, ensure_ascii=False)
+            except Exception:
+                pass
 
     # Auto-review + auto-improve: when a document agent produces a ready document
     _DOC_AGENTS = {

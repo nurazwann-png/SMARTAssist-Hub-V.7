@@ -900,27 +900,39 @@ function _buildAnnotatedReview(data, docText) {
     const scoreLabels = { A: 'Cemerlang', B: 'Baik', C: 'Perlu Pembetulan', D: 'Banyak Isu' };
     const scoreColor = scoreColors[data.score] || '#6b7280';
 
-    // Map each issue to its line index in the document
-    const issuesMapped = issues.map(issue => ({
-        ...issue,
-        _lineIdx: _matchIssueToLine(issue, allLines)
-    }));
+    const isPdfImg = _reviewIsPdf && _reviewPdfImages && _reviewPdfImages.length;
 
-    // Re-number issues in document top-to-bottom order so badge N always
-    // matches annotation N in the right column
-    const mapped   = issuesMapped.filter(i => i._lineIdx >= 0).sort((a, b) => a._lineIdx - b._lineIdx);
-    const unmapped = issuesMapped.filter(i => i._lineIdx < 0);
-    [...mapped, ...unmapped].forEach((issue, i) => { issue.num = i + 1; });
+    const lineIssues = {};   // keyed by lineIdx (Word/text preview)
+    const pageIssues = {};   // keyed by PDF page index (image preview)
+    let orderedIssues;
 
-    // Build lineIssues map (keyed by lineIdx)
-    const lineIssues = {};
-    mapped.forEach(issue => {
-        if (!lineIssues[issue._lineIdx]) lineIssues[issue._lineIdx] = [];
-        lineIssues[issue._lineIdx].push(issue);
-    });
-
-    // Ordered list for annotation column (doc order first, then unmapped)
-    const orderedIssues = [...mapped, ...unmapped];
+    if (isPdfImg) {
+        // PDF: order issues by highlight position (page, then top-to-bottom)
+        const located   = issues.filter(i => i.highlight)
+            .sort((a, b) => (a.highlight.page - b.highlight.page) || (a.highlight.y - b.highlight.y));
+        const unlocated = issues.filter(i => !i.highlight);
+        orderedIssues = [...located, ...unlocated];
+        orderedIssues.forEach((issue, i) => { issue.num = i + 1; });
+        located.forEach(issue => {
+            (pageIssues[issue.highlight.page] = pageIssues[issue.highlight.page] || []).push(issue);
+        });
+    } else {
+        // Word/text: map each issue to its line index in the document
+        const issuesMapped = issues.map(issue => ({
+            ...issue,
+            _lineIdx: _matchIssueToLine(issue, allLines)
+        }));
+        // Re-number issues in document top-to-bottom order so badge N always
+        // matches annotation N in the right column
+        const mapped   = issuesMapped.filter(i => i._lineIdx >= 0).sort((a, b) => a._lineIdx - b._lineIdx);
+        const unmapped = issuesMapped.filter(i => i._lineIdx < 0);
+        [...mapped, ...unmapped].forEach((issue, i) => { issue.num = i + 1; });
+        mapped.forEach(issue => {
+            if (!lineIssues[issue._lineIdx]) lineIssues[issue._lineIdx] = [];
+            lineIssues[issue._lineIdx].push(issue);
+        });
+        orderedIssues = [...mapped, ...unmapped];
+    }
 
     const docHtml = _reviewDocHtml;
     const isPdf   = _reviewIsPdf;
@@ -960,9 +972,19 @@ function _buildAnnotatedReview(data, docText) {
 
     if (isPdf) {
         if (_reviewPdfImages && _reviewPdfImages.length) {
-            // Faithful PDF preview: each page rendered as an image
-            _reviewPdfImages.forEach((src, i) => {
-                html += `<img class="rev-pdf-page" src="${src}" alt="Halaman PDF ${i + 1}" loading="lazy">`;
+            // Faithful PDF preview: each page as an image with error highlights
+            _reviewPdfImages.forEach((src, pi) => {
+                html += `<div class="rev-pdf-page-wrap">`;
+                html += `<img class="rev-pdf-page" src="${src}" alt="Halaman PDF ${pi + 1}" loading="lazy">`;
+                (pageIssues[pi] || []).forEach(iss => {
+                    const h = iss.highlight;
+                    const cls = iss.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
+                    const st = `left:${(h.x * 100).toFixed(2)}%;top:${(h.y * 100).toFixed(2)}%;`
+                             + `width:${(h.w * 100).toFixed(2)}%;height:${(h.h * 100).toFixed(2)}%`;
+                    html += `<div class="rev-hl ${cls}" style="${st}" onclick="scrollToAnnotation(${iss.num})" title="Isu ${iss.num}">`
+                          + `<span class="rev-hl-num ${cls}">${iss.num}</span></div>`;
+                });
+                html += `</div>`;
             });
         } else {
             const pdfSrc = _reviewPdfObjectUrl || '';

@@ -39,6 +39,7 @@ FORMAT MAKLUM BALAS — balas HANYA dalam JSON:
       "severity": "WAJIB_BETULKAN atau CADANGAN",
       "category": "Tatabahasa/Ejaan/Format/Nada/Placeholder/Kandungan",
       "location": "Bahagian/perenggan di mana isu ditemui",
+      "petikan": "Petik teks TEPAT (verbatim) dari dokumen di mana isu berlaku — salin frasa pendek (maksimum 8 patah perkataan) SAMA seperti dalam dokumen supaya boleh dikesan lokasinya. Biarkan kosong jika isu berkaitan sesuatu yang TIADA dalam dokumen.",
       "issue": "Penerangan isu",
       "suggestion": "Cadangan pembetulan"
     }
