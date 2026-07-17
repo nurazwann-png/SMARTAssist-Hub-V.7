@@ -49,6 +49,8 @@ FORMAT MAKLUM BALAS — balas HANYA dalam JSON:
 }
 
 PENTING:
+- HADKAN kepada MAKSIMUM 12 isu yang paling penting sahaja. JANGAN hasilkan lebih.
+- Jika terdapat isu yang SAMA atau SERUPA berulang (contoh: masalah yang sama pada banyak baris/lajur jadual atau senarai), GABUNGKAN menjadi SATU isu sahaja dan nyatakan ia berlaku berulang kali dalam "location". JANGAN senaraikan satu isu bagi setiap baris/lajur.
 - "corrected_document" WAJIB diisi dengan dokumen penuh yang telah diperbetulkan apabila pengguna meminta betulkan sebarang isu (contoh: "Betulkan isu ini...", "perbaiki", "betulkan", "fix")
 - Jika "corrected_document" diisi, ia mestilah dokumen PENUH dan LENGKAP dengan semua pembetulan yang diminta
 - Jika tiada isu ditemui, kembalikan senarai issues kosong dengan mesej positif
@@ -224,7 +226,7 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
         messages.append({"role": "user", "content": review_prompt})
 
         try:
-            raw = chat_completion(messages=messages, temperature=0.3, max_tokens=3000)
+            raw = chat_completion(messages=messages, temperature=0.3, max_tokens=4000)
         except RuntimeError as e:
             return json.dumps({
                 "message": f"Ralat semasa menyemak dokumen. Sila cuba lagi.\n{e}",
@@ -241,7 +243,11 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
             _save_session(session_id, session)
             return json.dumps(parsed, ensure_ascii=False)
 
-        return raw
+        # Parsing failed entirely — return a friendly message, never the raw JSON
+        return json.dumps({
+            "message": "Maaf, semakan menghasilkan output yang tidak lengkap. Sila cuba semak semula dokumen.",
+            "review_failed": True,
+        }, ensure_ascii=False)
     else:
         messages = [
             {"role": "system", "content": system_content},
@@ -381,6 +387,56 @@ def clear_session(session_id: str):
     get_store().delete_ns(session_id, _NS)
 
 
+def _salvage_review_json(text: str) -> dict | None:
+    """Recover a review JSON that was truncated mid-output (e.g. token limit hit
+    inside the issues array) by keeping only the complete issue objects."""
+    import re as _re
+    start = text.find("{")
+    if start == -1:
+        return None
+    s = text[start:]
+    m = _re.search(r'"issues"\s*:\s*\[', s)
+    if not m:
+        return None
+    header = s[:m.end()]
+    i = m.end()
+    depth = 0
+    in_str = False
+    esc = False
+    obj_start = None
+    objs = []
+    while i < len(s):
+        c = s[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+        else:
+            if c == '"':
+                in_str = True
+            elif c == "{":
+                if depth == 0:
+                    obj_start = i
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0 and obj_start is not None:
+                    objs.append(s[obj_start:i + 1])
+                    obj_start = None
+            elif c == "]" and depth == 0:
+                break
+        i += 1
+    if not objs:
+        return None
+    try:
+        return json.loads(header + ",".join(objs) + "]}")
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
 def _try_parse_json(text: str) -> dict | None:
     text = text.strip()
     if text.startswith("```"):
@@ -398,4 +454,5 @@ def _try_parse_json(text: str) -> dict | None:
                 return json.loads(text[start:end + 1])
             except (json.JSONDecodeError, ValueError):
                 pass
-    return None
+    # Last resort: salvage a truncated review JSON (keep complete issues)
+    return _salvage_review_json(text)

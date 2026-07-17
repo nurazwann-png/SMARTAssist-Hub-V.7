@@ -2388,9 +2388,15 @@ async function sendReviewRequest(filename, docType) {
         const result = await res.json();
         typingIndicator.classList.remove('active');
         const info = getAgentInfo('document_reviewer');
-        let structured = null;
-        try { structured = JSON.parse(result.response); } catch (_) {}
-        addMessage(result.response, 'assistant', info.icon, info.name, structured);
+        // Prefer the backend's parsed object; fall back to parsing the response
+        let structured = result.structured || null;
+        if (!structured) { try { structured = JSON.parse(result.response); } catch (_) {} }
+        // Never dump raw JSON into the chat if parsing failed
+        let chatContent = result.response;
+        if (!structured && typeof chatContent === 'string' && chatContent.trim().startsWith('{')) {
+            chatContent = 'Maaf, semakan menghasilkan output yang tidak lengkap. Sila cuba semak semula dokumen.';
+        }
+        addMessage(chatContent, 'assistant', info.icon, info.name, structured);
     } catch (err) {
         typingIndicator.classList.remove('active');
         addMessage(`Ralat: ${err.message}`, 'assistant', '⚠️', 'Sistem');
