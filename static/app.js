@@ -2675,6 +2675,11 @@ function closeKpmBubble() {
         overlay.style.display = 'none';
         overlay.classList.remove('active');
         if (avatar) avatar.classList.remove('av-out');
+        // Reset session so next open starts fresh
+        _kpmSessionId = null;
+        _kpmReady = false;
+        const msgs = document.getElementById('kpmBubbleMessages');
+        if (msgs) msgs.innerHTML = '';
     }, 420);
 }
 
