@@ -354,13 +354,16 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
     if not text.strip():
         return JSONResponse({"ok": False, "error": "Fail kosong atau teks tidak dapat diekstrak."}, status_code=400)
 
-    # Detect actual document type from content (overrides file-format label)
-    _upper = text.upper()
+    # Detect actual document type from content (overrides file-format label).
+    # Collapse whitespace around ':' and '/' so markers match regardless of
+    # spacing (e.g. both "KEPADA:" and "KEPADA :").
+    import re as _re_det
+    _upper = _re_det.sub(r'\s*([:/])\s*', r'\1', text.upper())
     _report_markers = ["NAMA PROGRAM", "BUTIRAN PERLAKSANAAN", "ONE PAGE REPORT",
-                       "DISEDIAKAN OLEH", "CADANGAN / TINDAKAN", "RUMUSAN", "TARIKH PROGRAM"]
+                       "DISEDIAKAN OLEH", "CADANGAN/TINDAKAN", "RUMUSAN", "TARIKH PROGRAM"]
     _letter_markers = ["RUJ. KAMI", "MALAYSIA MADANI", "SAYA YANG MENJALANKAN AMANAH",
                        "Y.BHG", "TUAN/PUAN", "BERKHIDMAT UNTUK NEGARA"]
-    _memo_markers = ["MEMO DALAMAN", "MEMO RASMI", "KEPADA :", "DARIPADA :", "TARIKH :", "PERKARA :"]
+    _memo_markers = ["MEMO DALAMAN", "MEMO RASMI", "KEPADA:", "DARIPADA:", "TARIKH:", "PERKARA:"]
     _report_score = sum(1 for m in _report_markers if m in _upper)
     _letter_score = sum(1 for m in _letter_markers if m in _upper)
     _memo_score   = sum(1 for m in _memo_markers if m in _upper)
