@@ -225,6 +225,12 @@ const I18N = {
         history_delete_tip: 'Padam', history_load_fail: 'Gagal memuatkan sejarah.',
         // KPM bubble
         kpm_input_ph: 'Taip soalan anda...', kpm_close_tip: 'Tutup', kpm_avatar_sub: 'Ejen Sokongan KPM',
+        // Document preview toolbar
+        doc_preview_title: 'Pratonton Dokumen', doc_preview_editable: '(boleh diedit)',
+        doc_corrected_title: 'Dokumen Diperbetulkan',
+        doc_undo: 'Batal', doc_redo: 'Buat Semula', doc_reset: 'Asal', doc_view_word: 'Lihat Word', doc_save: 'Simpan',
+        doc_undo_tip: 'Batal (Ctrl+Z)', doc_redo_tip: 'Buat Semula (Ctrl+Y)', doc_reset_tip: 'Kembali ke kandungan asal AI',
+        doc_download: 'Muat Turun', rev_expand: 'Kembangkan', rev_doc_label: 'Pratonton Dokumen',
         // Generic errors
         error_generic: 'Maaf, ralat berlaku. Sila cuba lagi.',
         error_conn: 'Ralat sambungan. Sila cuba lagi.',
@@ -277,6 +283,12 @@ const I18N = {
         history_delete_tip: 'Delete', history_load_fail: 'Failed to load history.',
         // KPM bubble
         kpm_input_ph: 'Type your question...', kpm_close_tip: 'Close', kpm_avatar_sub: 'KPM Support Agent',
+        // Document preview toolbar
+        doc_preview_title: 'Document Preview', doc_preview_editable: '(editable)',
+        doc_corrected_title: 'Corrected Document',
+        doc_undo: 'Undo', doc_redo: 'Redo', doc_reset: 'Original', doc_view_word: 'View Word', doc_save: 'Save',
+        doc_undo_tip: 'Undo (Ctrl+Z)', doc_redo_tip: 'Redo (Ctrl+Y)', doc_reset_tip: 'Restore original AI content',
+        doc_download: 'Download', rev_expand: 'Expand', rev_doc_label: 'Document Preview',
         // Generic errors
         error_generic: 'Sorry, an error occurred. Please try again.',
         error_conn: 'Connection error. Please try again.',
@@ -1125,10 +1137,11 @@ function buildReviewHtml(data) {
         html += '<div class="da-section"><div class="da-section-title">✅ Tiada Isu</div><p style="font-size:13px;color:var(--text-secondary)">Dokumen ini dalam keadaan baik.</p></div>';
     }
     if (data.corrected_document) {
+        const _d2 = I18N[currentLang];
         html += `<div class="da-section doc-preview-section review-doc-preview-section">`;
-        html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span><div class="doc-edit-tools"><button class="doc-edit-btn" onclick="docUndo()" title="Batal (Ctrl+Z)">↩ Batal</button><button class="doc-edit-btn" onclick="docRedo()" title="Buat Semula (Ctrl+Y)">↪ Buat Semula</button><button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" title="Kembali ke kandungan asal AI">⟳ Asal</button><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button></div></div>`;
+        html += `<div class="da-section-title">📄 ${_d2.doc_corrected_title} <span class="edit-hint">${_d2.doc_preview_editable}</span><div class="doc-edit-tools"><button class="doc-edit-btn" onclick="docUndo()" title="${_d2.doc_undo_tip}">↩ ${_d2.doc_undo}</button><button class="doc-edit-btn" onclick="docRedo()" title="${_d2.doc_redo_tip}">↪ ${_d2.doc_redo}</button><button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" title="${_d2.doc_reset_tip}">⟳ ${_d2.doc_reset}</button><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="${_d2.doc_view_word}">&#9974; ${_d2.doc_view_word}</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 ${_d2.doc_save}</button></div></div>`;
         html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview" oninput="onPreviewEdit()">${escapeHtml(data.corrected_document)}</pre>`;
-        html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 Muat Turun (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 Muat Turun (.pdf)</button></div>`;
+        html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 ${_d2.doc_download} (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 ${_d2.doc_download} (.pdf)</button></div>`;
         html += '</div>';
     }
     html += '</div>';
@@ -1233,16 +1246,17 @@ function _buildAnnotatedReview(data, docText) {
     html += '</div>';
 
     // ── Header: label + action buttons ──
+    const _dr = I18N[currentLang];
     html += `<div class="rev-doc-header">`;
-    html += `<span class="rev-doc-label">📄 Pratonton Dokumen</span>`;
+    html += `<span class="rev-doc-label">📄 ${_dr.rev_doc_label}</span>`;
     html += `<div class="rev-header-btns">`;
-    html += `<button class="rev-expand-btn" onclick="toggleRevExpand(this)">⛶ Kembangkan</button>`;
+    html += `<button class="rev-expand-btn" onclick="toggleRevExpand(this)">⛶ ${_dr.rev_expand}</button>`;
     if (isPdf) {
         html += `<button class="rev-download-btn" onclick="downloadUploadedPdf('word')">📥 Word</button>`;
         html += `<button class="rev-download-btn" onclick="downloadUploadedPdf('pdf')">📄 PDF</button>`;
     } else {
-        html += `<button class="rev-save-btn" onclick="saveDocEdit(this)" style="display:none">💾 Simpan</button>`;
-        html += `<button class="rev-download-btn" onclick="downloadEditedDoc(this)">📥 Muat Turun</button>`;
+        html += `<button class="rev-save-btn" onclick="saveDocEdit(this)" style="display:none">💾 ${_dr.doc_save}</button>`;
+        html += `<button class="rev-download-btn" onclick="downloadEditedDoc(this)">📥 ${_dr.doc_download}</button>`;
     }
     html += `</div></div>`;
 
@@ -1305,10 +1319,11 @@ function _buildAnnotatedReview(data, docText) {
 
     // Corrected document section (legacy — from agent corrected_document field)
     if (data.corrected_document) {
+        const _d3 = I18N[currentLang];
         html += `<div class="da-section doc-preview-section review-doc-preview-section">`;
-        html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span><div class="doc-edit-tools"><button class="doc-edit-btn" onclick="docUndo()" title="Batal (Ctrl+Z)">↩ Batal</button><button class="doc-edit-btn" onclick="docRedo()" title="Buat Semula (Ctrl+Y)">↪ Buat Semula</button><button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" title="Kembali ke kandungan asal AI">⟳ Asal</button><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button></div></div>`;
+        html += `<div class="da-section-title">📄 ${_d3.doc_corrected_title} <span class="edit-hint">${_d3.doc_preview_editable}</span><div class="doc-edit-tools"><button class="doc-edit-btn" onclick="docUndo()" title="${_d3.doc_undo_tip}">↩ ${_d3.doc_undo}</button><button class="doc-edit-btn" onclick="docRedo()" title="${_d3.doc_redo_tip}">↪ ${_d3.doc_redo}</button><button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" title="${_d3.doc_reset_tip}">⟳ ${_d3.doc_reset}</button><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="${_d3.doc_view_word}">&#9974; ${_d3.doc_view_word}</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 ${_d3.doc_save}</button></div></div>`;
         html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview" oninput="onPreviewEdit()">${escapeHtml(data.corrected_document)}</pre>`;
-        html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 Muat Turun (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 Muat Turun (.pdf)</button></div>`;
+        html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 ${_d3.doc_download} (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 ${_d3.doc_download} (.pdf)</button></div>`;
         html += '</div>';
     }
 
@@ -1923,14 +1938,15 @@ function buildLetterHtml(data) {
     }
 
     if (data.document_preview) {
+        const _d = I18N[currentLang];
         html += '<div class="da-section doc-preview-section">';
-        html += '<div class="da-section-title">📄 Pratonton Dokumen <span class="edit-hint">(boleh diedit)</span>'
+        html += `<div class="da-section-title">📄 ${_d.doc_preview_title} <span class="edit-hint">${_d.doc_preview_editable}</span>`
             + `<div class="doc-edit-tools">`
-            + `<button class="doc-edit-btn" onclick="docUndo()" title="Batal (Ctrl+Z)">↩ Batal</button>`
-            + `<button class="doc-edit-btn" onclick="docRedo()" title="Buat Semula (Ctrl+Y)">↪ Buat Semula</button>`
-            + `<button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" title="Kembali ke kandungan asal AI">⟳ Asal</button>`
-            + `<button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button>`
-            + `<button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button>`
+            + `<button class="doc-edit-btn" onclick="docUndo()" title="${_d.doc_undo_tip}">↩ ${_d.doc_undo}</button>`
+            + `<button class="doc-edit-btn" onclick="docRedo()" title="${_d.doc_redo_tip}">↪ ${_d.doc_redo}</button>`
+            + `<button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" title="${_d.doc_reset_tip}">⟳ ${_d.doc_reset}</button>`
+            + `<button class="doc-preview-expand-btn" onclick="openWordPreview()" title="${_d.doc_view_word}">&#9974; ${_d.doc_view_word}</button>`
+            + `<button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 ${_d.doc_save}</button>`
             + `</div></div>`;
         if (data.document_html) {
             html += `<pre class="doc-preview" contenteditable="true" id="docPreview" style="display:none" oninput="onPreviewEdit()">${escapeHtml(data.document_preview)}</pre>`;
