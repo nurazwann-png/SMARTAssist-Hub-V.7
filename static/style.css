@@ -1816,6 +1816,36 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
 .feedback-btn.active-up { color: var(--green); border-color: var(--green); opacity: 1; }
 .feedback-btn.active-down { color: var(--red); border-color: var(--red); opacity: 1; }
 
+/* ── Resume-session banner ── */
+.resume-banner {
+    position: fixed; bottom: 24px; right: 24px; z-index: 9998;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--bg-secondary); border: 1px solid var(--accent);
+    border-radius: 14px; padding: 12px 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    opacity: 0; transform: translateY(16px); transition: all 0.3s ease;
+    max-width: 360px; font-size: 14px;
+}
+.resume-banner.show { opacity: 1; transform: translateY(0); }
+.resume-banner-icon { font-size: 20px; flex-shrink: 0; }
+.resume-banner-text { flex: 1; color: var(--text-secondary); min-width: 160px; }
+.resume-banner-text strong { color: var(--text-primary); }
+.resume-banner-yes {
+    padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    background: var(--accent); color: #fff; border: none; cursor: pointer;
+    transition: opacity 0.2s;
+}
+.resume-banner-yes:hover { opacity: 0.85; }
+.resume-banner-no {
+    padding: 6px 12px; border-radius: 8px; font-size: 13px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-secondary); cursor: pointer; transition: color 0.2s;
+}
+.resume-banner-no:hover { color: var(--text-primary); }
+@media (max-width: 640px) {
+    .resume-banner { bottom: 16px; right: 12px; left: 12px; max-width: none; }
+}
+
 /* Retry button inside error message bubble */
 .retry-btn {
     display: inline-flex; align-items: center; gap: 5px;

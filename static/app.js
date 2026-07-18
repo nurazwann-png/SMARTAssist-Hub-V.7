@@ -19,6 +19,54 @@ let _reviewIsPdf        = false;
 let _reviewPdfObjectUrl = null;
 let _reviewPdfImages    = [];
 
+// ── Draft / last-session persistence ──
+const _DRAFT_KEY = 'smartassist_last_session';
+
+function _saveDraft() {
+    if (sessionId && currentAgent) {
+        localStorage.setItem(_DRAFT_KEY, JSON.stringify({ sessionId, agent: currentAgent }));
+    }
+}
+
+function _clearDraft() {
+    localStorage.removeItem(_DRAFT_KEY);
+}
+
+function _checkResumeBanner() {
+    const raw = localStorage.getItem(_DRAFT_KEY);
+    if (!raw) return;
+    let draft;
+    try { draft = JSON.parse(raw); } catch (_) { _clearDraft(); return; }
+    if (!draft.sessionId || !draft.agent) { _clearDraft(); return; }
+
+    const info = getAgentInfo(draft.agent);
+    const banner = document.createElement('div');
+    banner.id = 'resumeBanner';
+    banner.className = 'resume-banner';
+    banner.innerHTML = `
+        <span class="resume-banner-icon">${info.icon}</span>
+        <span class="resume-banner-text">Sambung sesi <strong>${info.name}</strong> yang lepas?</span>
+        <button class="resume-banner-yes" onclick="_resumeDraft()">Sambung</button>
+        <button class="resume-banner-no" onclick="_dismissResume()">Tutup</button>`;
+    document.body.appendChild(banner);
+    requestAnimationFrame(() => banner.classList.add('show'));
+}
+
+function _resumeDraft() {
+    const raw = localStorage.getItem(_DRAFT_KEY);
+    if (!raw) return;
+    let draft;
+    try { draft = JSON.parse(raw); } catch (_) { return; }
+    _dismissResume();
+    openAgent(draft.agent, draft.sessionId);
+}
+
+function _dismissResume() {
+    const banner = document.getElementById('resumeBanner');
+    if (banner) { banner.classList.remove('show'); setTimeout(() => banner.remove(), 300); }
+    _clearDraft();
+}
+
 // ── Fetch with timeout ──
 let _slowToastTimer = null;
 let _currentAbortController = null;
@@ -532,6 +580,7 @@ async function goHome() {
 
 async function newSession() {
     if (!currentAgent) return;
+    _clearDraft();
     await sendFarewell();
     openAgent(currentAgent);
 }
@@ -2747,6 +2796,7 @@ async function sendMessage() {
         const data = await res.json();
         lastActiveAgent = data.agent || currentAgent || 'fallback';
         addMessage(data.response, 'assistant', data.agent_icon, data.agent_name, data.structured);
+        _saveDraft();
 
         // Tanya followup jika dokumen baru sahaja siap
         if (data.structured?.ready_to_save && !_awaitingFollowup) {
@@ -2826,6 +2876,9 @@ if (historySearchInput) {
 }
 document.getElementById('langToggle').addEventListener('click', toggleLanguage);
 applyLanguage(currentLang);
+
+// Resume last session if available
+setTimeout(_checkResumeBanner, 800);
 
 // Agent cards
 document.querySelectorAll('.agent-card').forEach(card => {
