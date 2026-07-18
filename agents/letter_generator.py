@@ -80,6 +80,7 @@ GAYA:
 TARIKH SEMASA: {current_date}
 - Gunakan tarikh semasa sebagai rujukan. Tahun semasa ialah {current_year}.
 - Jangan persoalkan tarikh yang pengguna berikan selagi formatnya betul.
+- Format tarikh untuk field "tarikh" surat/memo MESTI dalam format "D Bulan YYYY" sahaja — contoh: "22 Julai 2026". JANGAN masukkan nama hari (Isnin, Selasa, Rabu, dll) dalam field "tarikh". Nama hari hanya dibenarkan dalam field "tarikh_acara" (tarikh acara memo).
 
 FORMAT OUTPUT — balas HANYA dalam JSON:
 {
@@ -332,6 +333,11 @@ def _strip_para_num(text: str) -> str:
     return _re.sub(r'^\s*\d+[\.\)]\s*', '', text)
 
 
+def _strip_day_name(tarikh: str) -> str:
+    """Buang nama hari dalam kurungan dari tarikh — '22 Julai 2026 (Rabu)' → '22 Julai 2026'."""
+    return _re.sub(r'\s*\([^)]*\)\s*$', '', (tarikh or '').strip())
+
+
 # Matches sub-item prefixes: 3.1  3.1.2  I.  II.  a.  a)  A)
 _SUBITEM_RE = _re.compile(
     r'^(\d+(?:\.\d+)+\.?\s+'
@@ -438,7 +444,7 @@ def _build_surat(f: dict) -> str:
 
     header_lines = [
         f"{'No. Rujukan : ' + f.get('rujukan', '[PLACEHOLDER]'):>{RIGHT_W}}",
-        f"{'Tarikh      : ' + f.get('tarikh', '[PLACEHOLDER]'):>{RIGHT_W}}",
+        f"{'Tarikh      : ' + _strip_day_name(f.get('tarikh', '[PLACEHOLDER]')):>{RIGHT_W}}",
         "",
     ] + addr_lines
 
@@ -484,7 +490,7 @@ def _build_memo(f: dict) -> str:
 
 {'Kepada':<10}| {'Pengerusi':<12}: {f.get('pengerusi', '[PLACEHOLDER]')}
 {ahli_lines}{'Daripada':<10}| {'Urus setia':<12}: {f.get('urus_setia', '[PLACEHOLDER]')}
-{'Tarikh':<10}| {'':12}: {f.get('tarikh', '[PLACEHOLDER]')}
+{'Tarikh':<10}| {'':12}: {_strip_day_name(f.get('tarikh', '[PLACEHOLDER]'))}
 {'Perkara':<10}| {'':12}: {f.get('tajuk', '[PLACEHOLDER]').upper()}
 {'Ruj. Kami':<10}| {'':12}: {f.get('rujukan', '[PLACEHOLDER]')}
 
@@ -1050,7 +1056,7 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
     if fields:
         # Ruj. Kami + Tarikh right-aligned (per KPM format)
         _p(f"Ruj. Kami : {fields.get('rujukan', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
-        _p(f"Tarikh    : {fields.get('tarikh', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
+        _p(f"Tarikh    : {_strip_day_name(fields.get('tarikh', ''))}", align=WD_ALIGN_PARAGRAPH.RIGHT)
 
         doc.add_paragraph("")
 
@@ -1233,7 +1239,7 @@ def _build_memo_html(f: dict) -> str:
             if ahli:
                 rows.append(('', '', ahli))
     rows.append((f'<b>Daripada</b>', ':', f.get('urus_setia', '')))
-    rows.append((f'<b>Tarikh</b>', ':', f.get('tarikh', '')))
+    rows.append((f'<b>Tarikh</b>', ':', _strip_day_name(f.get('tarikh', ''))))
     rows.append((f'<b>Ruj. Kami</b>', ':', f.get('rujukan', '')))
     rows.append((f'<b>Perkara</b>', ':', f'<b>{f.get("tajuk", "").upper()}</b>'))
 
@@ -1396,7 +1402,7 @@ def _build_surat_html(f: dict) -> str:
     penerima_html = "<br>".join(l for l in penerima_lines if l)
     rujukan_html = (
         f'Ruj. Kami &nbsp;: {f.get("rujukan","")}<br>'
-        f'Tarikh &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: {f.get("tarikh","")}'
+        f'Tarikh &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: {_strip_day_name(f.get("tarikh",""))}'
     )
 
     sig_extra = ""
@@ -1568,7 +1574,7 @@ def _build_memo_docx(doc, fields: dict):
             if ahli:
                 rows_data.append(("", ahli))
     rows_data.append(("Daripada", fields.get('urus_setia', '')))
-    rows_data.append(("Tarikh", fields.get('tarikh', '')))
+    rows_data.append(("Tarikh", _strip_day_name(fields.get('tarikh', ''))))
     rows_data.append(("Ruj. Kami", fields.get('rujukan', '')))
     rows_data.append(("Perkara", fields.get('tajuk', '').upper()))
 
