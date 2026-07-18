@@ -96,7 +96,7 @@ FORMAT OUTPUT — balas HANYA dalam JSON:
 PHASES:
 - Phase 0: Kenal pasti jenis dokumen (surat/memo). Jika pengguna minta tukar jenis, pindahkan field yang sama.
 - Phase 1: Kumpul maklumat secara berperingkat (satu field setiap giliran). JANGAN tanya "isi" — isi akan dijana automatik.
-- Phase 2: JANA ISI KANDUNGAN SECARA AUTOMATIK berdasarkan tajuk dan semua maklumat yang dikumpul. Simpan hasil dalam fields_collected dengan key "isi". Jika fields_collected sudah mengandungi "isi" (pengguna telah isikan ringkasan dalam borang), GUNAKAN ia sebagai konteks/panduan untuk jana isi yang penuh, formal dan berformat dengan betul — JANGAN salin teks pengguna secara verbatim, jana semula dalam ayat rasmi yang sesuai. Jika maklumat tidak mencukupi, tanya soalan spesifik untuk mendapat konteks tambahan. JANGAN minta pengguna tulis isi sendiri.
+- Phase 2: JANA ISI KANDUNGAN SECARA AUTOMATIK berdasarkan tajuk dan semua maklumat yang dikumpul. Simpan hasil dalam fields_collected dengan key "isi". Jika fields_collected sudah mengandungi "isi_user" (ringkasan/panduan dari pengguna melalui borang), WAJIB gunakan ia sebagai konteks untuk jana isi yang penuh, formal dan berformat dengan betul — JANGAN salin teks "isi_user" secara verbatim, jana semula dalam ayat rasmi yang lengkap. Jika maklumat tidak mencukupi, tanya soalan spesifik untuk mendapat konteks tambahan. JANGAN minta pengguna tulis isi sendiri.
   * Untuk SURAT: tulis isi dengan bernombor perenggan (2., 3., 4. dst), bahasa formal, lengkap dan profesional.
   * Untuk MEMO: field 'isi' WAJIB mengandungi SATU AYAT PENDEK SAHAJA tanpa sebarang newline — contoh: "Sukacita dimaklumkan bahawa mesyuarat akan diadakan seperti butiran berikut:". DILARANG KERAS memasukkan tarikh/masa/tempat, nombor perenggan (3., 4.), atau kandungan lain dalam 'isi'. Sistem akan papar tarikh_acara/masa_acara/tempat_acara secara berasingan. Field 'langkah_kerja' (PILIHAN) mengandungi langkah-langkah tindakan yang perlu diambil, SATU LANGKAH SETIAP BARIS (pisahkan dengan \n), contoh: "Semak senarai hadir\nSediakan kertas kerja\nHubungi peserta yang tidak hadir". Tanya tentang langkah_kerja hanya jika konteks memo memerlukan tindakan susulan.
 - Phase 3: Tunjukkan pratonton dokumen lengkap — SEMAK tiada [PLACEHOLDER] kekal
@@ -535,7 +535,10 @@ def _parse_form_submission(query: str, doc_type: str) -> dict:
             continue
         # Match label to field key (case-insensitive)
         key = label_to_key.get(label_raw.lower())
-        if key:
+        if key == 'isi':
+            # Simpan sebagai isi_user — AI akan jana isi formal; jangan overwrite terus
+            result['isi_user'] = value
+        elif key:
             result[key] = value
     return result
 
@@ -1317,18 +1320,29 @@ def _build_surat_html(f: dict) -> str:
     _plain_p = 'margin:6px 0;line-height:1.6;text-align:justify'
     _indent_p = 'margin:2px 0 2px 4em;line-height:1.6'
     isi_html = ""
-    for para_text in [_strip_para_num(p.strip()) for p in isi_raw.split('\n\n') if p.strip()]:
+    for para_text in [p.strip() for p in isi_raw.split('\n\n') if p.strip()]:
         # Skip duplicate "Dengan segala hormatnya" — already shown as fixed opening line
-        if _DENGAN_RE.match(para_text):
+        if _DENGAN_RE.match(_strip_para_num(para_text)):
             continue
-        for line in para_text.split('\n'):
-            line = _strip_para_num(line.strip())
+        lines = para_text.split('\n')
+        is_first = True
+        for line in lines:
+            line = line.strip()
             if not line:
                 continue
-            if _TARIKH_BARIS_RE.match(line):
-                isi_html += f'<p style="{_indent_p}">{line}</p>'
+            if is_first:
+                # Keep paragraph number (2., 3., ...) on first line; only strip from Tarikh/Masa/Tempat
+                if _TARIKH_BARIS_RE.match(_strip_para_num(line)):
+                    isi_html += f'<p style="{_indent_p}">{_strip_para_num(line)}</p>'
+                else:
+                    isi_html += f'<p style="{_plain_p}">{line}</p>'
+                is_first = False
             else:
-                isi_html += f'<p style="{_plain_p}">{line}</p>'
+                line_s = _strip_para_num(line)
+                if _TARIKH_BARIS_RE.match(line_s):
+                    isi_html += f'<p style="{_indent_p}">{line_s}</p>'
+                else:
+                    isi_html += f'<p style="{_plain_p}">{line_s}</p>'
         isi_html += '<p style="margin:0 0 4px 0"></p>'
 
     n = 'style="margin:6px 0;line-height:1.6"'

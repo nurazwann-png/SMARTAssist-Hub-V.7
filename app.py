@@ -885,6 +885,10 @@ def _render_html_to_pdf(html_content: str) -> bytes:
                 if el:
                     flow.append(el)
             elif nm in ('div', 'body', 'html', 'span', 'section', 'article'):
+                st = _parse_style(c.get('style', ''))
+                if st.get('page-break-before') == 'always':
+                    from reportlab.platypus import PageBreak as _PB
+                    flow.append(_PB())
                 _walk(c)
             else:
                 _walk(c)
