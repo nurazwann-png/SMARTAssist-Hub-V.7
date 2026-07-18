@@ -635,6 +635,23 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 .word-page-html-content td { border: 1px solid #000; }
 .edit-hint { font-size: 10px; color: var(--text-secondary); font-weight: 400; }
 
+/* contenteditable visual hint for #docPreviewHtml */
+#docPreviewHtml { cursor: text; transition: border-color 0.2s, box-shadow 0.2s; }
+#docPreviewHtml:focus { outline: none; border-color: #3b82f6 !important; box-shadow: 0 0 0 3px rgba(59,130,246,0.18); }
+
+/* Canvas action button labels */
+.canvas-action-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.canvas-action-icon { font-size: 1.1em; line-height: 1; }
+.canvas-action-label { font-size: 9px; font-weight: 500; letter-spacing: 0.02em; opacity: 0.85; line-height: 1; }
+
+/* Typing indicator label */
+.typing-label { font-size: 11px; color: var(--text-secondary, #888); margin-left: 6px; opacity: 0.8; align-self: center; }
+
+/* Reduced motion: hide particle canvas */
+@media (prefers-reduced-motion: reduce) {
+    #particleCanvas { display: none !important; }
+}
+
 /* Auto-review panel */
 .auto-review-panel {
     margin: 10px 0 4px;

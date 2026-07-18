@@ -255,6 +255,7 @@ function getAgentInfo(agentKey) {
 function initParticles() {
     const canvas = document.getElementById('particleCanvas');
     if (!canvas) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const ctx = canvas.getContext('2d');
     let w, h, particles = [];
 
@@ -409,6 +410,7 @@ async function sendAgentIntro(agentKey) {
         addMessage(data.response, 'assistant', info.icon, info.name);
     } catch (_) {
         typingIndicator.classList.remove('active');
+        addMessage('Tidak dapat memuat ejen. Sila cuba lagi.', 'assistant', info.icon, info.name);
     }
 }
 
@@ -543,6 +545,7 @@ function loadSession(sid, agent) {
 }
 
 async function deleteSession(sid) {
+    if (!confirm('Padam sesi ini? Tindakan ini tidak boleh dibatalkan.')) return;
     try {
         await fetch('/api/clear', {
             method: 'POST',
@@ -550,6 +553,7 @@ async function deleteSession(sid) {
             body: JSON.stringify({ session_id: sid, message: '' }),
         });
         refreshHistory();
+        alert('Sesi telah dipadamkan.');
     } catch (_) {}
 }
 
@@ -2003,6 +2007,9 @@ async function downloadReviewDocument() {
 }
 
 async function downloadDocument() {
+    const btn = document.querySelector('.doc-action-btn.download-btn');
+    const origText = btn ? btn.innerHTML : null;
+    if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Menyediakan...'; }
     const previewHtml = document.getElementById('docPreviewHtml');
     if (previewHtml) await saveDocumentEdits(previewHtml.innerText);
     const endpoint = currentAgent === 'report_generator' ? '/api/report/download' : '/api/document/download';
@@ -2018,6 +2025,7 @@ async function downloadDocument() {
         a.download = match ? match[1] : 'dokumen_rasmi.docx';
         a.click(); URL.revokeObjectURL(url);
     } catch (err) { alert(err.message); }
+    finally { if (btn) { btn.disabled = false; btn.innerHTML = origText; } }
 }
 
 async function saveDocumentEdits(content) {
@@ -2092,10 +2100,13 @@ async function saveOverlayEdits(btn) {
 
 // Download current document as PDF — direct download, no print dialog
 async function downloadDocumentPdf() {
+    const btn = document.querySelector('.doc-action-btn.pdf-btn');
+    const origText = btn ? btn.innerHTML : null;
+    if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Menyediakan...'; }
     const previewHtml = document.getElementById('docPreviewHtml') || document.getElementById('wordPreviewHtmlEdit');
     const preview     = document.getElementById('docPreview') || document.getElementById('reviewDocPreview') || document.getElementById('wordPreviewText');
     const html = previewHtml ? previewHtml.innerHTML : (preview ? `<pre style="font-family:Arial,sans-serif;font-size:12pt;white-space:pre-wrap">${preview.innerText}</pre>` : '');
-    if (!html) return;
+    if (!html) { if (btn) { btn.disabled = false; btn.innerHTML = origText; } return; }
 
     // Determine filename from agent and document type
     let filename;
@@ -2129,6 +2140,8 @@ async function downloadDocumentPdf() {
         setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
     } catch (e) {
         alert('Ralat muat turun PDF: ' + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = origText; }
     }
 }
 
