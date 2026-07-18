@@ -1387,11 +1387,23 @@ const _FIELD_DEFS = {
 const _MS_DAYS   = ['Ahad','Isnin','Selasa','Rabu','Khamis','Jumaat','Sabtu'];
 const _MS_MONTHS = ['Januari','Februari','Mac','April','Mei','Jun','Julai','Ogos','September','Oktober','November','Disember'];
 
-function _formatDateMS(iso) {
-    if (!iso) return '';
-    const [y, m, d] = iso.split('-').map(Number);
-    const dt = new Date(y, m - 1, d);
-    return `${d} ${_MS_MONTHS[m - 1]} ${y} (${_MS_DAYS[dt.getDay()]})`;
+function _parseDateInput(val) {
+    if (!val) return null;
+    // dd/mm/yyyy or dd-mm-yyyy
+    let m = val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) return { d: +m[1], mo: +m[2], y: +m[3] };
+    // yyyy-mm-dd (ISO from old type=date)
+    m = val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return { d: +m[3], mo: +m[2], y: +m[1] };
+    return null;
+}
+
+function _formatDateMS(val) {
+    if (!val) return '';
+    const p = _parseDateInput(val);
+    if (!p) return val; // return as-is if unrecognised
+    const dt = new Date(p.y, p.mo - 1, p.d);
+    return `${p.d} ${_MS_MONTHS[p.mo - 1]} ${p.y} (${_MS_DAYS[dt.getDay()]})`;
 }
 
 let _formCounter = 0;
@@ -1493,7 +1505,7 @@ function _buildMissingFieldsForm(missingLabels) {
         } else {
             let input = '';
             if (def.type === 'date') {
-                input = `<input class="ff-input ff-date" type="date" id="${iid}" data-label="${escapeAttr(label)}" data-is-date="1" onchange="_onDateChange(this,'${fid}')">`;
+                input = `<input class="ff-input ff-date" type="text" id="${iid}" data-label="${escapeAttr(label)}" data-is-date="1" placeholder="cth: 22/07/2026" oninput="_onDateChange(this,'${fid}')">`;
             } else {
                 input = `<input class="ff-input" type="text" id="${iid}" data-label="${escapeAttr(label)}" placeholder="${escapeAttr(def.ph)}">`;
             }
@@ -1564,8 +1576,9 @@ function _renumberSERows(list) {
 
 function _onDateChange(input, fid) {
     if (!input.value) return;
-    const [y, m, d] = input.value.split('-').map(Number);
-    const day = _MS_DAYS[new Date(y, m - 1, d).getDay()];
+    const p = _parseDateInput(input.value);
+    if (!p) return;
+    const day = _MS_DAYS[new Date(p.y, p.mo - 1, p.d).getDay()];
     const form = document.getElementById(fid);
     if (!form) return;
     const hariEl = Array.from(form.querySelectorAll('[data-label]')).find(e => e.dataset.label === 'Hari');
