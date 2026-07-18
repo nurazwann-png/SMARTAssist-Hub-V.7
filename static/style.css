@@ -490,15 +490,20 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 .canvas-agent-icon { font-size: 20px; display: flex; align-items: center; }
 .canvas-agent-icon svg { width: 32px; height: 32px; display: block; }
 .canvas-agent-name { font-size: 15px; font-weight: 700; }
-.canvas-actions { display: flex; gap: 8px; }
+.canvas-actions { display: flex; gap: 8px; align-items: center; }
 .canvas-action-btn {
-    font-size: 16px; color: var(--text-secondary);
-    background: var(--glass); border: 1px solid var(--border);
-    width: 36px; height: 36px; border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
+    display: flex; flex-direction: row; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 20px;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.13);
+    color: var(--text-secondary); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
-.canvas-action-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.canvas-action-btn:hover {
+    background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.28);
+    color: var(--text-primary); transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
 
 /* Messages */
 .canvas-messages {
@@ -640,9 +645,13 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 #docPreviewHtml:focus { outline: none; border-color: #3b82f6 !important; box-shadow: 0 0 0 3px rgba(59,130,246,0.18); }
 
 /* Canvas action button labels */
-.canvas-action-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.canvas-action-icon { font-size: 1.1em; line-height: 1; }
-.canvas-action-label { font-size: 9px; font-weight: 500; letter-spacing: 0.02em; opacity: 0.85; line-height: 1; }
+.canvas-action-icon { font-size: 14px; line-height: 1; }
+.canvas-action-label { font-size: 13px; font-weight: 500; line-height: 1; }
+
+#canvasHistoryBtn { border-color: rgba(99,179,237,0.3); color: #90cdf4; }
+#canvasHistoryBtn:hover { background: rgba(99,179,237,0.15); border-color: rgba(99,179,237,0.6); color: #bee3f8; }
+#canvasNewBtn { border-color: rgba(104,211,145,0.3); color: #9ae6b4; }
+#canvasNewBtn:hover { background: rgba(104,211,145,0.15); border-color: rgba(104,211,145,0.6); color: #c6f6d5; }
 
 /* Typing indicator label */
 .typing-label { font-size: 11px; color: var(--text-secondary, #888); margin-left: 6px; opacity: 0.8; align-self: center; }
