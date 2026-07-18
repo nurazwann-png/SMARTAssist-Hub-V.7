@@ -858,7 +858,7 @@ def _render_html_to_pdf(html_content: str) -> bytes:
                 flow.append(HRFlowable(width='100%', thickness=1.5,
                                        color=colors.black, spaceBefore=4, spaceAfter=8))
             elif nm == 'br':
-                flow.append(Spacer(1, FONT_PT))
+                flow.append(Spacer(1, FONT_PT * 1.6))
             elif nm == 'p':
                 txt = _inline(c).strip()
                 st = _parse_style(c.get('style', ''))
