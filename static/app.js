@@ -307,6 +307,10 @@ function applyLanguage(lang) {
         const key = el.getAttribute('data-i18n-placeholder');
         if (dict[key]) el.placeholder = dict[key];
     });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        if (dict[key]) el.title = dict[key];
+    });
     const toggle = document.getElementById('langToggle');
     if (toggle) {
         toggle.querySelector('.lang-flag').textContent = lang === 'bm' ? '🇲🇾' : '🇬🇧';
@@ -1139,9 +1143,9 @@ function buildReviewHtml(data) {
     if (data.corrected_document) {
         const _d2 = I18N[currentLang];
         html += `<div class="da-section doc-preview-section review-doc-preview-section">`;
-        html += `<div class="da-section-title">📄 ${_d2.doc_corrected_title} <span class="edit-hint">${_d2.doc_preview_editable}</span><div class="doc-edit-tools"><button class="doc-edit-btn" onclick="docUndo()" title="${_d2.doc_undo_tip}">↩ ${_d2.doc_undo}</button><button class="doc-edit-btn" onclick="docRedo()" title="${_d2.doc_redo_tip}">↪ ${_d2.doc_redo}</button><button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" title="${_d2.doc_reset_tip}">⟳ ${_d2.doc_reset}</button><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="${_d2.doc_view_word}">&#9974; ${_d2.doc_view_word}</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 ${_d2.doc_save}</button></div></div>`;
+        html += `<div class="da-section-title">📄 <span data-i18n="doc_corrected_title">${_d2.doc_corrected_title}</span> <span class="edit-hint" data-i18n="doc_preview_editable">${_d2.doc_preview_editable}</span><div class="doc-edit-tools"><button class="doc-edit-btn" onclick="docUndo()" data-i18n-title="doc_undo_tip" title="${_d2.doc_undo_tip}">↩ <span data-i18n="doc_undo">${_d2.doc_undo}</span></button><button class="doc-edit-btn" onclick="docRedo()" data-i18n-title="doc_redo_tip" title="${_d2.doc_redo_tip}">↪ <span data-i18n="doc_redo">${_d2.doc_redo}</span></button><button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" data-i18n-title="doc_reset_tip" title="${_d2.doc_reset_tip}">⟳ <span data-i18n="doc_reset">${_d2.doc_reset}</span></button><button class="doc-preview-expand-btn" onclick="openWordPreview()" data-i18n-title="doc_view_word" title="${_d2.doc_view_word}">&#9974; <span data-i18n="doc_view_word">${_d2.doc_view_word}</span></button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 <span data-i18n="doc_save">${_d2.doc_save}</span></button></div></div>`;
         html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview" oninput="onPreviewEdit()">${escapeHtml(data.corrected_document)}</pre>`;
-        html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 ${_d2.doc_download} (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 ${_d2.doc_download} (.pdf)</button></div>`;
+        html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 <span data-i18n="doc_download">${_d2.doc_download}</span> (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 <span data-i18n="doc_download">${_d2.doc_download}</span> (.pdf)</button></div>`;
         html += '</div>';
     }
     html += '</div>';
@@ -1321,9 +1325,9 @@ function _buildAnnotatedReview(data, docText) {
     if (data.corrected_document) {
         const _d3 = I18N[currentLang];
         html += `<div class="da-section doc-preview-section review-doc-preview-section">`;
-        html += `<div class="da-section-title">📄 ${_d3.doc_corrected_title} <span class="edit-hint">${_d3.doc_preview_editable}</span><div class="doc-edit-tools"><button class="doc-edit-btn" onclick="docUndo()" title="${_d3.doc_undo_tip}">↩ ${_d3.doc_undo}</button><button class="doc-edit-btn" onclick="docRedo()" title="${_d3.doc_redo_tip}">↪ ${_d3.doc_redo}</button><button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" title="${_d3.doc_reset_tip}">⟳ ${_d3.doc_reset}</button><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="${_d3.doc_view_word}">&#9974; ${_d3.doc_view_word}</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 ${_d3.doc_save}</button></div></div>`;
+        html += `<div class="da-section-title">📄 <span data-i18n="doc_corrected_title">${_d3.doc_corrected_title}</span> <span class="edit-hint" data-i18n="doc_preview_editable">${_d3.doc_preview_editable}</span><div class="doc-edit-tools"><button class="doc-edit-btn" onclick="docUndo()" data-i18n-title="doc_undo_tip" title="${_d3.doc_undo_tip}">↩ <span data-i18n="doc_undo">${_d3.doc_undo}</span></button><button class="doc-edit-btn" onclick="docRedo()" data-i18n-title="doc_redo_tip" title="${_d3.doc_redo_tip}">↪ <span data-i18n="doc_redo">${_d3.doc_redo}</span></button><button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" data-i18n-title="doc_reset_tip" title="${_d3.doc_reset_tip}">⟳ <span data-i18n="doc_reset">${_d3.doc_reset}</span></button><button class="doc-preview-expand-btn" onclick="openWordPreview()" data-i18n-title="doc_view_word" title="${_d3.doc_view_word}">&#9974; <span data-i18n="doc_view_word">${_d3.doc_view_word}</span></button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 <span data-i18n="doc_save">${_d3.doc_save}</span></button></div></div>`;
         html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview" oninput="onPreviewEdit()">${escapeHtml(data.corrected_document)}</pre>`;
-        html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 ${_d3.doc_download} (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 ${_d3.doc_download} (.pdf)</button></div>`;
+        html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 <span data-i18n="doc_download">${_d3.doc_download}</span> (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 <span data-i18n="doc_download">${_d3.doc_download}</span> (.pdf)</button></div>`;
         html += '</div>';
     }
 
@@ -1940,13 +1944,13 @@ function buildLetterHtml(data) {
     if (data.document_preview) {
         const _d = I18N[currentLang];
         html += '<div class="da-section doc-preview-section">';
-        html += `<div class="da-section-title">📄 ${_d.doc_preview_title} <span class="edit-hint">${_d.doc_preview_editable}</span>`
+        html += `<div class="da-section-title">📄 <span data-i18n="doc_preview_title">${_d.doc_preview_title}</span> <span class="edit-hint" data-i18n="doc_preview_editable">${_d.doc_preview_editable}</span>`
             + `<div class="doc-edit-tools">`
-            + `<button class="doc-edit-btn" onclick="docUndo()" title="${_d.doc_undo_tip}">↩ ${_d.doc_undo}</button>`
-            + `<button class="doc-edit-btn" onclick="docRedo()" title="${_d.doc_redo_tip}">↪ ${_d.doc_redo}</button>`
-            + `<button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" title="${_d.doc_reset_tip}">⟳ ${_d.doc_reset}</button>`
-            + `<button class="doc-preview-expand-btn" onclick="openWordPreview()" title="${_d.doc_view_word}">&#9974; ${_d.doc_view_word}</button>`
-            + `<button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 ${_d.doc_save}</button>`
+            + `<button class="doc-edit-btn" onclick="docUndo()" data-i18n-title="doc_undo_tip" title="${_d.doc_undo_tip}">↩ <span data-i18n="doc_undo">${_d.doc_undo}</span></button>`
+            + `<button class="doc-edit-btn" onclick="docRedo()" data-i18n-title="doc_redo_tip" title="${_d.doc_redo_tip}">↪ <span data-i18n="doc_redo">${_d.doc_redo}</span></button>`
+            + `<button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" data-i18n-title="doc_reset_tip" title="${_d.doc_reset_tip}">⟳ <span data-i18n="doc_reset">${_d.doc_reset}</span></button>`
+            + `<button class="doc-preview-expand-btn" onclick="openWordPreview()" data-i18n-title="doc_view_word" title="${_d.doc_view_word}">&#9974; <span data-i18n="doc_view_word">${_d.doc_view_word}</span></button>`
+            + `<button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 <span data-i18n="doc_save">${_d.doc_save}</span></button>`
             + `</div></div>`;
         if (data.document_html) {
             html += `<pre class="doc-preview" contenteditable="true" id="docPreview" style="display:none" oninput="onPreviewEdit()">${escapeHtml(data.document_preview)}</pre>`;
