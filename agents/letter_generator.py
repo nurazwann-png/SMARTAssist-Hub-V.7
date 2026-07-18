@@ -728,6 +728,39 @@ Status sesi semasa:
             if required_keys.issubset(session["fields"].keys()):
                 session["fields"]["isi"] = f"Sukacita dimaklumkan bahawa {tajuk.rstrip('.')} akan diadakan seperti butiran berikut:"
 
+    # Jana isi surat secara automatik jika isi_user ada tapi isi belum dijana
+    if (session.get("doc_type") == "surat"
+            and session["fields"].get("isi_user")
+            and not session["fields"].get("isi")):
+        _tajuk = session["fields"].get("tajuk", "")
+        _isi_user = session["fields"].get("isi_user", "")
+        _penerima = session["fields"].get("penerima", "")
+        _isi_prompt = [
+            {"role": "system", "content": (
+                "Kamu adalah pembantu yang menulis isi kandungan surat rasmi dalam Bahasa Malaysia yang formal dan profesional. "
+                "Balas HANYA dengan teks isi kandungan sahaja — tiada penjelasan, tiada JSON."
+            )},
+            {"role": "user", "content": (
+                f"Jana isi kandungan surat rasmi berdasarkan maklumat berikut:\n"
+                f"Tajuk: {_tajuk}\n"
+                f"Penerima: {_penerima}\n"
+                f"Ringkasan isi dari pengguna: {_isi_user}\n\n"
+                "Tulis 2-4 perenggan bernombor (2., 3., 4. dst) yang formal, lengkap dan profesional. "
+                "Setiap perenggan bermula dengan nombor (contoh: '2. Sehubungan dengan itu...'). "
+                "Jangan masukkan 'Dengan segala hormatnya' atau 'Sekian'. "
+                "Gunakan Bahasa Malaysia rasmi."
+            )}
+        ]
+        try:
+            _isi_raw = chat_completion(messages=_isi_prompt, temperature=0.4, max_tokens=800)
+            if _isi_raw and _isi_raw.strip():
+                session["fields"]["isi"] = _isi_raw.strip()
+                _save_session(session_id, session)
+        except Exception:
+            # Fallback: guna isi_user terus jika API call gagal
+            session["fields"]["isi"] = f"2. {_isi_user}\n\n3. Kerjasama dan perhatian pihak tuan/puan dalam perkara ini amatlah dihargai."
+            _save_session(session_id, session)
+
     all_filled = session["doc_type"] and not _find_missing_fields(session["doc_type"], session["fields"])
     if session["doc_type"] and (session["phase"] >= 3 or all_filled):
         if all_filled:
