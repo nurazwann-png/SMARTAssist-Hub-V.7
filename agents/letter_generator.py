@@ -377,8 +377,9 @@ def _auto_panggilan(nama: str) -> str:
     return "Tuan/Puan"
 
 
-def _build_senarai_edaran_page(se_raw: str) -> str:
+def _build_senarai_edaran_page(se_raw) -> str:
     """Jana halaman senarai edaran dari JSON string atau teks."""
+    se_raw = str(se_raw) if se_raw else ""
     entries = []
     if se_raw and se_raw.strip():
         try:
@@ -414,7 +415,7 @@ def _build_senarai_edaran_page(se_raw: str) -> str:
 
 
 def _build_surat(f: dict) -> str:
-    sk = f.get("salinan_kepada", "")
+    sk = str(f.get("salinan_kepada", "") or "")
     sk_lines = ""
     _sk_skip = {"tiada", "none", "kosong", "tak ada", "tidak ada", "-", "–", "tiada s.k.", "tiada sk"}
     if sk and sk.strip().lower() not in _sk_skip:
@@ -1178,7 +1179,7 @@ def _build_memo_html(f: dict) -> str:
     tempat_acara = f.get('tempat_acara', '')
 
     # Strip isi from AI-added tarikh/masa/tempat info (already in dedicated block)
-    _isi_raw = _strip_para_num(f.get('isi', '').split('\n')[0].strip())
+    _isi_raw = _strip_para_num(str(f.get('isi', '') or '').split('\n')[0].strip())
     _isi_lower = _isi_raw.lower()
     # Remove trailing sentences that mention date/time/place
     for _kw in [tarikh_acara.lower(), masa_acara.lower(), tempat_acara.lower()]:
@@ -1260,7 +1261,7 @@ def _build_surat_html(f: dict) -> str:
             f'</div>'
         )
 
-    sk = f.get("salinan_kepada", "")
+    sk = str(f.get("salinan_kepada", "") or "")
     sk_html = ""
     _sk_skip = {"tiada", "none", "kosong", "tak ada", "tidak ada", "-", "–", "tiada s.k.", "tiada sk"}
     if sk and sk.strip().lower() not in _sk_skip:
@@ -1271,12 +1272,12 @@ def _build_surat_html(f: dict) -> str:
                 sk_html += f'<p style="margin:2px 0">{i+1}. {item}</p>'
 
     # Penerima block — guna field 'penerima' baru, fallback ke penerima_nama lama
-    penerima_raw = f.get('penerima', '') or f.get('penerima_nama', '')
+    penerima_raw = str(f.get('penerima', '') or f.get('penerima_nama', '') or '')
     is_se = 'senarai edaran' in penerima_raw.lower()
     penerima_line = "Rujuk Senarai Edaran" if is_se else penerima_raw
     panggilan = "Tuan/Puan" if is_se else _auto_panggilan(penerima_raw)
 
-    isi_raw = f.get('isi', '')
+    isi_raw = str(f.get('isi', '') or '')
     isi_paras = [_strip_para_num(p.strip()) for p in isi_raw.split('\n\n') if p.strip()] if isi_raw else []
     # Build isi HTML with hanging indent
     _hi_main  = 'padding-left:1.4em;text-indent:-1.4em;margin:6px 0 0 0;line-height:1.6;text-align:justify'
@@ -1342,7 +1343,7 @@ def _build_surat_html(f: dict) -> str:
 
 def _build_senarai_edaran_html(f: dict) -> str:
     """Jana HTML halaman senarai edaran — ALL CAPS, BOLD."""
-    se_raw = f.get('senarai_edaran', '')
+    se_raw = str(f.get('senarai_edaran', '') or '')
     if not se_raw or not se_raw.strip():
         return ""
     entries = []
