@@ -524,49 +524,69 @@ async function loadSessionMessages(sid) {
 function toggleHistory() {
     historyPanel.classList.toggle('open');
     historyOverlay.classList.toggle('open');
-    if (historyPanel.classList.contains('open')) refreshHistory();
+    if (historyPanel.classList.contains('open')) {
+        refreshHistory();
+        const inp = document.getElementById('historySearchInput');
+        if (inp) { inp.value = ''; inp.focus(); }
+    }
 }
+
+let _allSessions = [];
 
 async function refreshHistory() {
     try {
         const res = await fetch('/api/sessions');
-        const sessions = await res.json();
-        const d = I18N[currentLang];
-        if (sessions.length === 0) {
-            historyList.innerHTML = `<div class="history-empty">${d.history_empty}</div>`;
-            return;
-        }
-        const locale = currentLang === 'en' ? 'en-GB' : 'ms-MY';
-        const buildItem = s => {
-            const info = s.agent ? getAgentInfo(s.agent) : { icon: '\u{1F4AC}', name: s.agent };
-            const time = new Date(s.updated).toLocaleString(locale, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-            return `<div class="history-item" onclick="loadSession('${escapeAttr(s.session_id)}', '${escapeAttr(s.agent)}')">
-                <div class="history-item-icon">${info.icon}</div>
-                <div class="history-item-info">
-                    <div class="history-item-title">${escapeHtml(s.title)}</div>
-                    <div class="history-item-meta">${info.name} &middot; ${time} &middot; ${s.message_count} ${d.history_msg_suffix}</div>
-                </div>
-                <button class="history-item-delete" onclick="event.stopPropagation(); deleteSession('${escapeAttr(s.session_id)}')" title="${d.history_delete_tip}">&times;</button>
-            </div>`;
-        };
-        const recent = sessions.slice(0, 10);
-        const older  = sessions.slice(10);
-        let html = recent.map(buildItem).join('');
-        if (older.length > 0) {
-            html += `
-            <div class="history-older-toggle" onclick="this.classList.toggle('open')">
-                <span class="history-older-icon">🗂️</span>
-                <span class="history-older-label">${d.history_older} <span class="history-older-count">${older.length}</span></span>
-                <span class="history-older-chevron">›</span>
-            </div>
-            <div class="history-older-list">
-                ${older.map(buildItem).join('')}
-            </div>`;
-        }
-        historyList.innerHTML = html;
+        _allSessions = await res.json();
+        _renderHistory();
     } catch (_) {
         historyList.innerHTML = `<div class="history-empty">${I18N[currentLang].history_load_fail}</div>`;
     }
+}
+
+function _renderHistory(query = '') {
+    const d = I18N[currentLang];
+    const q = query.trim().toLowerCase();
+    const sessions = q
+        ? _allSessions.filter(s => s.title.toLowerCase().includes(q) || (s.agent || '').toLowerCase().includes(q))
+        : _allSessions;
+
+    if (sessions.length === 0) {
+        historyList.innerHTML = `<div class="history-empty">${q ? 'Tiada hasil carian.' : d.history_empty}</div>`;
+        return;
+    }
+    const locale = currentLang === 'en' ? 'en-GB' : 'ms-MY';
+    const buildItem = s => {
+        const info = s.agent ? getAgentInfo(s.agent) : { icon: '\u{1F4AC}', name: s.agent };
+        const time = new Date(s.updated).toLocaleString(locale, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+        return `<div class="history-item" onclick="loadSession('${escapeAttr(s.session_id)}', '${escapeAttr(s.agent)}')">
+            <div class="history-item-icon">${info.icon}</div>
+            <div class="history-item-info">
+                <div class="history-item-title">${escapeHtml(s.title)}</div>
+                <div class="history-item-meta">${info.name} &middot; ${time} &middot; ${s.message_count} ${d.history_msg_suffix}</div>
+            </div>
+            <button class="history-item-delete" onclick="event.stopPropagation(); deleteSession('${escapeAttr(s.session_id)}')" title="${d.history_delete_tip}">&times;</button>
+        </div>`;
+    };
+    // When searching, flatten all results without older/recent split
+    if (q) {
+        historyList.innerHTML = sessions.map(buildItem).join('');
+        return;
+    }
+    const recent = sessions.slice(0, 10);
+    const older  = sessions.slice(10);
+    let html = recent.map(buildItem).join('');
+    if (older.length > 0) {
+        html += `
+        <div class="history-older-toggle" onclick="this.classList.toggle('open')">
+            <span class="history-older-icon">🗂️</span>
+            <span class="history-older-label">${d.history_older} <span class="history-older-count">${older.length}</span></span>
+            <span class="history-older-chevron">›</span>
+        </div>
+        <div class="history-older-list">
+            ${older.map(buildItem).join('')}
+        </div>`;
+    }
+    historyList.innerHTML = html;
 }
 
 function loadSession(sid, agent) {
@@ -2742,6 +2762,15 @@ document.getElementById('canvasHistoryBtn').addEventListener('click', toggleHist
 document.getElementById('historyBtn').addEventListener('click', toggleHistory);
 document.getElementById('historyCloseBtn').addEventListener('click', toggleHistory);
 historyOverlay.addEventListener('click', toggleHistory);
+
+// History search
+const historySearchInput = document.getElementById('historySearchInput');
+if (historySearchInput) {
+    historySearchInput.addEventListener('input', () => _renderHistory(historySearchInput.value));
+    // Clear search when panel closes
+    const _origToggle = toggleHistory;
+    window._clearHistorySearch = () => { historySearchInput.value = ''; };
+}
 document.getElementById('langToggle').addEventListener('click', toggleLanguage);
 applyLanguage(currentLang);
 

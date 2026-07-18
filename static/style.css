@@ -267,6 +267,18 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 .history-header h3 { font-size: 15px; font-weight: 700; }
 .history-close-btn { font-size: 22px; color: var(--text-secondary); }
 .history-close-btn:hover { color: var(--text-primary); }
+.history-search-wrap {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+}
+.history-search-icon { font-size: 14px; opacity: 0.5; flex-shrink: 0; }
+.history-search-input {
+    flex: 1; background: var(--bg-tertiary); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 10px; font-size: 13px;
+    color: var(--text-primary); outline: none; transition: border-color 0.2s;
+}
+.history-search-input::placeholder { color: var(--text-secondary); }
+.history-search-input:focus { border-color: var(--accent); }
 .history-list { flex: 1; overflow-y: auto; padding: 10px; }
 .history-empty { color: var(--text-secondary); font-size: 13px; text-align: center; padding: 40px 10px; }
 .history-item {
