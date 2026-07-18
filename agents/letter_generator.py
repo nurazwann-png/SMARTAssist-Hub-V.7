@@ -514,6 +514,32 @@ Saya yang menjalankan amanah
 {f.get('nama_pejabat', '[PLACEHOLDER]')}"""
 
 
+def _parse_form_submission(query: str, doc_type: str) -> dict:
+    """Parse Label: value pairs from form submission messages directly into field keys.
+    Returns dict of {field_key: value} for all matched labels."""
+    schema = _get_field_schema(doc_type) if doc_type else SURAT_FIELDS["fields"] + MEMO_FIELDS["fields"]
+    label_to_key = {f["label"].lower(): f["key"] for f in schema}
+    result = {}
+    import re as _re_form
+    # Split on pattern: ". SomeLabel:" or ". CAPS word:"
+    parts = _re_form.split(r'(?<=\.)\s+(?=[A-ZÀ-ɏ])', query)
+    if len(parts) <= 1:
+        parts = [query]
+    for part in parts:
+        m = _re_form.match(r'^(.+?):\s*(.+)$', part.strip(), _re_form.DOTALL)
+        if not m:
+            continue
+        label_raw = m.group(1).strip().rstrip('.')
+        value = m.group(2).strip().rstrip('.')
+        if not value:
+            continue
+        # Match label to field key (case-insensitive)
+        key = label_to_key.get(label_raw.lower())
+        if key:
+            result[key] = value
+    return result
+
+
 def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm", user_name: str = "") -> str:
     sapaan = f", {user_name.split()[0]}" if user_name else ""
     if query == '__INTRO__':
@@ -524,6 +550,13 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
                 "⚠️ Peringatan: Semua dokumen yang dijana adalah draf hasil AI. Sila semak dan sahkan semua kandungan, nama, tarikh serta rujukan dengan teliti sebelum digunakan secara rasmi.")
 
     session = _get_session(session_id)
+
+    # Parse form submission directly — map all Label: value pairs to field keys
+    # This bypasses the AI's one-field-at-a-time restriction for form submissions
+    _form_parsed = _parse_form_submission(query, session.get("doc_type", ""))
+    if _form_parsed:
+        session["fields"].update({k: v for k, v in _form_parsed.items() if v})
+        _save_session(session_id, session)
 
     _PATCH_KEYWORDS = {"kemaskini", "ubah", "ganti", "tukar", "edit", "update", "betulkan", "perbetulkan", "tukar kepada", "ubah suai"}
     query_lower = query.lower()
