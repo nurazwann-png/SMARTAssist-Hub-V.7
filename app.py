@@ -99,7 +99,7 @@ _feedback: list[dict] = []
 
 AGENT_LABELS = {
     "data_analysis": {"icon": "\U0001f4ca", "name": "Analisis Data"},
-    "letter_generator": {"icon": "✉️", "name": "Penjana Surat"},
+    "letter_generator": {"icon": "✉️", "name": "Penjana Surat Rasmi/Memo"},
     "report_generator": {"icon": "\U0001f4cb", "name": "Penjana Laporan"},
     "document_reviewer": {"icon": "\U0001f4dd", "name": "Semakan Dokumen"},
     "kpm_support": {"icon": "\U0001f6df", "name": "Sokongan KPM"},
@@ -189,9 +189,9 @@ async def chat(req: ChatRequest):
 
 
 @app.post("/api/upload")
-async def upload(file: UploadFile = File(...), session_id: str = Form("default")):
+async def upload(file: UploadFile = File(...), session_id: str = Form("default"), lang: str = Form("bm")):
     contents = await file.read()
-    result = da_upload(contents, file.filename, session_id)
+    result = da_upload(contents, file.filename, session_id, lang=lang)
 
     if result["ok"]:
         _get_store().append_message(session_id, {

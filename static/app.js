@@ -509,7 +509,7 @@ const AGENT_INFO = {
     },
     letter_generator: {
         icon: AGENT_ICONS.letter_generator,
-        name: { bm: 'Penjana Surat Rasmi', en: 'Official Letter Generator' },
+        name: { bm: 'Penjana Surat Rasmi/Memo', en: 'Official Letter/Memo Generator' },
         desc: { bm: 'Bantu anda menyediakan surat rasmi, memo dan surat siaran mengikut format KPM.', en: 'Help you draft official letters, memos and circulars in KPM format.' },
         quick: { bm: ['Tulis surat jemputan bengkel', 'Buat memo dalaman', 'Tulis surat siaran'], en: ['Write workshop invitation letter', 'Create internal memo', 'Write circular letter'] },
     },
@@ -2821,6 +2821,7 @@ async function handleDataUpload(file) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('session_id', sessionId);
+    formData.append('lang', currentLang);
     try {
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -2830,12 +2831,14 @@ async function handleDataUpload(file) {
             uploadBtn.classList.add('has-file');
             fileIndicator.style.display = 'flex';
             fileIndicatorText.textContent = `\u{1F4C4} ${data.filename} (${data.rows} baris, ${data.columns} lajur)`;
-            addMessage('', 'assistant', '\u{1F4CA}', 'Analisis Data', {
+            // Auto-EDA profile computed server-side with pandas (falls back to the basic notice)
+            const structured = data.eda || {
                 response_type: 'papar',
                 message: `Fail '${data.filename}' berjaya dimuat naik. ${data.rows} baris dan ${data.columns} lajur dikesan.`,
                 penemuan: [`Lajur: ${data.column_names.join(', ')}`],
                 susulan: ['Tunjukkan ringkasan statistik', 'Paparkan 10 baris pertama', 'Buat carta berdasarkan data ini'],
-            });
+            };
+            addMessage('', 'assistant', '\u{1F4CA}', 'Analisis Data', structured);
         } else {
             addMessage(data.error || I18N[currentLang].err_upload_fail, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
         }
@@ -2947,7 +2950,7 @@ async function lgHandleLetterPdfUpload(file) {
                 + `Jenis dokumen dicadangkan: ${docTypeLabel}\n`
                 + (fieldLines ? `\nMaklumat yang diekstrak:\n${fieldLines}\n` : '\nTiada maklumat khusus dapat diekstrak. Sila isi borang secara manual.\n')
                 + `\nSila lengkapkan borang di bawah untuk jana surat.`;
-            addMessage(summaryMsg, 'assistant', '📄', 'Penjana Surat Rasmi');
+            addMessage(summaryMsg, 'assistant', '📄', 'Penjana Surat Rasmi/Memo');
             await lgSendPdfAnalysisRequest(file.name, data.analysis_summary, data.suggested_type, data.extracted_fields);
         } else {
             addMessage(data.error || I18N[currentLang].error_generic, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
