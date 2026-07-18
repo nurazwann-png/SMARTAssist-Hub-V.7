@@ -19,6 +19,43 @@ let _reviewIsPdf        = false;
 let _reviewPdfObjectUrl = null;
 let _reviewPdfImages    = [];
 
+// ── Fetch with timeout ──
+let _slowToastTimer = null;
+let _currentAbortController = null;
+
+function fetchWithTimeout(url, options = {}, timeoutMs = 60000, slowMs = 20000) {
+    if (_currentAbortController) _currentAbortController.abort();
+    _currentAbortController = new AbortController();
+    const signal = _currentAbortController.signal;
+
+    clearTimeout(_slowToastTimer);
+    _slowToastTimer = setTimeout(() => {
+        if (isProcessing) showToast('AI sedang memproses, sila tunggu...', 'info', 8000);
+    }, slowMs);
+
+    const timeoutId = setTimeout(() => _currentAbortController.abort(), timeoutMs);
+
+    return fetch(url, { ...options, signal })
+        .finally(() => { clearTimeout(timeoutId); clearTimeout(_slowToastTimer); });
+}
+
+let _lastRetryFn = null;
+
+function _showRetryMessage(agentIcon, agentName) {
+    const info = { icon: agentIcon || '⚠️', name: agentName || 'Sistem' };
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message assistant';
+    msgDiv.innerHTML = `<div class="agent-tag">${info.icon} ${info.name}</div>
+        <div class="message-bubble">Permintaan mengambil masa terlalu lama atau sambungan terputus.
+        <br><button class="retry-btn" onclick="_retryLast()">🔄 Cuba Semula</button></div>`;
+    canvasMessages.insertBefore(msgDiv, typingIndicator);
+    scrollToBottom();
+}
+
+function _retryLast() {
+    if (_lastRetryFn) _lastRetryFn();
+}
+
 // ── Scroll helper ──
 function scrollToBottom(smooth = false) {
     if (!canvasMessages) return;
@@ -2548,9 +2585,10 @@ async function sendReviewRequest(filename, docType) {
     setProcessing(true);
     typingIndicator.classList.add('active');
     scrollToBottom();
+    _lastRetryFn = () => sendReviewRequest(filename, docType);
 
     try {
-        const res = await fetch('/api/agent-chat', {
+        const res = await fetchWithTimeout('/api/agent-chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: reviewMsg, session_id: sessionId, agent: 'document_reviewer' }),
@@ -2569,7 +2607,11 @@ async function sendReviewRequest(filename, docType) {
         addMessage(chatContent, 'assistant', info.icon, info.name, structured);
     } catch (err) {
         typingIndicator.classList.remove('active');
-        addMessage(`Ralat: ${err.message}`, 'assistant', '⚠️', 'Sistem');
+        if (err.name === 'AbortError') {
+            _showRetryMessage('⚠️', 'Sistem');
+        } else {
+            addMessage(`Ralat: ${err.message}`, 'assistant', '⚠️', 'Sistem');
+        }
     } finally { setProcessing(false); }
 }
 
@@ -2623,8 +2665,9 @@ async function lgSendPdfAnalysisRequest(filename, summary, suggestedType, extrac
     setProcessing(true);
     typingIndicator.classList.add('active');
     scrollToBottom();
+    _lastRetryFn = () => lgSendPdfAnalysisRequest(filename, summary, suggestedType, extractedFields);
     try {
-        const res = await fetch('/api/agent-chat', {
+        const res = await fetchWithTimeout('/api/agent-chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: msg, session_id: sessionId, agent: 'letter_generator', lang: currentLang }),
@@ -2637,7 +2680,11 @@ async function lgSendPdfAnalysisRequest(filename, summary, suggestedType, extrac
         addMessage(result.response, 'assistant', info.icon, info.name, structured);
     } catch (err) {
         typingIndicator.classList.remove('active');
-        addMessage(`Ralat: ${err.message}`, 'assistant', '⚠️', 'Sistem');
+        if (err.name === 'AbortError') {
+            _showRetryMessage('⚠️', 'Sistem');
+        } else {
+            addMessage(`Ralat: ${err.message}`, 'assistant', '⚠️', 'Sistem');
+        }
     } finally { setProcessing(false); }
 }
 
@@ -2685,12 +2732,14 @@ async function sendMessage() {
     _suppressUserMsg = false;
     setProcessing(true);
 
+    const endpoint = currentAgent ? '/api/agent-chat' : '/api/chat';
+    const body = currentAgent
+        ? { message, session_id: sessionId, agent: currentAgent, lang: currentLang }
+        : { message, session_id: sessionId, lang: currentLang };
+    _lastRetryFn = () => { chatInput.value = message; sendMessage(); };
+
     try {
-        const endpoint = currentAgent ? '/api/agent-chat' : '/api/chat';
-        const body = currentAgent
-            ? { message, session_id: sessionId, agent: currentAgent, lang: currentLang }
-            : { message, session_id: sessionId, lang: currentLang };
-        const res = await fetch(endpoint, {
+        const res = await fetchWithTimeout(endpoint, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
         });
@@ -2709,7 +2758,11 @@ async function sendMessage() {
             setTimeout(() => addMessage(followupMsg, 'assistant', info.icon, info.name), 600);
         }
     } catch (err) {
-        addMessage(`${currentLang === 'en' ? 'Error' : 'Ralat'}: ${err.message}. ${I18N[currentLang].error_conn}`, 'assistant', '⚠️', currentLang === 'en' ? 'System' : 'Sistem');
+        if (err.name === 'AbortError') {
+            _showRetryMessage('⚠️', currentLang === 'en' ? 'System' : 'Sistem');
+        } else {
+            addMessage(`${currentLang === 'en' ? 'Error' : 'Ralat'}: ${err.message}. ${I18N[currentLang].error_conn}`, 'assistant', '⚠️', currentLang === 'en' ? 'System' : 'Sistem');
+        }
     } finally { setProcessing(false); }
 }
 
