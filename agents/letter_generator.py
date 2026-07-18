@@ -291,11 +291,7 @@ def _get_field_schema(doc_type: str) -> list[dict]:
 
 def _find_missing_fields(doc_type: str, collected: dict) -> list[dict]:
     schema = _get_field_schema(doc_type)
-    # isi_user dianggap cukup untuk jana isi — jangan minta isi lagi
-    _effective = dict(collected)
-    if _effective.get("isi_user") and not _effective.get("isi"):
-        _effective["isi"] = _effective["isi_user"]
-    base = [f for f in schema if not f.get("optional") and (f["key"] not in _effective or not _effective[f["key"]])]
+    base = [f for f in schema if not f.get("optional") and (f["key"] not in collected or not collected[f["key"]])]
     # When penerima is missing, inject penerima_organisasi/penerima_alamat right after it
     # so the form renders them as hideable fields (JS shows/hides based on penerima value)
     if doc_type == "surat" and any(f["key"] == "penerima" for f in base):
@@ -765,9 +761,12 @@ Status sesi semasa:
                 if f["key"] in ("penerima_organisasi", "penerima_alamat") and not (session["fields"].get(f["key"])):
                     form_extras.append(f["label"])
 
+    _missing_all = _find_missing_fields(session["doc_type"], session["fields"]) if session["doc_type"] else []
+    # GENERATED_FIELD_KEYS dijana oleh AI — jangan tunjuk dalam borang, biar AI jana
+    _missing_form = [f["label"] for f in _missing_all if f["key"] not in GENERATED_FIELD_KEYS]
     parsed["fields_status"] = {
         "collected": session["fields"],
-        "missing": [f["label"] for f in _find_missing_fields(session["doc_type"], session["fields"])] if session["doc_type"] else [],
+        "missing": _missing_form,
         "form_extras": form_extras,
     }
 
