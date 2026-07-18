@@ -1311,29 +1311,24 @@ def _build_surat_html(f: dict) -> str:
     panggilan = "Tuan/Puan" if is_se else _auto_panggilan(penerima_raw)
 
     isi_raw = str(f.get('isi', '') or '')
-    isi_paras = [_strip_para_num(p.strip()) for p in isi_raw.split('\n\n') if p.strip()] if isi_raw else []
-    # Build isi HTML with hanging indent
-    _hi_main  = 'padding-left:1.4em;text-indent:-1.4em;margin:6px 0 0 0;line-height:1.6;text-align:justify'
-    _hi_sub   = 'padding-left:2.2em;text-indent:-2.2em;margin:2px 0 0 1.4em;line-height:1.6;text-align:justify'
-    _hi_cont  = 'margin:2px 0 0 1.4em;line-height:1.6;text-align:justify'
+    import re as _re_isi
+    _DENGAN_RE = _re_isi.compile(r'^\s*dengan\s+segala\s+hormatnya', _re_isi.IGNORECASE)
+    _TARIKH_BARIS_RE = _re_isi.compile(r'^\s*(Tarikh|Masa|Tempat|Venue|Date|Time)\s*:', _re_isi.IGNORECASE)
+    _plain_p = 'margin:6px 0;line-height:1.6;text-align:justify'
+    _indent_p = 'margin:2px 0 2px 4em;line-height:1.6'
     isi_html = ""
-    for i, para_text in enumerate(isi_paras):
-        lines = _split_isi_lines(para_text)
-        if not lines:
+    for para_text in [_strip_para_num(p.strip()) for p in isi_raw.split('\n\n') if p.strip()]:
+        # Skip duplicate "Dengan segala hormatnya" — already shown as fixed opening line
+        if _DENGAN_RE.match(para_text):
             continue
-        # First line — main paragraph number
-        first_pfx, first_body, _ = lines[0]
-        has_children = len(lines) > 1
-        if has_children:
-            isi_html += f'<p style="{_hi_main}">{i+2}.&nbsp;&nbsp;{first_body}</p>'
-            for pfx, body, is_sub in lines[1:]:
-                if is_sub:
-                    isi_html += f'<p style="{_hi_sub}">{pfx}&nbsp;&nbsp;{body}</p>'
-                else:
-                    isi_html += f'<p style="{_hi_cont}">{body}</p>'
-        else:
-            _plain = 'margin:6px 0;line-height:1.6;text-align:justify'
-            isi_html += f'<p style="{_plain}">{i+2}.&nbsp;&nbsp;&nbsp;&nbsp;{first_body}</p>'
+        for line in para_text.split('\n'):
+            line = _strip_para_num(line.strip())
+            if not line:
+                continue
+            if _TARIKH_BARIS_RE.match(line):
+                isi_html += f'<p style="{_indent_p}">{line}</p>'
+            else:
+                isi_html += f'<p style="{_plain_p}">{line}</p>'
         isi_html += '<p style="margin:0 0 4px 0"></p>'
 
     n = 'style="margin:6px 0;line-height:1.6"'
@@ -1361,6 +1356,7 @@ def _build_surat_html(f: dict) -> str:
         f'<p style="margin:10px 0;font-weight:bold;text-align:left">{f.get("tajuk","").upper()}</p>'
         f'<p style="margin:8px 0;line-height:1.6;text-align:justify">Dengan segala hormatnya perkara di atas adalah dirujuk.</p>'
         f'{isi_html}'
+        f'<div style="page-break-inside:avoid">'
         f'<p {n}>Sekian, terima kasih.</p>'
         f'<p style="margin:11pt 0 0 0;line-height:1.6"><b>&ldquo;MALAYSIA MADANI&rdquo;</b></p>'
         f'<p style="margin:11pt 0 0 0;line-height:1.6"><b>&ldquo;BERKHIDMAT UNTUK NEGARA&rdquo;</b></p>'
@@ -1368,6 +1364,7 @@ def _build_surat_html(f: dict) -> str:
         f'<p style="margin:33pt 0 0 0;line-height:1.6"><b>({f.get("penandatangan_nama","").upper()})</b></p>'
         f'<p style="margin:2px 0">{f.get("penandatangan_jawatan","")}</p>'
         f'{sig_extra}'
+        f'</div>'
         f'{sk_html}'
         f'{_build_senarai_edaran_html(f) if is_se else ""}'
         f'</div>'
