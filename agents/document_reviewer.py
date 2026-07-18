@@ -187,6 +187,10 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
     elif embedded_doc:
         document = embedded_doc
         doc_type = doc_type or "Dokumen"
+        # Cache embedded doc in session for follow-up fix requests
+        session["cached_doc"] = embedded_doc
+        session["cached_doc_type"] = doc_type or "Dokumen"
+        _save_session(session_id, session)
     elif linked_doc:
         document = linked_doc
         review_keywords = ["semak", "review", "proofread", "periksa", "check"]
@@ -194,6 +198,11 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
             pass
         else:
             document = None
+
+    # Fall back to cached doc for follow-up requests (e.g. "betulkan")
+    if not document and session.get("cached_doc"):
+        document = session["cached_doc"]
+        doc_type = doc_type or session.get("cached_doc_type", "Dokumen")
 
     fix_keywords = ["betulkan", "perbaiki", "fix", "baiki", "correct"]
     if document and any(kw in query.lower() for kw in fix_keywords):

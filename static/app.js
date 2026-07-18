@@ -922,6 +922,13 @@ function buildReviewHtml(data) {
     if (data.issues && data.issues.length === 0) {
         html += '<div class="da-section"><div class="da-section-title">✅ Tiada Isu</div><p style="font-size:13px;color:var(--text-secondary)">Dokumen ini dalam keadaan baik.</p></div>';
     }
+    if (data.corrected_document) {
+        html += `<div class="da-section doc-preview-section review-doc-preview-section">`;
+        html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button></div>`;
+        html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview" oninput="onPreviewEdit()">${escapeHtml(data.corrected_document)}</pre>`;
+        html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 Muat Turun (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 Muat Turun (.pdf)</button></div>`;
+        html += '</div>';
+    }
     html += '</div>';
     return html;
 }
@@ -1096,7 +1103,7 @@ function _buildAnnotatedReview(data, docText) {
 
     // Corrected document section (legacy — from agent corrected_document field)
     if (data.corrected_document) {
-        html += `<div class="da-section doc-preview-section review-doc-preview-section" style="background:var(--bg-secondary);border-radius:8px;padding:12px;margin-top:4px">`;
+        html += `<div class="da-section doc-preview-section review-doc-preview-section">`;
         html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button></div>`;
         html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview" oninput="onPreviewEdit()">${escapeHtml(data.corrected_document)}</pre>`;
         html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 Muat Turun (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 Muat Turun (.pdf)</button></div>`;
