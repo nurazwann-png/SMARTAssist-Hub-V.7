@@ -300,6 +300,11 @@ function applyLanguage(lang) {
         toggle.querySelector('.lang-flag').textContent = lang === 'bm' ? '🇲🇾' : '🇬🇧';
         toggle.querySelector('.lang-code').textContent = lang === 'bm' ? 'BM' : 'EN';
     }
+    const canvasLangBtn = document.getElementById('canvasLangBtn');
+    if (canvasLangBtn) {
+        canvasLangBtn.querySelector('.canvas-lang-flag').textContent = lang === 'bm' ? '🇲🇾' : '🇬🇧';
+        canvasLangBtn.querySelector('.canvas-lang-code').textContent = lang === 'bm' ? 'BM' : 'EN';
+    }
     const backBtn = document.getElementById('backBtn');
     if (backBtn) backBtn.textContent = dict.back_btn;
 
@@ -322,6 +327,14 @@ function applyLanguage(lang) {
         if (currentAgent === 'document_reviewer') uploadBtn.title = dict.upload_tip_reviewer;
         else if (currentAgent === 'letter_generator') uploadBtn.title = dict.upload_tip_letter;
         else uploadBtn.title = dict.upload_tip_data;
+    }
+
+    // Re-render agent nav bar if canvas is open (labels use currentLang)
+    if (currentAgent) {
+        updateAgentNavBar(currentAgent);
+        const info = getAgentInfo(currentAgent);
+        const nameEl = document.getElementById('canvasAgentName');
+        if (nameEl) nameEl.textContent = info.name;
     }
 
     // KPM bubble elements
