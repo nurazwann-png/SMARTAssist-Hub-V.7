@@ -231,6 +231,14 @@ const I18N = {
         doc_undo: 'Batal', doc_redo: 'Buat Semula', doc_reset: 'Asal', doc_view_word: 'Lihat Word', doc_save: 'Simpan',
         doc_undo_tip: 'Batal (Ctrl+Z)', doc_redo_tip: 'Buat Semula (Ctrl+Y)', doc_reset_tip: 'Kembali ke kandungan asal AI',
         doc_download: 'Muat Turun', rev_expand: 'Kembangkan', rev_doc_label: 'Pratonton Dokumen',
+        // Usage dashboard
+        back_btn_short: 'Kembali', admin_refresh_tip: 'Muat Semula',
+        admin_total_sessions: 'Jumlah Sesi', admin_total_messages: 'Jumlah Mesej',
+        admin_feedback_pos: '👍 Maklum Balas Positif', admin_feedback_neg: '👎 Maklum Balas Negatif',
+        admin_chart_usage: '📊 Penggunaan Mengikut Ejen', admin_chart_feedback: '💬 Maklum Balas Mengikut Ejen',
+        admin_recent_sessions: '🕓 Sesi Terkini',
+        admin_th_session: 'Sesi', admin_th_agent: 'Ejen', admin_th_title: 'Tajuk',
+        admin_th_messages: 'Mesej', admin_th_updated: 'Dikemaskini',
         // Generic errors
         error_generic: 'Maaf, ralat berlaku. Sila cuba lagi.',
         error_conn: 'Ralat sambungan. Sila cuba lagi.',
@@ -289,6 +297,14 @@ const I18N = {
         doc_undo: 'Undo', doc_redo: 'Redo', doc_reset: 'Original', doc_view_word: 'View Word', doc_save: 'Save',
         doc_undo_tip: 'Undo (Ctrl+Z)', doc_redo_tip: 'Redo (Ctrl+Y)', doc_reset_tip: 'Restore original AI content',
         doc_download: 'Download', rev_expand: 'Expand', rev_doc_label: 'Document Preview',
+        // Usage dashboard
+        back_btn_short: 'Back', admin_refresh_tip: 'Refresh',
+        admin_total_sessions: 'Total Sessions', admin_total_messages: 'Total Messages',
+        admin_feedback_pos: '👍 Positive Feedback', admin_feedback_neg: '👎 Negative Feedback',
+        admin_chart_usage: '📊 Usage by Agent', admin_chart_feedback: '💬 Feedback by Agent',
+        admin_recent_sessions: '🕓 Recent Sessions',
+        admin_th_session: 'Session', admin_th_agent: 'Agent', admin_th_title: 'Title',
+        admin_th_messages: 'Messages', admin_th_updated: 'Updated',
         // Generic errors
         error_generic: 'Sorry, an error occurred. Please try again.',
         error_conn: 'Connection error. Please try again.',
@@ -3474,7 +3490,8 @@ async function loadAdminStats() {
         document.getElementById('statFeedbackUp').textContent = data.feedback_total?.up ?? 0;
         document.getElementById('statFeedbackDown').textContent = data.feedback_total?.down ?? 0;
 
-        const labels = Object.keys(data.agent_counts).map(k => data.agent_labels?.[k] || k);
+        const _agentLabel = k => getAgentInfo(k).name || data.agent_labels?.[k] || k;
+        const labels = Object.keys(data.agent_counts).map(_agentLabel);
         const counts = Object.values(data.agent_counts);
         const agentColors = ['#7c3aed', '#d97706', '#16a34a', '#0891b2', '#dc2626', '#6b7280'];
 
@@ -3508,7 +3525,7 @@ async function loadAdminStats() {
             },
         });
 
-        const fbLabels = Object.keys(data.feedback_by_agent).map(k => data.agent_labels?.[k] || k);
+        const fbLabels = Object.keys(data.feedback_by_agent).map(_agentLabel);
         const fbUp = Object.values(data.feedback_by_agent).map(v => v.up || 0);
         const fbDown = Object.values(data.feedback_by_agent).map(v => v.down || 0);
         const fbCtx = document.getElementById('adminFeedbackChart').getContext('2d');
@@ -3518,8 +3535,8 @@ async function loadAdminStats() {
             data: {
                 labels: fbLabels,
                 datasets: [
-                    { label: '👍 Positif', data: fbUp, backgroundColor: '#22c55ecc', borderColor: '#22c55e', borderWidth: 2, borderRadius: 6, borderSkipped: false },
-                    { label: '👎 Negatif', data: fbDown, backgroundColor: '#ef4444cc', borderColor: '#ef4444', borderWidth: 2, borderRadius: 6, borderSkipped: false },
+                    { label: I18N[currentLang].feedback_pos, data: fbUp, backgroundColor: '#22c55ecc', borderColor: '#22c55e', borderWidth: 2, borderRadius: 6, borderSkipped: false },
+                    { label: I18N[currentLang].feedback_neg, data: fbDown, backgroundColor: '#ef4444cc', borderColor: '#ef4444', borderWidth: 2, borderRadius: 6, borderSkipped: false },
                 ],
             },
             options: {
@@ -3540,7 +3557,7 @@ async function loadAdminStats() {
         if (tbody) {
             tbody.innerHTML = (data.recent_sessions || []).map(s => {
                 const t = s.updated ? new Date(s.updated).toLocaleString('ms-MY', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
-                const agentName = data.agent_labels?.[s.agent] || s.agent || '—';
+                const agentName = (s.agent ? getAgentInfo(s.agent).name : null) || data.agent_labels?.[s.agent] || s.agent || '—';
                 return `<tr>
                     <td title="${escapeHtml(s.session_id)}">${escapeHtml(s.session_id.slice(-8))}</td>
                     <td>${escapeHtml(agentName)}</td>

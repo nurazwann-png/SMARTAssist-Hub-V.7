@@ -91,43 +91,43 @@
     <!-- ═══ Admin Dashboard Page ═══ -->
     <div class="admin-page" id="adminPage" style="display:none;">
         <div class="admin-header">
-            <button class="back-btn" id="adminBackBtn">&#8592; Kembali</button>
-            <div class="admin-title">&#128202; Papan Pemuka Penggunaan</div>
-            <button class="admin-refresh-btn" id="adminRefreshBtn" title="Muat Semula">&#8635;</button>
+            <button class="back-btn" id="adminBackBtn">&#8592; <span data-i18n="back_btn_short">Kembali</span></button>
+            <div class="admin-title">&#128202; <span data-i18n="profile_dashboard">Papan Pemuka Penggunaan</span></div>
+            <button class="admin-refresh-btn" id="adminRefreshBtn" data-i18n-title="admin_refresh_tip" title="Muat Semula">&#8635;</button>
         </div>
         <div class="admin-body">
             <div class="admin-stats-row">
                 <div class="admin-stat-card">
                     <div class="admin-stat-value" id="statTotalSessions">—</div>
-                    <div class="admin-stat-label">Jumlah Sesi</div>
+                    <div class="admin-stat-label" data-i18n="admin_total_sessions">Jumlah Sesi</div>
                 </div>
                 <div class="admin-stat-card">
                     <div class="admin-stat-value" id="statTotalMessages">—</div>
-                    <div class="admin-stat-label">Jumlah Mesej</div>
+                    <div class="admin-stat-label" data-i18n="admin_total_messages">Jumlah Mesej</div>
                 </div>
                 <div class="admin-stat-card">
                     <div class="admin-stat-value" id="statFeedbackUp">—</div>
-                    <div class="admin-stat-label">👍 Maklum Balas Positif</div>
+                    <div class="admin-stat-label" data-i18n="admin_feedback_pos">👍 Maklum Balas Positif</div>
                 </div>
                 <div class="admin-stat-card">
                     <div class="admin-stat-value" id="statFeedbackDown">—</div>
-                    <div class="admin-stat-label">👎 Maklum Balas Negatif</div>
+                    <div class="admin-stat-label" data-i18n="admin_feedback_neg">👎 Maklum Balas Negatif</div>
                 </div>
             </div>
             <div class="admin-charts-row">
                 <div class="admin-chart-card">
-                    <div class="admin-chart-title">📊 Penggunaan Mengikut Ejen</div>
+                    <div class="admin-chart-title" data-i18n="admin_chart_usage">📊 Penggunaan Mengikut Ejen</div>
                     <div class="admin-chart-wrap"><canvas id="adminAgentChart"></canvas></div>
                 </div>
                 <div class="admin-chart-card">
-                    <div class="admin-chart-title">💬 Maklum Balas Mengikut Ejen</div>
+                    <div class="admin-chart-title" data-i18n="admin_chart_feedback">💬 Maklum Balas Mengikut Ejen</div>
                     <div class="admin-chart-wrap"><canvas id="adminFeedbackChart"></canvas></div>
                 </div>
             </div>
             <div class="admin-table-card">
-                <div class="admin-chart-title">🕓 Sesi Terkini</div>
+                <div class="admin-chart-title" data-i18n="admin_recent_sessions">🕓 Sesi Terkini</div>
                 <table class="admin-table" id="adminRecentTable">
-                    <thead><tr><th>Sesi</th><th>Ejen</th><th>Tajuk</th><th>Mesej</th><th>Dikemaskini</th></tr></thead>
+                    <thead><tr><th data-i18n="admin_th_session">Sesi</th><th data-i18n="admin_th_agent">Ejen</th><th data-i18n="admin_th_title">Tajuk</th><th data-i18n="admin_th_messages">Mesej</th><th data-i18n="admin_th_updated">Dikemaskini</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
