@@ -643,6 +643,7 @@ async function loadSessionMessages(sid) {
                 }
             });
             scrollToBottom();
+            requestAnimationFrame(_storeDocOriginal);
         }
     } catch (_) {}
 }
