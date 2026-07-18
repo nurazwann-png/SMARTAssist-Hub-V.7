@@ -1612,19 +1612,26 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
     .lang-toggle { right: 12px; padding: 5px 10px; font-size: 12px; }
     .lang-flag { font-size: 14px; }
 
-    .landing-hero { padding: 40px 16px 20px; }
-    .hero-title { letter-spacing: -1px; }
-    .hero-subtitle { letter-spacing: 2px; }
+    .landing-hero { padding: 24px 16px 12px; }
+    .hero-title { font-size: clamp(28px, 10vw, 48px); letter-spacing: -1px; }
+    .hero-subtitle { font-size: 11px; letter-spacing: 2px; }
+    .hero-name { font-size: clamp(14px, 4vw, 20px); }
+    .hero-role { font-size: 11px; }
 
-    .agent-grid { flex-wrap: wrap; gap: 12px; padding: 20px 16px; max-width: 100%; }
-    .agent-card { width: calc(50% - 8px); min-width: 0; padding: 20px 14px; }
-    .agent-card-icon { font-size: 28px; margin-bottom: 8px; }
-    .agent-card-name { font-size: 13px; }
+    .agent-grid { flex-wrap: wrap; gap: 10px; padding: 16px 12px 24px; max-width: 100%; }
+    .agent-card { width: calc(50% - 6px); min-width: 0; padding: 16px 10px; border-radius: 14px; }
+    .agent-card-icon { font-size: 24px; margin-bottom: 6px; }
+    .agent-card-icon svg { width: 60px; height: 60px; }
+    .agent-card-name { font-size: 12px; }
     .agent-card-desc { font-size: 10px; }
 
     .canvas-header-top { padding: 8px 12px; }
-    .canvas-header-nav { padding: 4px 12px 6px; }
-    .back-btn { font-size: 12px; padding: 4px 8px; }
+    .canvas-actions { gap: 6px; }
+    .canvas-action-btn { padding: 5px 8px; font-size: 12px; }
+    .canvas-action-label { display: none; }
+    .canvas-action-icon { font-size: 16px; }
+    .canvas-header-nav { padding: 4px 12px 6px; overflow-x: auto; }
+    .back-btn { font-size: 12px; padding: 4px 8px; white-space: nowrap; }
     .canvas-agent-name { font-size: 13px; }
     .agent-nav-btn { font-size: 11px; padding: 4px 8px; }
     .agent-nav-label { display: none; }
@@ -1638,8 +1645,11 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
     .footer-links { gap: 16px; }
     .footer-links a { font-size: 12px; }
 
-    .history-panel { width: 280px; left: -290px; }
+    .history-panel { width: 85vw; left: -86vw; }
+    .history-search-input { font-size: 14px; }
 }
+
+/* Small mobile */
 
 /* ═══════════════════════════════════════
    PROFILE NAV BUTTON
@@ -1785,7 +1795,8 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
 
 /* Small mobile */
 @media (max-width: 380px) {
-    .agent-card { width: 100%; }
+    .agent-card { width: calc(50% - 6px); padding: 12px 8px; }
+    .agent-card-icon svg { width: 50px; height: 50px; }
     .canvas-quick-actions { flex-direction: column; align-items: center; }
     .canvas-quick-btn { width: 100%; text-align: center; }
 }
