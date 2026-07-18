@@ -19,6 +19,48 @@ let _reviewIsPdf        = false;
 let _reviewPdfObjectUrl = null;
 let _reviewPdfImages    = [];
 
+// ── Document undo/redo ──
+let _docOriginalHtml = null;
+let _docOriginalText = null;
+
+function _storeDocOriginal() {
+    const htmlEl = document.getElementById('docPreviewHtml') || document.getElementById('wordPreviewHtmlEdit');
+    const textEl = document.getElementById('docPreview') || document.getElementById('reviewDocPreview');
+    if (htmlEl && _docOriginalHtml === null) _docOriginalHtml = htmlEl.innerHTML;
+    if (textEl && _docOriginalText === null) _docOriginalText = textEl.innerText;
+}
+
+function docUndo() {
+    const active = document.activeElement;
+    const editors = ['docPreviewHtml', 'wordPreviewHtmlEdit', 'docPreview', 'reviewDocPreview'];
+    const el = (active && active.isContentEditable) ? active
+        : editors.map(id => document.getElementById(id)).find(e => e);
+    if (el) { el.focus(); document.execCommand('undo'); }
+}
+
+function docRedo() {
+    const active = document.activeElement;
+    const editors = ['docPreviewHtml', 'wordPreviewHtmlEdit', 'docPreview', 'reviewDocPreview'];
+    const el = (active && active.isContentEditable) ? active
+        : editors.map(id => document.getElementById(id)).find(e => e);
+    if (el) { el.focus(); document.execCommand('redo'); }
+}
+
+function docResetToOriginal() {
+    if (!_docOriginalHtml && !_docOriginalText) {
+        showToast('Tiada kandungan asal untuk dipulihkan.', 'err'); return;
+    }
+    if (!confirm('Kembali ke kandungan asal? Semua perubahan manual akan hilang.')) return;
+    const htmlEl = document.getElementById('docPreviewHtml');
+    const textEl = document.getElementById('docPreview') || document.getElementById('reviewDocPreview');
+    if (htmlEl && _docOriginalHtml !== null) htmlEl.innerHTML = _docOriginalHtml;
+    if (textEl && _docOriginalText !== null) textEl.innerText = _docOriginalText;
+    // Sync overlay editor if open
+    const overlayEl = document.getElementById('wordPreviewHtmlEdit');
+    if (overlayEl && _docOriginalHtml !== null) overlayEl.innerHTML = _docOriginalHtml;
+    showToast('Kandungan asal telah dipulihkan.', 'ok');
+}
+
 // ── Draft / last-session persistence ──
 const _DRAFT_KEY = 'smartassist_last_session';
 
@@ -815,6 +857,10 @@ function addMessage(content, role, agentIcon, agentName, structured) {
 
         if (structured.chart) renderChart(workItem, structured.chart);
         if (document.getElementById('reportImgGrid')) _refreshReportImages();
+        if (structured.document_html || structured.document_preview || structured.corrected_document) {
+            _docOriginalHtml = null; _docOriginalText = null;
+            requestAnimationFrame(_storeDocOriginal);
+        }
 
         // Add agent text to chat panel
         const _rawChatMsg = structured.message || '';
@@ -1066,7 +1112,7 @@ function buildReviewHtml(data) {
     }
     if (data.corrected_document) {
         html += `<div class="da-section doc-preview-section review-doc-preview-section">`;
-        html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button></div>`;
+        html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span><div class="doc-edit-tools"><button class="doc-edit-btn" onclick="docUndo()" title="Batal (Ctrl+Z)">↩ Batal</button><button class="doc-edit-btn" onclick="docRedo()" title="Buat Semula (Ctrl+Y)">↪ Buat Semula</button><button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" title="Kembali ke kandungan asal AI">⟳ Asal</button><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button></div></div>`;
         html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview" oninput="onPreviewEdit()">${escapeHtml(data.corrected_document)}</pre>`;
         html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 Muat Turun (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 Muat Turun (.pdf)</button></div>`;
         html += '</div>';
@@ -1246,7 +1292,7 @@ function _buildAnnotatedReview(data, docText) {
     // Corrected document section (legacy — from agent corrected_document field)
     if (data.corrected_document) {
         html += `<div class="da-section doc-preview-section review-doc-preview-section">`;
-        html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button></div>`;
+        html += `<div class="da-section-title">📄 Dokumen Diperbetulkan <span class="edit-hint">(boleh diedit)</span><div class="doc-edit-tools"><button class="doc-edit-btn" onclick="docUndo()" title="Batal (Ctrl+Z)">↩ Batal</button><button class="doc-edit-btn" onclick="docRedo()" title="Buat Semula (Ctrl+Y)">↪ Buat Semula</button><button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" title="Kembali ke kandungan asal AI">⟳ Asal</button><button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button><button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button></div></div>`;
         html += `<pre class="doc-preview" contenteditable="true" id="reviewDocPreview" oninput="onPreviewEdit()">${escapeHtml(data.corrected_document)}</pre>`;
         html += `<div class="doc-actions"><button class="doc-action-btn download-btn" onclick="downloadReviewDocument()">📥 Muat Turun (.docx)</button><button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 Muat Turun (.pdf)</button></div>`;
         html += '</div>';
@@ -1865,8 +1911,13 @@ function buildLetterHtml(data) {
     if (data.document_preview) {
         html += '<div class="da-section doc-preview-section">';
         html += '<div class="da-section-title">📄 Pratonton Dokumen <span class="edit-hint">(boleh diedit)</span>'
+            + `<div class="doc-edit-tools">`
+            + `<button class="doc-edit-btn" onclick="docUndo()" title="Batal (Ctrl+Z)">↩ Batal</button>`
+            + `<button class="doc-edit-btn" onclick="docRedo()" title="Buat Semula (Ctrl+Y)">↪ Buat Semula</button>`
+            + `<button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" title="Kembali ke kandungan asal AI">⟳ Asal</button>`
             + `<button class="doc-preview-expand-btn" onclick="openWordPreview()" title="Besar">&#9974; Lihat Word</button>`
-            + `<button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button></div>`;
+            + `<button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 Simpan</button>`
+            + `</div></div>`;
         if (data.document_html) {
             html += `<pre class="doc-preview" contenteditable="true" id="docPreview" style="display:none" oninput="onPreviewEdit()">${escapeHtml(data.document_preview)}</pre>`;
             html += `<div class="doc-preview doc-preview-html" contenteditable="true" id="docPreviewHtml" oninput="onPreviewEdit()">${data.document_html}</div>`;

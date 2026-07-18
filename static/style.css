@@ -580,6 +580,7 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 .da-section-title {
     font-size: 12px; font-weight: 700; color: var(--accent);
     margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
 }
 .da-section ul { list-style: none; padding: 0; }
 .da-section ul li {
@@ -1815,6 +1816,21 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
 .feedback-btn:hover { opacity: 1; background: var(--bg-tertiary); }
 .feedback-btn.active-up { color: var(--green); border-color: var(--green); opacity: 1; }
 .feedback-btn.active-down { color: var(--red); border-color: var(--red); opacity: 1; }
+
+/* ── Document edit toolbar ── */
+.doc-edit-tools {
+    display: inline-flex; align-items: center; gap: 4px; margin-left: 6px;
+}
+.doc-edit-btn {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 3px 9px; border-radius: 6px; font-size: 12px; font-weight: 500;
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    color: var(--text-secondary); cursor: pointer; transition: all 0.15s;
+    white-space: nowrap;
+}
+.doc-edit-btn:hover { background: var(--glass); color: var(--text-primary); }
+.doc-edit-reset { border-color: rgba(245,158,11,0.3); color: #f59e0b; }
+.doc-edit-reset:hover { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.6); }
 
 /* ── Resume-session banner ── */
 .resume-banner {
