@@ -19,6 +19,18 @@ let _reviewIsPdf        = false;
 let _reviewPdfObjectUrl = null;
 let _reviewPdfImages    = [];
 
+// ── Scroll helper ──
+function scrollToBottom(smooth = false) {
+    if (!canvasMessages) return;
+    requestAnimationFrame(() => {
+        if (smooth) {
+            canvasMessages.scrollTo({ top: canvasMessages.scrollHeight, behavior: 'smooth' });
+        } else {
+            canvasMessages.scrollTop = canvasMessages.scrollHeight;
+        }
+    });
+}
+
 // ── Toast notification ──
 let _toastTimer = null;
 function showToast(msg, type = 'info', duration = 3000) {
@@ -502,6 +514,7 @@ async function loadSessionMessages(sid) {
                     addMessage(msg.content, 'assistant', msg.agent_icon, msg.agent_name, structured);
                 }
             });
+            scrollToBottom();
         }
     } catch (_) {}
 }
@@ -719,7 +732,7 @@ function addMessage(content, role, agentIcon, agentName, structured) {
         chatDiv.innerHTML = chatHtml;
         if (chatHtml.trim()) {
             canvasMessages.insertBefore(chatDiv, typingIndicator);
-            canvasMessages.scrollTop = canvasMessages.scrollHeight;
+            scrollToBottom();
         }
         if (structured.phase !== undefined) _activeChatBubble = chatDiv;
         return;
@@ -742,7 +755,7 @@ function addMessage(content, role, agentIcon, agentName, structured) {
     }
     msgDiv.innerHTML = html;
     canvasMessages.insertBefore(msgDiv, typingIndicator);
-    canvasMessages.scrollTop = canvasMessages.scrollHeight;
+    scrollToBottom();
 }
 
 async function submitFeedback(idx, type) {
@@ -2420,6 +2433,7 @@ function setProcessing(state) {
     chatInput.disabled = state;
     if (uploadBtn) uploadBtn.disabled = state;
     typingIndicator.className = state ? 'typing-indicator active' : 'typing-indicator';
+    if (state) scrollToBottom();
     if (!state) chatInput.focus();
 }
 
@@ -2513,7 +2527,7 @@ async function sendReviewRequest(filename, docType) {
 
     setProcessing(true);
     typingIndicator.classList.add('active');
-    canvasMessages.scrollTop = canvasMessages.scrollHeight;
+    scrollToBottom();
 
     try {
         const res = await fetch('/api/agent-chat', {
@@ -2588,7 +2602,7 @@ async function lgSendPdfAnalysisRequest(filename, summary, suggestedType, extrac
 
     setProcessing(true);
     typingIndicator.classList.add('active');
-    canvasMessages.scrollTop = canvasMessages.scrollHeight;
+    scrollToBottom();
     try {
         const res = await fetch('/api/agent-chat', {
             method: 'POST',
