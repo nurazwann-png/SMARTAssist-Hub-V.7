@@ -1356,7 +1356,9 @@ def _build_surat_html(f: dict) -> str:
     _TARIKH_BARIS_RE = _re_isi.compile(r'^\s*(Tarikh|Masa|Tempat|Venue|Date|Time)\s*:', _re_isi.IGNORECASE)
     _plain_p = 'margin:6px 0;line-height:1.6;text-align:justify'
     _indent_p = 'margin:2px 0 2px 4em;line-height:1.6'
+    _PARA_NUM_RE = _re_isi.compile(r'^\d+\.\s*')
     isi_html = ""
+    _para_num = 2
     for para_text in [p.strip() for p in isi_raw.split('\n\n') if p.strip()]:
         # Skip duplicate "Dengan segala hormatnya" — already shown as fixed opening line
         if _DENGAN_RE.match(_strip_para_num(para_text)):
@@ -1368,11 +1370,16 @@ def _build_surat_html(f: dict) -> str:
             if not line:
                 continue
             if is_first:
-                # Keep paragraph number (2., 3., ...) on first line; only strip from Tarikh/Masa/Tempat
-                if _TARIKH_BARIS_RE.match(_strip_para_num(line)):
-                    isi_html += f'<p style="{_indent_p}">{_strip_para_num(line)}</p>'
+                line_s = _strip_para_num(line)
+                if _TARIKH_BARIS_RE.match(line_s):
+                    isi_html += f'<p style="{_indent_p}">{line_s}</p>'
                 else:
-                    isi_html += f'<p style="{_plain_p}">{line}</p>'
+                    # Tambah nombor jika belum ada (contoh: surat pemakluman dari PDF)
+                    if _PARA_NUM_RE.match(line):
+                        display = line  # sudah ada nombor, guna terus
+                    else:
+                        display = f'{_para_num}. {line_s}'
+                    isi_html += f'<p style="{_plain_p}">{display}</p>'
                 is_first = False
             else:
                 line_s = _strip_para_num(line)
@@ -1381,6 +1388,7 @@ def _build_surat_html(f: dict) -> str:
                 else:
                     isi_html += f'<p style="{_plain_p}">{line_s}</p>'
         isi_html += '<p style="margin:0 0 4px 0"></p>'
+        _para_num += 1
 
     n = 'style="margin:6px 0;line-height:1.6"'
     # Ruj.Kami+Tarikh right-aligned, then address left — per template
