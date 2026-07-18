@@ -2019,6 +2019,45 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
     color: #fff; border-style: solid;
 }
 
+/* Image upload section inside fields form (Report Generator) */
+.ff-img-upload-section {
+    margin: 12px 0 8px;
+    padding: 14px 16px;
+    border: 1px dashed var(--border-glow);
+    border-radius: 12px;
+    background: var(--glass-indigo);
+}
+.ff-img-upload-title {
+    font-size: 13px; font-weight: 700; color: var(--indigo);
+    margin-bottom: 6px;
+}
+.ff-img-required {
+    font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-left: 4px;
+}
+.ff-img-upload-hint {
+    font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.5;
+}
+.ff-img-upload-actions {
+    display: flex; align-items: center; gap: 10px; margin-top: 8px;
+}
+.ff-img-count-badge {
+    font-size: 12px; font-weight: 600; color: var(--text-secondary);
+    background: var(--bg-tertiary); border-radius: 20px;
+    padding: 3px 10px; border: 1px solid var(--border);
+}
+.ff-img-count-badge.ff-img-count-ok {
+    color: #22c55e; border-color: #22c55e44; background: #22c55e11;
+}
+/* Smaller thumbnails in the form upload section */
+.report-img-grid-sm {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.report-img-grid-sm .report-img-thumb {
+    aspect-ratio: 4 / 3;
+}
+
 /* ═══════════════════════════════════════
    KPM SUPPORT CHAT BUBBLE (homepage)
    ═══════════════════════════════════════ */

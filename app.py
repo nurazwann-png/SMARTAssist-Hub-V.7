@@ -544,7 +544,7 @@ Teks dokumen:
     })
 
 
-def _render_html_to_pdf(html_content: str) -> bytes:
+def _render_html_to_pdf(html_content: str, top_margin_mm: float | None = None, bottom_margin_mm: float | None = None) -> bytes:
     """Render the document-preview HTML into a PDF using reportlab.
 
     Supports the subset of HTML the app produces: <img> (letterhead), <hr>,
@@ -567,7 +567,9 @@ def _render_html_to_pdf(html_content: str) -> bytes:
     from reportlab.lib.styles import ParagraphStyle
 
     FONT_PT = 12.0
-    MARGIN = 25.4 * mm
+    MARGIN = 20 * mm  # 2cm untuk kiri & kanan (dan lalai atas/bawah)
+    TOP_MARGIN = (top_margin_mm * mm) if top_margin_mm is not None else MARGIN
+    BOTTOM_MARGIN = (bottom_margin_mm * mm) if bottom_margin_mm is not None else MARGIN
     CONTENT_W = A4[0] - 2 * MARGIN
 
     def _css_len(val, font_pt=FONT_PT):
@@ -744,16 +746,31 @@ def _render_html_to_pdf(html_content: str) -> bytes:
                     pass
         return None
 
-    def _make_table(tbl):
+    def _get_direct_rows(tbl_node):
+        """Return only direct <tr> children of a table, handling optional tbody/thead/tfoot wrappers."""
+        rows = []
+        for child in tbl_node.children:
+            if not hasattr(child, 'name') or not child.name:
+                continue
+            if child.name == 'tr':
+                rows.append(child)
+            elif child.name in ('tbody', 'thead', 'tfoot'):
+                for tr in child.children:
+                    if hasattr(tr, 'name') and tr.name == 'tr':
+                        rows.append(tr)
+        return rows
+
+    def _make_table(tbl, available_width=None):
+        aw = available_width if available_width is not None else CONTENT_W
         # First pass: determine total column count and collect explicit widths
+        # Use recursive=False to avoid counting cells from nested tables
         num_cols = 1
         col_widths_px = {}  # col_index -> width in px
-        for tr in tbl.find_all('tr'):
-            cells = tr.find_all(['td', 'th'])
+        for tr in _get_direct_rows(tbl):
+            cells = tr.find_all(['td', 'th'], recursive=False)
             total = sum(int(c.get('colspan', 1)) for c in cells)
             if total > num_cols:
                 num_cols = total
-            # Collect widths from first data row (non-spanning cells)
             ci = 0
             for c in cells:
                 cs = int(c.get('colspan', 1))
@@ -761,19 +778,18 @@ def _render_html_to_pdf(html_content: str) -> bytes:
                     st = _parse_style(c.get('style', ''))
                     w_str = st.get('width', '') or c.get('width', '')
                     if w_str:
-                        m = _re.match(r'([\d.]+)\s*(px)?', w_str)
+                        m = _re.match(r'([\d.]+)\s*(px|%)?', w_str)
                         if m:
                             col_widths_px[ci] = float(m.group(1))
                 ci += cs
 
-        # Build column widths: use explicit px widths where available
+        # Build column widths using aw (available width)
         if col_widths_px and len(col_widths_px) == num_cols:
             total_px = sum(col_widths_px.values())
-            col_widths = [CONTENT_W * col_widths_px[i] / total_px for i in range(num_cols)]
+            col_widths = [aw * col_widths_px[i] / total_px for i in range(num_cols)]
         elif col_widths_px:
-            # Partial: fixed px cols, rest shares remaining space
             known_pt = sum(_css_len(f'{col_widths_px[i]}px') for i in col_widths_px)
-            remaining = max(CONTENT_W - known_pt, 10)
+            remaining = max(aw - known_pt, 10)
             unknown_cols = num_cols - len(col_widths_px)
             col_widths = []
             for i in range(num_cols):
@@ -782,14 +798,19 @@ def _render_html_to_pdf(html_content: str) -> bytes:
                 else:
                     col_widths.append(remaining / max(unknown_cols, 1))
         else:
-            col_widths = [CONTENT_W / num_cols] * num_cols
+            col_widths = [aw / num_cols] * num_cols
+
+        # Detect borderless table (border="0" attribute or border:none in style)
+        tbl_st = _parse_style(tbl.get('style', ''))
+        no_border = (tbl.get('border', '') in ('0', 'none')
+                     or tbl_st.get('border', '') in ('none', '0'))
 
         rows = []
         span_cmds = []
         color_cmds = []
         row_idx = 0
-        for tr in tbl.find_all('tr'):
-            cells = tr.find_all(['td', 'th'])
+        for tr in _get_direct_rows(tbl):
+            cells = tr.find_all(['td', 'th'], recursive=False)
             if not cells:
                 continue
             row_data = []
@@ -799,26 +820,54 @@ def _render_html_to_pdf(html_content: str) -> bytes:
                 rs = int(c.get('rowspan', 1))
                 st = _parse_style(c.get('style', ''))
                 bold_default = c.name == 'th' or st.get('font-weight', '') in ('bold', '700')
-                # Apply text color from style
                 txt_color = _parse_color(st.get('color', ''))
                 cell_style = _para_style(st, 10.0, bold_default=bold_default)
                 if txt_color:
                     cell_style = ParagraphStyle('pc', parent=cell_style, textColor=txt_color)
-                para = Paragraph(_inline(c) or '&nbsp;', cell_style)
-                row_data.append(para)
+
+                img_tag = c.find('img')
+                nested_tbl_tag = None if img_tag else c.find('table', recursive=False)
+
+                if img_tag:
+                    img_el = _make_image(img_tag)
+                    cell_content = img_el if img_el else Paragraph('', cell_style)
+                elif nested_tbl_tag:
+                    # Render pre-table inline content then nested table at correct cell width
+                    pre_parts = []
+                    for child in c.children:
+                        if child == nested_tbl_tag:
+                            break
+                        if isinstance(child, NavigableString):
+                            pre_parts.append(_esc(str(child)))
+                        else:
+                            cn = (child.name or '').lower()
+                            if cn == 'br':
+                                pre_parts.append('<br/>')
+                            else:
+                                pre_parts.append(_inline(child))
+                    pre_text = ''.join(pre_parts)
+                    cell_w = sum(col_widths[col_idx:col_idx + cs])
+                    nested_rl = _make_table(nested_tbl_tag, available_width=cell_w)
+                    flowables = []
+                    if pre_text.strip() or '<br/>' in pre_text:
+                        flowables.append(Paragraph(pre_text or '&nbsp;', cell_style))
+                    if nested_rl:
+                        flowables.append(nested_rl)
+                    cell_content = flowables if flowables else Paragraph('&nbsp;', cell_style)
+                else:
+                    cell_content = Paragraph(_inline(c) or '&nbsp;', cell_style)
+
+                row_data.append(cell_content)
                 if cs > 1 or rs > 1:
                     span_cmds.append(('SPAN', (col_idx, row_idx),
                                       (col_idx + cs - 1, row_idx + rs - 1)))
-                # Background color
                 bg = _parse_color(st.get('background', '') or st.get('background-color', ''))
                 if bg:
                     color_cmds.append(('BACKGROUND', (col_idx, row_idx),
                                        (col_idx + cs - 1, row_idx + rs - 1), bg))
-                # Text color for entire cell span
                 if txt_color:
                     color_cmds.append(('TEXTCOLOR', (col_idx, row_idx),
                                        (col_idx + cs - 1, row_idx + rs - 1), txt_color))
-                # Padding overrides from style
                 for _ in range(cs - 1):
                     row_data.append(Paragraph('', _para_style({})))
                     col_idx += 1
@@ -832,13 +881,17 @@ def _render_html_to_pdf(html_content: str) -> bytes:
             return None
 
         t = Table(rows, hAlign='LEFT', colWidths=col_widths)
-        style_cmds = [
-            ('GRID', (0, 0), (-1, -1), 0.75, colors.black),
+        lpad = 1 if no_border else 5
+        rpad = 1 if no_border else 5
+        tpad = 0 if no_border else 3
+        bpad = 0 if no_border else 3
+        grid_cmds = [] if no_border else [('GRID', (0, 0), (-1, -1), 0.75, colors.black)]
+        style_cmds = grid_cmds + [
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('LEFTPADDING', (0, 0), (-1, -1), lpad),
+            ('RIGHTPADDING', (0, 0), (-1, -1), rpad),
+            ('TOPPADDING', (0, 0), (-1, -1), tpad),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), bpad),
         ] + span_cmds + color_cmds
         t.setStyle(TableStyle(style_cmds))
         return t
@@ -909,7 +962,7 @@ def _render_html_to_pdf(html_content: str) -> bytes:
 
     out = _io.BytesIO()
     doc = SimpleDocTemplate(out, pagesize=A4, leftMargin=MARGIN, rightMargin=MARGIN,
-                            topMargin=MARGIN, bottomMargin=MARGIN)
+                            topMargin=TOP_MARGIN, bottomMargin=BOTTOM_MARGIN)
     doc.build(flow)
     return out.getvalue()
 
@@ -921,6 +974,11 @@ async def export_pdf(request: Request):
         body = await request.json()
         html_content = body.get("html", "")
         filename = body.get("filename", "dokumen") or "dokumen"
+        agent = body.get("agent", "")
+        # Report generator: top & bottom margin 1.5cm (kiri/kanan kekal 2cm)
+        top_m = bottom_m = None
+        if agent == "report_generator":
+            top_m = bottom_m = 15.0
         # Sanitize filename
         import re as _re
         filename = _re.sub(r'[^\w\-.]', '_', filename)
@@ -929,7 +987,7 @@ async def export_pdf(request: Request):
         if not html_content.strip():
             return JSONResponse({"ok": False, "error": "Tiada kandungan HTML."}, status_code=400)
 
-        pdf_bytes = _render_html_to_pdf(html_content)
+        pdf_bytes = _render_html_to_pdf(html_content, top_margin_mm=top_m, bottom_margin_mm=bottom_m)
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
@@ -1193,6 +1251,16 @@ async def report_upload_image(file: UploadFile = File(...), session_id: str = Fo
     contents = await file.read()
     result = rg_add_image(session_id, contents, file.filename or "image.jpg")
     return JSONResponse(result)
+
+
+@app.get("/api/report/preview-html")
+async def report_preview_html(session_id: str = "default"):
+    from agents.report_generator import _get_session, _build_report_html
+    session = _get_session(session_id)
+    if not session or not session.get("fields"):
+        return JSONResponse({"html": ""})
+    html = _build_report_html(session["fields"], session_id=session_id)
+    return JSONResponse({"html": html})
 
 
 @app.get("/api/report/images")

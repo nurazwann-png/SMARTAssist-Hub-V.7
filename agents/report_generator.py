@@ -323,6 +323,40 @@ Kembalikan HANYA laporan yang telah dikemaskini dalam format JSON:
         except Exception:
             pass
 
+    # Arahan tambah gambar → paparkan butang muat naik gambar
+    _IMAGE_ADD_KEYWORDS = (
+        "tambah gambar", "tambah foto", "tambah imej", "tambah lampiran",
+        "muat naik gambar", "muat naik foto", "muatnaik gambar", "upload gambar",
+        "upload foto", "sisip gambar", "masukkan gambar", "letak gambar",
+        "lampir gambar", "lampiran gambar",
+        "add image", "add photo", "add picture", "attach photo", "attach image",
+        "upload image", "upload photo", "insert image", "insert photo",
+    )
+    if any(kw in query_lower for kw in _IMAGE_ADD_KEYWORDS):
+        image_count = len(get_report_images(session_id))
+        msg = (
+            "Please click the “+ Add Photo” button below to upload your landscape photos (maximum 4)."
+            if lang == "en" else
+            "Sila tekan butang “+ Tambah Gambar” di bawah untuk memuat naik gambar landscape anda (maksimum 4 gambar)."
+        )
+        resp = {
+            "phase": session["phase"],
+            "message": msg,
+            "show_image_uploader": True,
+            "image_count": image_count,
+            "max_images": MAX_IMAGES,
+        }
+        if session.get("document"):
+            doc_text = session["document"]
+            resp["document_preview"] = doc_text
+            resp["document_html"] = _build_report_html(session["fields"], session_id=session_id)
+            resp["ready_to_save"] = not bool(_has_placeholders(doc_text))
+            resp["fields_status"] = {
+                "collected": session["fields"],
+                "missing": [f["label"] for f in _find_missing_fields(session["fields"])],
+            }
+        return json.dumps(resp, ensure_ascii=False)
+
     missing = _find_missing_fields(session["fields"])
     context_info = f"""
 Status sesi semasa:
@@ -386,7 +420,7 @@ Status sesi semasa:
         doc_text = _build_report(session["fields"])
         placeholders = _has_placeholders(doc_text)
         parsed["document_preview"] = doc_text
-        parsed["document_html"] = _build_report_html(session["fields"])
+        parsed["document_html"] = _build_report_html(session["fields"], session_id=session_id)
         if placeholders:
             parsed["validation_errors"] = [f"Masih ada placeholder yang belum diisi: {', '.join(placeholders)}"]
             parsed["ready_to_save"] = False
@@ -408,7 +442,62 @@ Status sesi semasa:
     return json.dumps(parsed, ensure_ascii=False)
 
 
-def _build_report_html(f: dict) -> str:
+def _build_images_html(session_id: str | None) -> str:
+    """Return HTML for Lampiran Gambar section with base64-embedded images (aspect-ratio preserved)."""
+    if not session_id:
+        return ""
+    images = get_report_images(session_id)
+    if not images:
+        return ""
+    import base64 as _b64
+    MAX_W_CM = 7.5   # max width per image in 2-column grid
+    MAX_H_CM = 6.0   # max height cap
+
+    parts = []
+    for i, img_info in enumerate(images):
+        try:
+            from PIL import Image as _PIL
+            with _PIL.open(img_info["path"]) as im:
+                orig_w, orig_h = im.size
+            ratio = orig_h / orig_w if orig_w else 1
+            disp_w = MAX_W_CM
+            disp_h = disp_w * ratio
+            if disp_h > MAX_H_CM:
+                disp_h = MAX_H_CM
+                disp_w = disp_h / ratio
+            with open(img_info["path"], "rb") as fh:
+                raw = fh.read()
+            ext = img_info["filename"].rsplit(".", 1)[-1].lower()
+            mime = "image/jpeg" if ext in ("jpg", "jpeg") else "image/png"
+            b64 = _b64.b64encode(raw).decode()
+            parts.append(
+                f'<td style="width:50%;text-align:center;padding:6px;vertical-align:top">'
+                f'<img src="data:{mime};base64,{b64}" '
+                f'style="width:{disp_w:.2f}cm;height:{disp_h:.2f}cm;display:block;margin:0 auto">'
+                f'</td>'
+            )
+        except Exception:
+            parts.append(
+                f'<td style="width:50%;text-align:center;padding:6px">[Gambar {i+1}]</td>'
+            )
+
+    rows = []
+    for i in range(0, len(parts), 2):
+        pair = parts[i:i+2]
+        if len(pair) == 1:
+            pair.append('<td style="width:50%"></td>')
+        rows.append(f"<tr>{''.join(pair)}</tr>")
+
+    return (
+        f'<div style="page-break-before:always;margin-top:14px">'
+        f'<p style="font-family:Arial,sans-serif;font-size:11pt;font-weight:bold;'
+        f'text-align:center;margin-bottom:8px">LAMPIRAN GAMBAR</p>'
+        f'<table style="width:100%;border-collapse:collapse">{"".join(rows)}</table>'
+        f'</div>'
+    )
+
+
+def _build_report_html(f: dict, session_id: str | None = None) -> str:
     logo_url = None
     try:
         from backend.letterhead_store import get_active_by_type
@@ -460,10 +549,10 @@ def _build_report_html(f: dict) -> str:
         obj_items = [o.strip() for o in objektif.split(",") if o.strip()]
     obj_html = "<br>".join(f"{i+1}) {o}" for i, o in enumerate(obj_items)) if obj_items else objektif
 
-    rumusan = f.get("rumusan", "").replace("\n", "<br>")
-    cadangan = f.get("cadangan", "").replace("\n", "<br>")
+    rumusan = (f.get("rumusan") or "").replace("\n", "<br>")
+    cadangan = (f.get("cadangan") or "").replace("\n", "<br>")
 
-    TH = 'style="border:1px solid #000;padding:5px 8px;font-weight:bold"'
+    TH = 'style="border:1px solid #000;padding:5px 8px;font-weight:bold;text-align:center"'
     TC = 'style="border:1px solid #000;padding:5px 8px;vertical-align:top;text-align:justify"'
     TL = 'style="border:1px solid #000;padding:5px 8px;width:20%"'
     TV = 'style="border:1px solid #000;padding:5px 8px;width:30%"'
@@ -483,7 +572,7 @@ def _build_report_html(f: dict) -> str:
         f'</tr>'
         f'<tr>'
         f'<td {TL}>Masa</td><td {TV}>{f.get("masa","")}</td>'
-        f'<td {TL}>Nama Sekolah</td><td {TV}>{f.get("organisasi","")}</td>'
+        f'<td {TL}>Jabatan</td><td {TV}>{f.get("organisasi","")}</td>'
         f'</tr>'
         f'<tr><td colspan="4" {TH}>PEGAWAI YANG TERLIBAT</td></tr>'
         f'<tr><td colspan="4" style="border:1px solid #000;padding:5px 8px;min-height:50px;vertical-align:top">{pegawai_html}</td></tr>'
@@ -493,28 +582,62 @@ def _build_report_html(f: dict) -> str:
         f'<tr><td colspan="4" style="border:1px solid #000;padding:5px 8px;min-height:70px;vertical-align:top;text-align:justify">{rumusan}</td></tr>'
         f'<tr><td colspan="4" {TH}>CADANGAN / TINDAKAN</td></tr>'
         f'<tr><td colspan="4" style="border:1px solid #000;padding:5px 8px;min-height:70px;vertical-align:top;text-align:justify">{cadangan}</td></tr>'
-        f'<tbody style="page-break-inside:avoid">'
+        f'</table>'
+        f'<div style="page-break-inside:avoid">'
+        f'<table style="width:100%;border-collapse:collapse">'
         f'<tr>'
         f'<td colspan="2" {TH}>DISEDIAKAN OLEH</td>'
         f'<td colspan="2" style="border:1px solid #000;padding:5px 8px;font-weight:bold;text-align:center">DISAHKAN OLEH</td>'
         f'</tr>'
         f'<tr>'
-        f'<td colspan="2" style="border:1px solid #000;padding:8px;height:80px;vertical-align:bottom">'
-        f'............................................................<br>'
-        f'NAMA &nbsp;&nbsp;&nbsp;&nbsp;: {f.get("penyedia_nama","")}<br>'
-        f'JAWATAN &nbsp;: {f.get("penyedia_jawatan","")}<br>'
-        f'ORGANISASI : {f.get("organisasi","")}<br>'
-        f'TARIKH &nbsp;&nbsp;&nbsp;: {f.get("tarikh_disediakan","")}'
+        f'<td colspan="2" style="border:1px solid #000;padding:8px;height:110px;vertical-align:bottom">'
+        f'<br><br>............................................................<br>'
+        f'<table border="0" style="border:none;border-collapse:collapse;width:100%">'
+        f'<tr>'
+        f'<td style="border:none;padding:0 4px 0 0;white-space:nowrap;width:30%">NAMA</td>'
+        f'<td style="border:none;padding:0 2px;width:5%">:</td>'
+        f'<td style="border:none;padding:0;width:65%">{f.get("penyedia_nama","")}</td>'
+        f'</tr><tr>'
+        f'<td style="border:none;padding:0 4px 0 0;white-space:nowrap;width:30%">JAWATAN</td>'
+        f'<td style="border:none;padding:0 2px;width:5%">:</td>'
+        f'<td style="border:none;padding:0;width:65%">{f.get("penyedia_jawatan","")}</td>'
+        f'</tr><tr>'
+        f'<td style="border:none;padding:0 4px 0 0;white-space:nowrap;width:30%">ORGANISASI</td>'
+        f'<td style="border:none;padding:0 2px;width:5%">:</td>'
+        f'<td style="border:none;padding:0;width:65%">{f.get("organisasi","")}</td>'
+        f'</tr><tr>'
+        f'<td style="border:none;padding:0 4px 0 0;white-space:nowrap;width:30%">TARIKH</td>'
+        f'<td style="border:none;padding:0 2px;width:5%">:</td>'
+        f'<td style="border:none;padding:0;width:65%">{f.get("tarikh_disediakan","")}</td>'
+        f'</tr>'
+        f'</table>'
         f'</td>'
-        f'<td colspan="2" style="border:1px solid #000;padding:8px;height:80px;vertical-align:bottom">'
-        f'............................................................<br>'
-        f'NAMA &nbsp;&nbsp;&nbsp;&nbsp;: {f.get("pengesah_nama","")}<br>'
-        f'JAWATAN &nbsp;: {f.get("pengesah_jawatan","")}<br>'
-        f'ORGANISASI : {f.get("organisasi","")}'
+        f'<td colspan="2" style="border:1px solid #000;padding:8px;height:110px;vertical-align:bottom">'
+        f'<br><br>............................................................<br>'
+        f'<table border="0" style="border:none;border-collapse:collapse;width:100%">'
+        f'<tr>'
+        f'<td style="border:none;padding:0 4px 0 0;white-space:nowrap;width:30%">NAMA</td>'
+        f'<td style="border:none;padding:0 2px;width:5%">:</td>'
+        f'<td style="border:none;padding:0;width:65%">{f.get("pengesah_nama","")}</td>'
+        f'</tr><tr>'
+        f'<td style="border:none;padding:0 4px 0 0;white-space:nowrap;width:30%">JAWATAN</td>'
+        f'<td style="border:none;padding:0 2px;width:5%">:</td>'
+        f'<td style="border:none;padding:0;width:65%">{f.get("pengesah_jawatan","")}</td>'
+        f'</tr><tr>'
+        f'<td style="border:none;padding:0 4px 0 0;white-space:nowrap;width:30%">ORGANISASI</td>'
+        f'<td style="border:none;padding:0 2px;width:5%">:</td>'
+        f'<td style="border:none;padding:0;width:65%">{f.get("organisasi","")}</td>'
+        f'</tr><tr>'
+        f'<td style="border:none;padding:0 4px 0 0;white-space:nowrap;width:30%">TARIKH</td>'
+        f'<td style="border:none;padding:0 2px;width:5%">:</td>'
+        f'<td style="border:none;padding:0;width:65%"></td>'
+        f'</tr>'
+        f'</table>'
         f'</td>'
         f'</tr>'
-        f'</tbody>'
         f'</table>'
+        f'</div>'
+        f'{_build_images_html(session_id)}'
         f'</div>'
     )
 
@@ -673,7 +796,7 @@ def build_docx(session_id: str) -> bytes | None:
             trPr.append(trHeight)
         return cell
 
-    def _add_two_col_row(left_text, right_text, left_bold=True, right_bold=False, right_center=False, min_height=None):
+    def _add_two_col_row(left_text, right_text, left_bold=True, right_bold=False, left_center=False, right_center=False, min_height=None):
         row = table.add_row()
         left_cell = row.cells[0]
         left_cell.merge(row.cells[1])
@@ -683,6 +806,8 @@ def build_docx(session_id: str) -> bytes | None:
         lp = left_cell.paragraphs[0]
         lp.paragraph_format.space_before = Pt(4)
         lp.paragraph_format.space_after = Pt(4)
+        if left_center:
+            lp.alignment = WD_ALIGN_PARAGRAPH.CENTER
         _run(lp, left_text, bold=left_bold)
         _set_cell_border(left_cell, **_border_kwargs())
 
@@ -732,12 +857,12 @@ def build_docx(session_id: str) -> bytes | None:
         _run(vp, val, bold=False)
         _set_cell_border(val_cell, **_border_kwargs())
 
-    # Row 5: Masa | value | Nama Sekolah | value
+    # Row 5: Masa | value | Jabatan | value
     row5 = table.add_row()
     cells5 = row5.cells
     for i, (label, val) in enumerate([
         ("Masa", f.get("masa", "")),
-        ("Nama Sekolah", f.get("organisasi", "")),
+        ("Jabatan", f.get("organisasi", "")),
     ]):
         label_cell = cells5[i * 2]
         val_cell = cells5[i * 2 + 1]
@@ -779,32 +904,71 @@ def build_docx(session_id: str) -> bytes | None:
     _add_full_row(objektif_text, bold=False, center=False, min_height="800")
 
     # Row 8: RUMUSAN/LAPORAN (title row + content row)
-    _add_full_row("RUMUSAN / LAPORAN", bold=True, center=False)
+    _add_full_row("RUMUSAN / LAPORAN", bold=True, center=True)
     _add_full_row(f.get("rumusan", ""), bold=False, center=False, min_height="2000")
 
     # Row 9: CADANGAN/TINDAKAN (title row + content row)
-    _add_full_row("CADANGAN / TINDAKAN", bold=True, center=False)
+    _add_full_row("CADANGAN / TINDAKAN", bold=True, center=True)
     _add_full_row(f.get("cadangan", ""), bold=False, center=False, min_height="2000")
 
-    # Row 10: DISEDIAKAN OLEH | DISAHKAN OLEH header
-    _add_two_col_row("DISEDIAKAN OLEH", "DISAHKAN OLEH", left_bold=True, right_bold=True, right_center=True, min_height=None)
+    # Row 10: DISEDIAKAN OLEH | DISAHKAN OLEH header — keep with next row
+    lc10, rc10 = _add_two_col_row("DISEDIAKAN OLEH", "DISAHKAN OLEH", left_bold=True, right_bold=True, left_center=True, right_center=True, min_height=None)
+    # keep_with_next prevents page break between this row and the next
+    for cell in (lc10, rc10):
+        for para in cell.paragraphs:
+            para.paragraph_format.keep_with_next = True
+    table.rows[-1].allow_break = False
 
-    # Row 11: Signature blocks side by side
+    # Row 11: Signature blocks side by side — keep together, no internal break
     org = f.get('organisasi', '')
-    sig_left = (
-        f"............................................................\n"
-        f"NAMA       : {f.get('penyedia_nama', '')}\n"
-        f"JAWATAN    : {f.get('penyedia_jawatan', '')}\n"
-        f"ORGANISASI : {org}\n"
-        f"TARIKH     : {f.get('tarikh_disediakan', '')}"
-    )
-    sig_right = (
-        f"............................................................\n"
-        f"NAMA       : {f.get('pengesah_nama', '')}\n"
-        f"JAWATAN    : {f.get('pengesah_jawatan', '')}\n"
-        f"ORGANISASI : {org}"
-    )
-    _add_two_col_row(sig_left, sig_right, left_bold=False, min_height="1600")
+
+    def _build_sig_cell(cell, nama, jawatan, tarikh):
+        for p in cell.paragraphs:
+            p.clear()
+        TAB_PT = int(Cm(2.8).pt * 20)
+
+        def _sp(txt):
+            p = cell.add_paragraph()
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
+            if txt:
+                r = p.add_run(txt)
+                r.font.name = "Arial"; r.font.size = Pt(10)
+            return p
+
+        def _row(label, value):
+            p = cell.add_paragraph()
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(1)
+            pPr = p._p.get_or_add_pPr()
+            tabs_xml = parse_xml(
+                f'<w:tabs {nsdecls("w")}>'
+                f'<w:tab w:val="left" w:pos="{TAB_PT}"/>'
+                f'</w:tabs>'
+            )
+            pPr.append(tabs_xml)
+            for txt in (label, "\t: ", value):
+                r = p.add_run(txt)
+                r.font.name = "Arial"; r.font.size = Pt(10)
+
+        _sp(""); _sp(""); _sp("")
+        _sp("............................................................")
+        _row("NAMA", nama)
+        _row("JAWATAN", jawatan)
+        _row("ORGANISASI", org)
+        _row("TARIKH", tarikh)
+        _set_cell_border(cell, **_border_kwargs())
+
+    row11 = table.add_row()
+    lc11 = row11.cells[0]; lc11.merge(row11.cells[1])
+    rc11 = row11.cells[2]; rc11.merge(row11.cells[3])
+    _build_sig_cell(lc11, f.get("penyedia_nama",""), f.get("penyedia_jawatan",""), f.get("tarikh_disediakan",""))
+    _build_sig_cell(rc11, f.get("pengesah_nama",""), f.get("pengesah_jawatan",""), "")
+    tr11 = row11._tr
+    trPr11 = tr11.get_or_add_trPr()
+    trHeight11 = parse_xml(f'<w:trHeight {nsdecls("w")} w:val="1600" w:hRule="atLeast"/>')
+    trPr11.append(trHeight11)
+    table.rows[-1].allow_break = False
 
     # Set column widths
     for row in table.rows:
@@ -832,6 +996,7 @@ def build_docx(session_id: str) -> bytes | None:
         for pair_start in range(0, len(images), 2):
             pair = images[pair_start:pair_start + 2]
             img_tbl = doc.add_table(rows=1, cols=2)
+            img_tbl.style = "Table Grid"
             img_tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
             img_tbl.autofit = False
             for j, img_info in enumerate(pair):
@@ -844,10 +1009,17 @@ def build_docx(session_id: str) -> bytes | None:
                 try:
                     from PIL import Image as PILImage
                     with PILImage.open(img_info["path"]) as im:
-                        w, h = im.size
-                    # Crop to uniform ratio before embedding — keep width fixed, calc height
+                        orig_w, orig_h = im.size
+                    # Preserve original aspect ratio — scale to fit cell width, cap height
+                    ratio = orig_h / orig_w if orig_w else 1
+                    img_w = IMG_W
+                    img_h = IMG_W * ratio
+                    MAX_H = Cm(7.0)
+                    if img_h > MAX_H:
+                        img_h = MAX_H
+                        img_w = img_h / ratio
                     run = para.add_run()
-                    run.add_picture(img_info["path"], width=IMG_W, height=IMG_H)
+                    run.add_picture(img_info["path"], width=img_w, height=img_h)
                 except Exception:
                     try:
                         para.add_run().add_picture(img_info["path"], width=IMG_W)

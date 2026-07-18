@@ -1850,10 +1850,27 @@ function _buildMissingFieldsForm(missingLabels) {
             rows += `<tr${hideAttr}><td><label class="ff-label" for="${iid}">${escapeHtml(label)}</label></td><td>${input}</td></tr>`;
         }
     });
+    const MIN_IMAGES = 2;
+    const MAX_IMAGES_FORM = 4;
+    const imgUploadSection = currentAgent === 'report_generator' ? `
+        <div class="ff-img-upload-section">
+            <div class="ff-img-upload-title">📷 ${currentLang === 'en' ? 'Attach Photos' : 'Lampirkan Gambar'} <span class="ff-img-required">(${currentLang === 'en' ? 'min. 2 required' : 'sekurang-kurangnya 2'})</span></div>
+            <p class="ff-img-upload-hint">${currentLang === 'en'
+                ? 'Upload at least <strong>2</strong> and up to <strong>4</strong> <strong>landscape</strong> photos before submitting.'
+                : 'Muat naik sekurang-kurangnya <strong>2</strong> hingga <strong>4</strong> gambar <strong>landscape</strong> sebelum hantar.'}</p>
+            <div class="report-img-grid report-img-grid-sm" id="reportImgGrid"></div>
+            <div class="ff-img-upload-actions">
+                <button type="button" class="report-img-add-btn" id="reportImgAddBtn" onclick="triggerReportImageUpload()">+ ${currentLang === 'en' ? 'Add Photo' : 'Tambah Gambar'}</button>
+                <span class="ff-img-count-badge" id="ffImgCountBadge">0 / ${MAX_IMAGES_FORM}</span>
+            </div>
+            <input type="file" id="reportImgInput" accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none" onchange="handleReportImageUpload(this)">
+        </div>` : '';
+
     return `<div class="da-section fields-form-section">
         <div class="da-section-title" data-i18n="fields_form_title">${I18N[currentLang].fields_form_title}</div>
         <form class="fields-form" id="${fid}" onsubmit="event.preventDefault();_submitFieldsForm('${fid}')">
         <table class="ff-table"><tbody>${rows}</tbody></table>
+        ${imgUploadSection}
         <table class="ff-table"><tbody><tr class="ff-submit-row"><td colspan="2">
             <button type="submit" class="ff-submit-btn" data-i18n="fields_form_submit">${I18N[currentLang].fields_form_submit}</button>
         </td></tr></tbody></table>
@@ -2018,6 +2035,15 @@ function _submitFieldsForm(fid) {
         }
     });
     if (parts.length === 0) { showToast(currentLang === 'en' ? 'Please fill in at least one field.' : 'Sila isi sekurang-kurangnya satu medan.', 'err'); return; }
+    // Report Generator: require at least 2 images before submitting
+    if (currentAgent === 'report_generator') {
+        const imgGrid = document.getElementById('reportImgGrid');
+        const imgCount = imgGrid ? imgGrid.querySelectorAll('.report-img-thumb').length : 0;
+        if (imgCount < 2) {
+            showToast(currentLang === 'en' ? 'Please upload at least 2 landscape photos before submitting.' : 'Sila muat naik sekurang-kurangnya 2 gambar landscape sebelum menghantar.', 'err');
+            return;
+        }
+    }
     form.querySelectorAll('input,textarea,button').forEach(el => el.disabled = true);
     form.querySelector('.ff-submit-btn').textContent = I18N[currentLang].btn_sending;
     _suppressUserMsg = true;
@@ -2079,15 +2105,21 @@ function buildLetterHtml(data) {
         html += renderAutoReviewPanel(data.auto_review);
     }
 
-    // Image upload panel for report generator
-    if (data.awaiting_images && currentAgent === 'report_generator') {
-        const imgCount = data.image_count || 0;
-        const maxImg = data.max_images || 4;
-        html += `<div class="da-section report-img-section" id="reportImgSection">
-            <div class="da-section-title">📷 Lampiran Gambar (<span id="reportImgCounter">${imgCount}</span>/${maxImg})</div>
-            <p class="report-img-hint">📷 <strong>Langkah Akhir:</strong> Laporan anda telah siap! Sila muat naik sehingga ${maxImg} gambar <strong>landscape</strong> untuk dilampirkan dalam laporan. Gunakan butang '+ Tambah Gambar' di bawah, atau terus muat turun jika tiada gambar diperlukan.</p>
-            <div class="report-img-grid" id="reportImgGrid"></div>
-            <button class="report-img-add-btn" id="reportImgAddBtn" onclick="triggerReportImageUpload()" ${imgCount >= maxImg ? 'style="display:none"' : ''}>+ Tambah Gambar</button>
+    // Image upload panel for report generator — shown on demand when the user
+    // asks to add photos (backend sets show_image_uploader). Reuses the same
+    // element IDs as the pre-submit form so upload/refresh helpers work as-is.
+    if (data.show_image_uploader) {
+        const _max = data.max_images || 4;
+        html += `<div class="da-section ff-img-upload-section">
+            <div class="ff-img-upload-title">📷 ${currentLang === 'en' ? 'Attach Photos' : 'Lampirkan Gambar'} <span class="ff-img-required">(${currentLang === 'en' ? 'up to 4' : 'sehingga 4'})</span></div>
+            <p class="ff-img-upload-hint">${currentLang === 'en'
+                ? 'Upload up to <strong>4</strong> <strong>landscape</strong> photos.'
+                : 'Muat naik sehingga <strong>4</strong> gambar <strong>landscape</strong>.'}</p>
+            <div class="report-img-grid report-img-grid-sm" id="reportImgGrid"></div>
+            <div class="ff-img-upload-actions">
+                <button type="button" class="report-img-add-btn" id="reportImgAddBtn" onclick="triggerReportImageUpload()">+ ${currentLang === 'en' ? 'Add Photo' : 'Tambah Gambar'}</button>
+                <span class="ff-img-count-badge" id="ffImgCountBadge">${data.image_count || 0} / ${_max}</span>
+            </div>
             <input type="file" id="reportImgInput" accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none" onchange="handleReportImageUpload(this)">
         </div>`;
     }
@@ -2304,6 +2336,23 @@ async function _refreshReportImages() {
         }
         if (counter) counter.textContent = images.length;
         if (addBtn) addBtn.style.display = images.length >= (data.max || 4) ? 'none' : 'inline-flex';
+        // Update count badge in form (pre-submit upload section)
+        const badge = document.getElementById('ffImgCountBadge');
+        if (badge) {
+            badge.textContent = `${images.length} / ${data.max || 4}`;
+            badge.className = 'ff-img-count-badge' + (images.length >= 2 ? ' ff-img-count-ok' : '');
+        }
+    } catch (_) {}
+    await _refreshDocPreviewHtml();
+}
+
+async function _refreshDocPreviewHtml() {
+    try {
+        const res = await fetch(`/api/report/preview-html?session_id=${encodeURIComponent(sessionId)}`);
+        const data = await res.json();
+        if (!data.html) return;
+        const el = document.getElementById('docPreviewHtml');
+        if (el) el.innerHTML = data.html;
     } catch (_) {}
 }
 
@@ -2435,9 +2484,20 @@ async function downloadDocumentPdf() {
     const btn = document.querySelector('.doc-action-btn.pdf-btn');
     const origText = btn ? btn.innerHTML : null;
     if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Menyediakan...'; }
-    const previewHtml = document.getElementById('docPreviewHtml') || document.getElementById('wordPreviewHtmlEdit');
-    const preview     = document.getElementById('docPreview') || document.getElementById('reviewDocPreview') || document.getElementById('wordPreviewText');
-    const html = previewHtml ? previewHtml.innerHTML : (preview ? `<pre style="font-family:Arial,sans-serif;font-size:12pt;white-space:pre-wrap">${preview.innerText}</pre>` : '');
+    // For report_generator, always fetch fresh HTML (includes Lampiran Gambar with embedded images)
+    let html;
+    if (currentAgent === 'report_generator') {
+        try {
+            const r = await fetch(`/api/report/preview-html?session_id=${encodeURIComponent(sessionId)}`);
+            const d = await r.json();
+            html = d.html || '';
+        } catch (_) { html = ''; }
+    }
+    if (!html) {
+        const previewHtml = document.getElementById('docPreviewHtml') || document.getElementById('wordPreviewHtmlEdit');
+        const preview     = document.getElementById('docPreview') || document.getElementById('reviewDocPreview') || document.getElementById('wordPreviewText');
+        html = previewHtml ? previewHtml.innerHTML : (preview ? `<pre style="font-family:Arial,sans-serif;font-size:12pt;white-space:pre-wrap">${preview.innerText}</pre>` : '');
+    }
     if (!html) { if (btn) { btn.disabled = false; btn.innerHTML = origText; } return; }
 
     // Determine filename from agent and document type
@@ -2455,7 +2515,7 @@ async function downloadDocumentPdf() {
         const res = await fetch('/api/export/pdf', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ html, filename })
+            body: JSON.stringify({ html, filename, agent: currentAgent })
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
@@ -3470,35 +3530,95 @@ async function openWordPreview() {
             if (!measure) return;
             const contentEl = measure.querySelector('.word-page-html-content');
             const totalH = contentEl ? contentEl.scrollHeight : measure.scrollHeight;
-            measure.remove();
 
             const MM_TO_PX = 3.7795;
             // A4 content area height: 297mm - 25.4mm top - 25.4mm bottom = 246.2mm
             const pageContentH = Math.round(246.2 * MM_TO_PX);
             // Single-page threshold: full page height minus top padding only (96px).
-            // Allows content that fits within the printable area to stay on 1 page
-            // even if it slightly exceeds pageContentH due to letterhead or tight spacing.
             const singlePageH = Math.round(297 * MM_TO_PX) - 96;
-            const numPages = totalH <= singlePageH ? 1 : Math.max(2, Math.ceil(totalH / pageContentH));
             const scroll = document.querySelector('#wordPreviewOverlay .word-preview-scroll');
-            if (!scroll) return;
+            if (!scroll) { measure.remove(); return; }
 
-            if (numPages <= 1) {
-                scroll.innerHTML = `<div class="word-page"><div class="word-page-html-content" contenteditable="true" id="wordPreviewHtmlEdit" spellcheck="false" oninput="onOverlayEdit()">${_htmlContent}</div></div>`;
-            } else {
-                // Multi-page: page 1 is editable; pages 2+ are read-only overflow views
-                scroll.innerHTML = Array.from({ length: numPages }, (_, i) => {
-                    const offsetPx = i * pageContentH;
-                    const pageNum = `<div class="word-page-num">${i + 1} / ${numPages}</div>`;
+            measure.remove();
+
+            const _buildPages = (forcedBreakOffsets) => {
+                // Build page start offsets: forced breaks take priority over natural breaks
+                const pageStarts = [0];
+                let cursor = 0;
+                let remaining = forcedBreakOffsets.filter(fb => fb > 0 && fb < totalH);
+                while (cursor < totalH) {
+                    const naturalNext = cursor + pageContentH;
+                    const nextForced = remaining.find(fb => fb > cursor);
+                    let next;
+                    if (nextForced !== undefined && nextForced <= naturalNext) {
+                        // Forced break falls within (or at) next natural page end — snap to it
+                        next = nextForced;
+                        remaining = remaining.filter(fb => fb !== nextForced);
+                    } else if (naturalNext < totalH) {
+                        // Natural break still within content
+                        next = naturalNext;
+                    } else if (nextForced !== undefined) {
+                        // Past natural end but there is still a pending forced break
+                        next = nextForced;
+                        remaining = remaining.filter(fb => fb !== nextForced);
+                    } else {
+                        break; // nothing more to add
+                    }
+                    pageStarts.push(next);
+                    cursor = next;
+                }
+                return pageStarts.map((offsetPx, i) => {
+                    // Each page shows content up to the next page start. For forced breaks
+                    // this is shorter than pageContentH, so content after the break (e.g. the
+                    // signature block) is clipped and does not bleed onto the previous page.
+                    const nextStart = (i + 1 < pageStarts.length) ? pageStarts[i + 1] : (offsetPx + pageContentH);
+                    const pageH = Math.min(pageContentH, nextStart - offsetPx);
+                    const pageNum = `<div class="word-page-num">${i + 1} / ${pageStarts.length}</div>`;
                     const editAttrs = i === 0 ? `contenteditable="true" id="wordPreviewHtmlEdit" spellcheck="false" oninput="onOverlayEdit()"` : '';
-                    // Clip wrapper ensures content is cut at exactly pageContentH — no overlap between pages
                     return `<div class="word-page" style="overflow:hidden;max-height:297mm;min-height:297mm">
-                        <div style="overflow:hidden;height:${pageContentH}px">
+                        <div style="overflow:hidden;height:${pageH}px">
                             <div class="word-page-html-content" ${editAttrs} style="position:relative;top:-${offsetPx}px">${_htmlContent}</div>
                         </div>
                         ${pageNum}
                     </div>`;
                 }).join('');
+            };
+
+            if (totalH <= singlePageH) {
+                scroll.innerHTML = `<div class="word-page"><div class="word-page-html-content" contenteditable="true" id="wordPreviewHtmlEdit" spellcheck="false" oninput="onOverlayEdit()">${_htmlContent}</div></div>`;
+            } else {
+                // Pass 1: render with natural breaks so DOM is live and measurable
+                scroll.innerHTML = _buildPages([]);
+
+                // Pass 2: measure forced-break positions from the live rendered content,
+                // then rebuild if any forced breaks are found
+                requestAnimationFrame(() => {
+                    const liveContent = scroll.querySelector('.word-page-html-content');
+                    if (!liveContent) return;
+
+                    // page-break-before:always → always start this element on a new page
+                    const forcedBreakOffsets = Array.from(
+                        liveContent.querySelectorAll('[style*="page-break-before:always"],[style*="page-break-before: always"]')
+                    ).map(el => el.offsetTop).filter(v => v > 0);
+
+                    // page-break-inside:avoid → force page break at element top if a
+                    // natural page boundary would otherwise cut through the element
+                    for (const el of liveContent.querySelectorAll('[style*="page-break-inside:avoid"]')) {
+                        const top = el.offsetTop;
+                        const bottom = top + el.offsetHeight;
+                        if (top <= 0) continue;
+                        // First natural page boundary that falls inside this element
+                        const firstCut = Math.ceil(top / pageContentH) * pageContentH;
+                        if (firstCut < bottom && !forcedBreakOffsets.includes(top)) {
+                            forcedBreakOffsets.push(top);
+                        }
+                    }
+
+                    forcedBreakOffsets.sort((a, b) => a - b);
+                    if (forcedBreakOffsets.length > 0) {
+                        scroll.innerHTML = _buildPages(forcedBreakOffsets);
+                    }
+                });
             }
         });
     }
