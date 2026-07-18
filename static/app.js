@@ -19,6 +19,23 @@ let _reviewIsPdf        = false;
 let _reviewPdfObjectUrl = null;
 let _reviewPdfImages    = [];
 
+// ── Toast notification ──
+let _toastTimer = null;
+function showToast(msg, type = 'info', duration = 3000) {
+    let el = document.getElementById('appToast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'appToast';
+        el.className = 'app-toast';
+        document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.className = 'app-toast' + (type === 'ok' ? ' toast-ok' : type === 'err' ? ' toast-err' : '');
+    clearTimeout(_toastTimer);
+    requestAnimationFrame(() => { el.classList.add('show'); });
+    _toastTimer = setTimeout(() => { el.classList.remove('show'); }, duration);
+}
+
 // ── i18n ──
 const I18N = {
     bm: {
@@ -553,7 +570,7 @@ async function deleteSession(sid) {
             body: JSON.stringify({ session_id: sid, message: '' }),
         });
         refreshHistory();
-        alert('Sesi telah dipadamkan.');
+        showToast('Sesi telah dipadamkan.', 'ok');
     } catch (_) {}
 }
 
@@ -2003,7 +2020,8 @@ async function downloadReviewDocument() {
         const match = cd.match(/filename="?([^"]+)"?/);
         a.download = match ? match[1] : 'dokumen_diperbetulkan.docx';
         a.click(); URL.revokeObjectURL(url);
-    } catch (err) { alert(err.message); }
+        showToast('Dokumen berjaya dimuat turun.', 'ok');
+    } catch (err) { showToast(err.message, 'err'); }
 }
 
 async function downloadDocument() {
@@ -2024,7 +2042,8 @@ async function downloadDocument() {
         const match = cd.match(/filename="?([^"]+)"?/);
         a.download = match ? match[1] : 'dokumen_rasmi.docx';
         a.click(); URL.revokeObjectURL(url);
-    } catch (err) { alert(err.message); }
+        showToast('Dokumen berjaya dimuat turun.', 'ok');
+    } catch (err) { showToast(err.message, 'err'); }
     finally { if (btn) { btn.disabled = false; btn.innerHTML = origText; } }
 }
 
@@ -2053,6 +2072,7 @@ async function savePreviewEdits(btn) {
     const preview = document.getElementById('docPreview') || document.getElementById('reviewDocPreview');
     const content = previewHtml ? previewHtml.innerText : (preview ? preview.innerText : '');
     await saveDocumentEdits(content);
+    showToast('Perubahan telah disimpan.', 'ok');
     if (btn) {
         btn.textContent = '✅ Tersimpan';
         btn.classList.remove('unsaved');
@@ -2127,7 +2147,7 @@ async function downloadDocumentPdf() {
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            alert(err.error || 'Gagal hasilkan PDF. Sila cuba semula.');
+            showToast(err.error || 'Gagal hasilkan PDF. Sila cuba semula.', 'err');
             return;
         }
         const blob = await res.blob();
@@ -2138,8 +2158,9 @@ async function downloadDocumentPdf() {
         document.body.appendChild(a);
         a.click();
         setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+        showToast('PDF berjaya dimuat turun.', 'ok');
     } catch (e) {
-        alert('Ralat muat turun PDF: ' + e.message);
+        showToast('Ralat muat turun PDF: ' + e.message, 'err');
     } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = origText; }
     }
@@ -2319,7 +2340,7 @@ async function downloadAnalysis(format) {
     if (!lastStructuredData) return;
     if (format === 'csv') {
         const table = lastStructuredData.table;
-        if (!table) { alert('Tiada jadual untuk dimuat turun.'); return; }
+        if (!table) { showToast('Tiada jadual untuk dimuat turun.', 'err'); return; }
         let csv = '﻿' + table.headers.join(',') + '\n';
         table.rows.forEach(row => { csv += row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',') + '\n'; });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2338,7 +2359,8 @@ async function downloadAnalysis(format) {
         const blob = await res.blob();
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
         a.download = format === 'pptx' ? 'analisis_data.pptx' : 'analisis_data.pdf'; a.click();
-    } catch (err) { alert(err.message); }
+        showToast('Fail berjaya dimuat turun.', 'ok');
+    } catch (err) { showToast(err.message, 'err'); }
 }
 
 // ═══ Table tools ═══
