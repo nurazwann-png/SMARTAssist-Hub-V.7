@@ -662,15 +662,34 @@ Status sesi semasa:
         if se_match:
             session["fields"]["senarai_edaran"] = se_match.group(1).strip()
 
+    # Extract Isi Kandungan from form message reliably (LLM may ignore it per system prompt)
+    import re as _re3
+    _isi_m = _re3.search(
+        r'Isi Kandungan\s*:\s*(.+?)(?=\s*,\s*[A-Z][a-zA-Z\s]*\s*:|\s*$)',
+        query, _re3.DOTALL | _re3.IGNORECASE
+    )
+    if _isi_m:
+        _user_isi = _isi_m.group(1).strip().strip(',').strip()
+        if _user_isi and "isi_user" not in session["fields"]:
+            session["fields"]["isi_user"] = _user_isi
+
     if parsed.get("phase") is not None:
         session["phase"] = parsed["phase"]
 
-    # Auto-generate memo isi if all other fields are filled but isi is missing
-    if session.get("doc_type") == "memo" and "isi" not in session["fields"]:
+    # For memo: build proper isi. If user provided a brief, incorporate it (override LLM version).
+    if session.get("doc_type") == "memo":
         tajuk = session["fields"].get("tajuk", "")
-        required_keys = {f["key"] for f in MEMO_FIELDS["fields"] if not f.get("optional") and f["key"] != "isi"}
-        if tajuk and required_keys.issubset(session["fields"].keys()):
-            session["fields"]["isi"] = f"Sukacita dimaklumkan bahawa {tajuk.rstrip('.')} akan diadakan seperti butiran berikut:"
+        isi_user = session["fields"].get("isi_user", "").strip()
+        if tajuk and isi_user:
+            _brief = isi_user.rstrip('.').rstrip(',').strip()
+            session["fields"]["isi"] = (
+                f"Sukacita dimaklumkan bahawa {tajuk.rstrip('.')} diadakan bagi tujuan "
+                f"{_brief[0].lower()}{_brief[1:]} seperti butiran berikut:"
+            )
+        elif tajuk and "isi" not in session["fields"]:
+            required_keys = {f["key"] for f in MEMO_FIELDS["fields"] if not f.get("optional") and f["key"] != "isi"}
+            if required_keys.issubset(session["fields"].keys()):
+                session["fields"]["isi"] = f"Sukacita dimaklumkan bahawa {tajuk.rstrip('.')} akan diadakan seperti butiran berikut:"
 
     all_filled = session["doc_type"] and not _find_missing_fields(session["doc_type"], session["fields"])
     if session["doc_type"] and (session["phase"] >= 3 or all_filled):
