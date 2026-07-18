@@ -39,7 +39,6 @@ MEMO_FIELDS = {
         {"key": "rujukan", "label": "Nombor Rujukan (Ruj. Kami)", "example": "PPD.XXX-X/X/X ( )"},
         {"key": "tarikh", "label": "Tarikh Memo", "example": "10 Julai 2026"},
         {"key": "pengerusi", "label": "Nama Pengerusi dan Jawatan", "example": "Ahmad bin Ali (Pengetua SK Taman Jaya)"},
-        {"key": "penyelaras", "label": "Nama Penyelaras dan Jawatan", "example": "Siti binti Hassan (Guru Kanan)"},
         {"key": "ahli", "label": "Nama Ahli-Ahli (pisahkan dengan koma)", "example": "Razif bin Ramli (Unit ICT), Nora binti Aziz (Unit HEM)"},
         {"key": "urus_setia", "label": "Nama Urus Setia dan Jawatan", "example": "Farah binti Zainudin (Pembantu Tadbir)"},
         {"key": "tajuk", "label": "Perkara / Tajuk Memo (huruf besar)", "example": "JEMPUTAN MESYUARAT PENGURUSAN BIL. 3/2026"},
@@ -69,7 +68,7 @@ CARA KERJA:
 URUTAN SOALAN (ikut susunan ini):
 - Surat: rujukan → tarikh → penerima → (penerima_organisasi + penerima_alamat HANYA jika penerima adalah nama individu/organisasi — LANGKAU jika "Rujuk Senarai Edaran" atau "Semua...") → tajuk → (jana isi secara automatik) → penandatangan_nama → penandatangan_jawatan → nama_pejabat (pilihan) → nama_organisasi (pilihan) → salinan_kepada (pilihan)
 - Jika penerima = "Senarai Edaran" atau "Rujuk Senarai Edaran": sistem akan tanya senarai_edaran berasingan melalui borang khas — JANGAN tanya pengguna untuk senarai_edaran dalam chat. JANGAN tanya penerima_organisasi dan penerima_alamat.
-- Memo: rujukan → tarikh → pengerusi → penyelaras → ahli → urus_setia → tajuk → tarikh_acara → masa_acara → tempat_acara → (jana isi secara automatik) → langkah_kerja (tanya jika relevan) → penandatangan_nama → penandatangan_jawatan → nama_pejabat
+- Memo: rujukan → tarikh → pengerusi → ahli → urus_setia → tajuk → tarikh_acara → masa_acara → tempat_acara → (jana isi secara automatik) → langkah_kerja (tanya jika relevan) → penandatangan_nama → penandatangan_jawatan → nama_pejabat
 
 GAYA:
 - Bertanya seperti pembantu peribadi yang cekap — sopan, ringkas, dan spesifik
@@ -97,7 +96,7 @@ FORMAT OUTPUT — balas HANYA dalam JSON:
 PHASES:
 - Phase 0: Kenal pasti jenis dokumen (surat/memo). Jika pengguna minta tukar jenis, pindahkan field yang sama.
 - Phase 1: Kumpul maklumat secara berperingkat (satu field setiap giliran). JANGAN tanya "isi" — isi akan dijana automatik.
-- Phase 2: JANA ISI KANDUNGAN SECARA AUTOMATIK berdasarkan tajuk dan semua maklumat yang dikumpul. Simpan hasil dalam fields_collected dengan key "isi". Jika maklumat tidak mencukupi untuk menjana isi yang bermakna (cth: tajuk terlalu umum), tanya pengguna soalan spesifik untuk mendapat konteks tambahan (cth: "Boleh nyatakan tujuan utama dan jumlah yang dipohon?"). JANGAN minta pengguna tulis isi sendiri.
+- Phase 2: JANA ISI KANDUNGAN SECARA AUTOMATIK berdasarkan tajuk dan semua maklumat yang dikumpul. Simpan hasil dalam fields_collected dengan key "isi". Jika fields_collected sudah mengandungi "isi" (pengguna telah isikan ringkasan dalam borang), GUNAKAN ia sebagai konteks/panduan untuk jana isi yang penuh, formal dan berformat dengan betul — JANGAN salin teks pengguna secara verbatim, jana semula dalam ayat rasmi yang sesuai. Jika maklumat tidak mencukupi, tanya soalan spesifik untuk mendapat konteks tambahan. JANGAN minta pengguna tulis isi sendiri.
   * Untuk SURAT: tulis isi dengan bernombor perenggan (2., 3., 4. dst), bahasa formal, lengkap dan profesional.
   * Untuk MEMO: field 'isi' WAJIB mengandungi SATU AYAT PENDEK SAHAJA tanpa sebarang newline — contoh: "Sukacita dimaklumkan bahawa mesyuarat akan diadakan seperti butiran berikut:". DILARANG KERAS memasukkan tarikh/masa/tempat, nombor perenggan (3., 4.), atau kandungan lain dalam 'isi'. Sistem akan papar tarikh_acara/masa_acara/tempat_acara secara berasingan. Field 'langkah_kerja' (PILIHAN) mengandungi langkah-langkah tindakan yang perlu diambil, SATU LANGKAH SETIAP BARIS (pisahkan dengan \n), contoh: "Semak senarai hadir\nSediakan kertas kerja\nHubungi peserta yang tidak hadir". Tanya tentang langkah_kerja hanya jika konteks memo memerlukan tindakan susulan.
 - Phase 3: Tunjukkan pratonton dokumen lengkap — SEMAK tiada [PLACEHOLDER] kekal
@@ -113,7 +112,7 @@ PENTING: Gunakan "penerima" (BUKAN "penerima_nama"), simpan data senarai edaran 
     b) Di HUJUNG surat (selepas penandatangan), tambah halaman senarai edaran (lihat FORMAT SENARAI EDARAN)
   * Jika field "senarai_edaran" ada data JSON, gunakan data tersebut untuk jana halaman senarai edaran
   * JANGAN abaikan senarai_edaran — ia WAJIB dipaparkan sebagai halaman berasingan
-Untuk memo: rujukan, tarikh, pengerusi, penyelaras, ahli, urus_setia, tajuk, tarikh_acara, masa_acara, tempat_acara, isi, langkah_kerja (pilihan), penandatangan_nama, penandatangan_jawatan, nama_pejabat
+Untuk memo: rujukan, tarikh, pengerusi, ahli, urus_setia, tajuk, tarikh_acara, masa_acara, tempat_acara, isi, langkah_kerja (pilihan), penandatangan_nama, penandatangan_jawatan, nama_pejabat
 
 FORMAT TEMPLATE YANG MESTI DIIKUTI:
 
@@ -151,7 +150,6 @@ s.k.:
 
 === MEMO DALAMAN ===
 Kepada    | Pengerusi  : [pengerusi]
-          | Penyelaras : [penyelaras]
           | Ahli       : [ahli 1]
           |             : [ahli 2 dan seterusnya]
 Daripada  | Urus setia : [urus_setia]
@@ -484,7 +482,6 @@ def _build_memo(f: dict) -> str:
     return f"""MEMO DALAMAN
 
 {'Kepada':<10}| {'Pengerusi':<12}: {f.get('pengerusi', '[PLACEHOLDER]')}
-{'':10}| {'Penyelaras':<12}: {f.get('penyelaras', '[PLACEHOLDER]')}
 {ahli_lines}{'Daripada':<10}| {'Urus setia':<12}: {f.get('urus_setia', '[PLACEHOLDER]')}
 {'Tarikh':<10}| {'':12}: {f.get('tarikh', '[PLACEHOLDER]')}
 {'Perkara':<10}| {'':12}: {f.get('tajuk', '[PLACEHOLDER]').upper()}
@@ -1132,14 +1129,11 @@ def _build_memo_html(f: dict) -> str:
     ahli_str = f.get('ahli', '')
     ahli_list = [a.strip() for a in ahli_str.split(',') if a.strip()] if ahli_str else []
     pengerusi = f.get('pengerusi', '')
-    penyelaras = f.get('penyelaras', '')
 
     TD = 'style="padding:4px 8px;border:1px solid #000;vertical-align:top"'
     rows = []
     if pengerusi:
         rows.append((f'<b>Kepada</b>', ':', pengerusi))
-        if penyelaras:
-            rows.append(('', '', penyelaras))
         for ahli in ahli_list:
             if ahli:
                 rows.append(('', '', ahli))
@@ -1462,14 +1456,11 @@ def _build_memo_docx(doc, fields: dict):
     ahli_str = fields.get('ahli', '')
     ahli_list = [a.strip() for a in ahli_str.split(',') if a.strip()] if ahli_str else ['']
     pengerusi = fields.get('pengerusi', '')
-    penyelaras = fields.get('penyelaras', '')
 
     # Build rows: (label, value) pairs
     rows_data = []
     if pengerusi:
         rows_data.append(("Kepada", pengerusi))
-        if penyelaras:
-            rows_data.append(("", penyelaras))
         for ahli in ahli_list:
             if ahli:
                 rows_data.append(("", ahli))

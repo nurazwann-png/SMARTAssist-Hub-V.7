@@ -20,7 +20,6 @@
 | | | |
 |---|---|---|
 | **Kepada** | **Pengerusi** | : [Nama Pengerusi (Jawatan)] |
-| | **Penyelaras** | : [Nama Penyelaras (Jawatan)] |
 | | **Ahli** | : [Nama Ahli 1 (Unit)] |
 | | | : [Nama Ahli 2 (Unit)] |
 | | | : [Nama Ahli 3 (Unit)] |
