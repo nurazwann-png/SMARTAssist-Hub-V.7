@@ -48,9 +48,9 @@ function docRedo() {
 
 function docResetToOriginal() {
     if (!_docOriginalHtml && !_docOriginalText) {
-        showToast('Tiada kandungan asal untuk dipulihkan.', 'err'); return;
+        showToast(I18N[currentLang].toast_no_original, 'err'); return;
     }
-    if (!confirm('Kembali ke kandungan asal? Semua perubahan manual akan hilang.')) return;
+    if (!confirm(I18N[currentLang].confirm_reset_doc)) return;
     const htmlEl = document.getElementById('docPreviewHtml');
     const textEl = document.getElementById('docPreview') || document.getElementById('reviewDocPreview');
     if (htmlEl && _docOriginalHtml !== null) htmlEl.innerHTML = _docOriginalHtml;
@@ -58,7 +58,7 @@ function docResetToOriginal() {
     // Sync overlay editor if open
     const overlayEl = document.getElementById('wordPreviewHtmlEdit');
     if (overlayEl && _docOriginalHtml !== null) overlayEl.innerHTML = _docOriginalHtml;
-    showToast('Kandungan asal telah dipulihkan.', 'ok');
+    showToast(I18N[currentLang].toast_restored, 'ok');
 }
 
 // ── Draft / last-session persistence ──
@@ -87,9 +87,9 @@ function _checkResumeBanner() {
     banner.className = 'resume-banner';
     banner.innerHTML = `
         <span class="resume-banner-icon">${info.icon}</span>
-        <span class="resume-banner-text">Sambung sesi <strong>${info.name}</strong> yang lepas?</span>
-        <button class="resume-banner-yes" onclick="_resumeDraft()">Sambung</button>
-        <button class="resume-banner-no" onclick="_dismissResume()">Tutup</button>`;
+        <span class="resume-banner-text">${I18N[currentLang].resume_banner_text.replace('?', '')} <strong>${info.name}</strong>?</span>
+        <button class="resume-banner-yes" onclick="_resumeDraft()">${I18N[currentLang].resume_yes}</button>
+        <button class="resume-banner-no" onclick="_dismissResume()">${I18N[currentLang].resume_no}</button>`;
     document.body.appendChild(banner);
     requestAnimationFrame(() => banner.classList.add('show'));
 }
@@ -120,7 +120,7 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 60000, slowMs = 20000) 
 
     clearTimeout(_slowToastTimer);
     _slowToastTimer = setTimeout(() => {
-        if (isProcessing) showToast('AI sedang memproses, sila tunggu...', 'info', 8000);
+        if (isProcessing) showToast(I18N[currentLang].toast_ai_slow, 'info', 8000);
     }, slowMs);
 
     const timeoutId = setTimeout(() => _currentAbortController.abort(), timeoutMs);
@@ -239,6 +239,52 @@ const I18N = {
         admin_recent_sessions: '🕓 Sesi Terkini',
         admin_th_session: 'Sesi', admin_th_agent: 'Ejen', admin_th_title: 'Tajuk',
         admin_th_messages: 'Mesej', admin_th_updated: 'Dikemaskini',
+        admin_no_sessions: 'Tiada sesi lagi.',
+        // Toast messages
+        toast_doc_downloaded: 'Dokumen berjaya dimuat turun.', toast_pdf_downloaded: 'PDF berjaya dimuat turun.',
+        toast_file_downloaded: 'Fail berjaya dimuat turun.', toast_changes_saved: 'Perubahan telah disimpan.',
+        toast_fix_undone: 'Pembetulan telah dibatalkan.', toast_restored: 'Kandungan asal telah dipulihkan.',
+        toast_no_original: 'Tiada kandungan asal untuk dipulihkan.',
+        toast_session_deleted: 'Sesi telah dipadamkan.',
+        toast_img_ok: 'Gambar berjaya dimuat naik.', toast_img_fail: 'Gagal muat naik gambar.',
+        toast_img_landscape: 'Gambar mesti landscape (lebar > tinggi). Sila pilih gambar landscape.',
+        toast_img_deleted: 'Gambar dibuang.', toast_img_delete_fail: 'Gagal membuang gambar.',
+        toast_email_ok: 'Emel berjaya dihantar.', toast_email_fail: 'Gagal menghantar emel.',
+        toast_email_no_recipient: 'Sila masukkan emel penerima.',
+        toast_no_table: 'Tiada jadual untuk dimuat turun.',
+        toast_pdf_fail: 'Gagal hasilkan PDF. Sila cuba semula.',
+        toast_ai_slow: 'AI sedang memproses, sila tunggu...',
+        // Button states
+        btn_preparing: '⏳ Menyediakan...', btn_processing: '⏳ Sedang diproses...',
+        btn_sending: '⏳ Menghantar...', btn_save_unsaved: '💾 Simpan*',
+        btn_save_saved: '✅ Tersimpan', btn_save: '💾 Simpan',
+        btn_download: '📥 Muat Turun', btn_fix_done: '✅ Berjaya Dibetulkan',
+        btn_undo_fix: '↩️ Batal Pembetulan',
+        // Confirm dialogs
+        confirm_delete_session: 'Padam sesi ini? Tindakan ini tidak boleh dibatalkan.',
+        confirm_reset_doc: 'Kembali ke kandungan asal? Semua perubahan manual akan hilang.',
+        // Resume banner
+        resume_banner_text: 'Sambung sesi yang lepas?',
+        resume_yes: 'Sambung', resume_no: 'Tutup',
+        // Doc action buttons
+        doc_download_docx: '📥 Muat Turun (.docx)', doc_download_pdf: '📄 Muat Turun (.pdf)',
+        // Auto-review panel
+        auto_review_title: '📝 Semakan & Penambahbaikan Automatik',
+        // Fields form
+        fields_form_title: '📝 Sila Isikan Maklumat', fields_form_submit: '📤 Hantar Maklumat',
+        // Expand/collapse
+        rev_collapse: '⛶ Kecilkan',
+        // Errors in chat
+        err_no_pdf: 'Tiada fail PDF untuk dimuat turun.', err_no_doc: 'Tiada dokumen untuk dimuat turun.',
+        err_upload_fail: 'Gagal memuat naik fail.', err_review_incomplete: 'Maaf, semakan menghasilkan output yang tidak lengkap. Sila cuba semak semula dokumen.',
+        err_pdf_too_large: 'Fail terlalu besar (melebihi 10MB). Sila gunakan PDF yang lebih kecil.',
+        err_prefix: 'Ralat: ',
+        // Word preview overlay
+        word_save: '💾 Simpan', word_download_docx: 'Muat Turun .docx',
+        // Email dialog
+        email_title: 'Hantar Dokumen Melalui Emel', email_to_label: 'Emel Penerima',
+        email_to_ph: 'contoh@email.com', email_subject_label: 'Subjek',
+        email_subject_ph: 'Subjek emel', email_cancel: 'Batal', email_send: 'Hantar',
         // Generic errors
         error_generic: 'Maaf, ralat berlaku. Sila cuba lagi.',
         error_conn: 'Ralat sambungan. Sila cuba lagi.',
@@ -305,6 +351,52 @@ const I18N = {
         admin_recent_sessions: '🕓 Recent Sessions',
         admin_th_session: 'Session', admin_th_agent: 'Agent', admin_th_title: 'Title',
         admin_th_messages: 'Messages', admin_th_updated: 'Updated',
+        admin_no_sessions: 'No sessions yet.',
+        // Toast messages
+        toast_doc_downloaded: 'Document downloaded successfully.', toast_pdf_downloaded: 'PDF downloaded successfully.',
+        toast_file_downloaded: 'File downloaded successfully.', toast_changes_saved: 'Changes saved.',
+        toast_fix_undone: 'Correction undone.', toast_restored: 'Original content restored.',
+        toast_no_original: 'No original content to restore.',
+        toast_session_deleted: 'Session deleted.',
+        toast_img_ok: 'Image uploaded successfully.', toast_img_fail: 'Failed to upload image.',
+        toast_img_landscape: 'Image must be landscape (width > height). Please choose a landscape image.',
+        toast_img_deleted: 'Image removed.', toast_img_delete_fail: 'Failed to remove image.',
+        toast_email_ok: 'Email sent successfully.', toast_email_fail: 'Failed to send email.',
+        toast_email_no_recipient: 'Please enter the recipient email.',
+        toast_no_table: 'No table to download.',
+        toast_pdf_fail: 'Failed to generate PDF. Please try again.',
+        toast_ai_slow: 'AI is processing, please wait...',
+        // Button states
+        btn_preparing: '⏳ Preparing...', btn_processing: '⏳ Processing...',
+        btn_sending: '⏳ Sending...', btn_save_unsaved: '💾 Save*',
+        btn_save_saved: '✅ Saved', btn_save: '💾 Save',
+        btn_download: '📥 Download', btn_fix_done: '✅ Fixed',
+        btn_undo_fix: '↩️ Undo Fix',
+        // Confirm dialogs
+        confirm_delete_session: 'Delete this session? This action cannot be undone.',
+        confirm_reset_doc: 'Restore original content? All manual changes will be lost.',
+        // Resume banner
+        resume_banner_text: 'Resume last session?',
+        resume_yes: 'Resume', resume_no: 'Dismiss',
+        // Doc action buttons
+        doc_download_docx: '📥 Download (.docx)', doc_download_pdf: '📄 Download (.pdf)',
+        // Auto-review panel
+        auto_review_title: '📝 Automatic Review & Improvement',
+        // Fields form
+        fields_form_title: '📝 Please Fill In Details', fields_form_submit: '📤 Submit Details',
+        // Expand/collapse
+        rev_collapse: '⛶ Collapse',
+        // Errors in chat
+        err_no_pdf: 'No PDF file to download.', err_no_doc: 'No document to download.',
+        err_upload_fail: 'Failed to upload file.', err_review_incomplete: 'Sorry, the review produced incomplete output. Please try reviewing the document again.',
+        err_pdf_too_large: 'File too large (exceeds 10MB). Please use a smaller PDF.',
+        err_prefix: 'Error: ',
+        // Word preview overlay
+        word_save: '💾 Save', word_download_docx: 'Download .docx',
+        // Email dialog
+        email_title: 'Send Document via Email', email_to_label: 'Recipient Email',
+        email_to_ph: 'example@email.com', email_subject_label: 'Subject',
+        email_subject_ph: 'Email subject', email_cancel: 'Cancel', email_send: 'Send',
         // Generic errors
         error_generic: 'Sorry, an error occurred. Please try again.',
         error_conn: 'Connection error. Please try again.',
@@ -769,7 +861,7 @@ function loadSession(sid, agent) {
 }
 
 async function deleteSession(sid) {
-    if (!confirm('Padam sesi ini? Tindakan ini tidak boleh dibatalkan.')) return;
+    if (!confirm(I18N[currentLang].confirm_delete_session)) return;
     try {
         await fetch('/api/clear', {
             method: 'POST',
@@ -799,13 +891,13 @@ function addMessage(content, role, agentIcon, agentName, structured) {
             if (docActions && !docActions.querySelector('.undo-fix-btn')) {
                 const undoBtn = document.createElement('button');
                 undoBtn.className = 'doc-action-btn undo-fix-btn';
-                undoBtn.textContent = '↩️ Batal Pembetulan';
+                undoBtn.textContent = I18N[currentLang].btn_undo_fix;
                 undoBtn.onclick = undoReviewFix;
                 docActions.appendChild(undoBtn);
             }
             setTimeout(() => previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
         }
-        _pendingFixBtn.textContent = '✅ Berjaya Dibetulkan';
+        _pendingFixBtn.textContent = I18N[currentLang].btn_fix_done;
         _pendingFixBtn.classList.remove('fix-processing');
         _pendingFixBtn.classList.add('fix-done');
         _pendingFixBtn.disabled = true;
@@ -827,7 +919,7 @@ function addMessage(content, role, agentIcon, agentName, structured) {
         if (previewSection && !previewSection.querySelector('.undo-fix-btn')) {
             const undoBtn = document.createElement('button');
             undoBtn.className = 'doc-action-btn undo-fix-btn';
-            undoBtn.textContent = '↩️ Batal Pembetulan';
+            undoBtn.textContent = I18N[currentLang].btn_undo_fix;
             undoBtn.onclick = undoLetterFix;
             previewSection.appendChild(undoBtn);
         }
@@ -839,7 +931,7 @@ function addMessage(content, role, agentIcon, agentName, structured) {
                 reviewPanel.replaceWith(tmp.firstElementChild);
             }
         }
-        _pendingLetterFixBtn.textContent = '✅ Berjaya Dibetulkan';
+        _pendingLetterFixBtn.textContent = I18N[currentLang].btn_fix_done;
         _pendingLetterFixBtn.classList.remove('fix-processing');
         _pendingLetterFixBtn.classList.add('fix-done');
         _pendingLetterFixBtn.disabled = true;
@@ -1425,7 +1517,7 @@ function onDocEdit(annotated) {
     if (!saveBtn) return;
     saveBtn.style.display = 'inline-flex';
     saveBtn.classList.add('unsaved');
-    saveBtn.textContent = '💾 Simpan*';
+    saveBtn.textContent = I18N[currentLang].btn_save_unsaved;
 }
 
 function saveDocEdit(btn) {
@@ -1433,17 +1525,17 @@ function saveDocEdit(btn) {
     const htmlDoc = annotated?.querySelector('.rev-html-doc');
     if (htmlDoc) {
         window._savedDocHtml = htmlDoc.innerHTML;
-        btn.textContent = '✅ Tersimpan';
+        btn.textContent = I18N[currentLang].btn_save_saved;
         btn.classList.remove('unsaved');
         btn.classList.add('saved');
-        setTimeout(() => { btn.textContent = '💾 Simpan'; btn.classList.remove('saved'); }, 2200);
+        setTimeout(() => { btn.textContent = I18N[currentLang].btn_save; btn.classList.remove('saved'); }, 2200);
     }
 }
 
 // Download the uploaded PDF as the original PDF, or converted to Word (.docx)
 async function downloadUploadedPdf(fmt) {
     if (!_reviewPdfObjectUrl) {
-        addMessage('Tiada fail PDF untuk dimuat turun.', 'assistant', '⚠️', 'Sistem');
+        addMessage(I18N[currentLang].err_no_pdf, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
         return;
     }
     const a = document.createElement('a');
@@ -1463,7 +1555,7 @@ async function downloadUploadedPdf(fmt) {
 }
 
 async function downloadEditedDoc(btn) {
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ Menyediakan...'; }
+    if (btn) { btn.disabled = true; btn.textContent = I18N[currentLang].btn_preparing; }
 
     try {
         if (_reviewIsPdf && _reviewPdfObjectUrl) {
@@ -1478,7 +1570,7 @@ async function downloadEditedDoc(btn) {
         // DOCX: send current edited HTML to server for conversion
         const htmlDoc = document.querySelector('.rev-html-doc');
         const html = (htmlDoc ? htmlDoc.innerHTML : null) || window._savedDocHtml || _reviewDocHtml;
-        if (!html) { addMessage('Tiada dokumen untuk dimuat turun.', 'assistant', '⚠️', 'Sistem'); return; }
+        if (!html) { addMessage(I18N[currentLang].err_no_doc, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name); return; }
 
         const res = await fetch('/api/review/download-edited', {
             method: 'POST',
@@ -1494,9 +1586,9 @@ async function downloadEditedDoc(btn) {
         a.click();
         URL.revokeObjectURL(url);
     } catch (err) {
-        addMessage(`Ralat muat turun: ${err.message}`, 'assistant', '⚠️', 'Sistem');
+        addMessage(I18N[currentLang].err_prefix + err.message, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = '📥 Muat Turun'; }
+        if (btn) { btn.disabled = false; btn.textContent = I18N[currentLang].btn_download; }
     }
 }
 
@@ -1573,7 +1665,7 @@ function toggleRevExpand(btn) {
     if (!splitLayout || !docPage) return;
 
     const isExpanded = splitLayout.classList.toggle('rev-split-expanded');
-    btn.textContent  = isExpanded ? '⛶ Kecilkan' : '⛶ Kembangkan';
+    btn.textContent  = isExpanded ? I18N[currentLang].rev_collapse : I18N[currentLang].rev_expand;
 
     const closeBtn = docPage.querySelector('.rev-close-btn');
     if (closeBtn) closeBtn.style.display = isExpanded ? 'block' : 'none';
@@ -1759,11 +1851,11 @@ function _buildMissingFieldsForm(missingLabels) {
         }
     });
     return `<div class="da-section fields-form-section">
-        <div class="da-section-title">\u{1F4DD} Sila Isikan Maklumat</div>
+        <div class="da-section-title" data-i18n="fields_form_title">${I18N[currentLang].fields_form_title}</div>
         <form class="fields-form" id="${fid}" onsubmit="event.preventDefault();_submitFieldsForm('${fid}')">
         <table class="ff-table"><tbody>${rows}</tbody></table>
         <table class="ff-table"><tbody><tr class="ff-submit-row"><td colspan="2">
-            <button type="submit" class="ff-submit-btn">\u{1F4E4} Hantar Maklumat</button>
+            <button type="submit" class="ff-submit-btn" data-i18n="fields_form_submit">${I18N[currentLang].fields_form_submit}</button>
         </td></tr></tbody></table>
         </form></div>`;
 }
@@ -1925,9 +2017,9 @@ function _submitFieldsForm(fid) {
             parts.push(`${el.dataset.label}: ${val}`);
         }
     });
-    if (parts.length === 0) { showToast('Sila isi sekurang-kurangnya satu medan.', false); return; }
+    if (parts.length === 0) { showToast(currentLang === 'en' ? 'Please fill in at least one field.' : 'Sila isi sekurang-kurangnya satu medan.', 'err'); return; }
     form.querySelectorAll('input,textarea,button').forEach(el => el.disabled = true);
-    form.querySelector('.ff-submit-btn').textContent = '⏳ Menghantar...';
+    form.querySelector('.ff-submit-btn').textContent = I18N[currentLang].btn_sending;
     _suppressUserMsg = true;
     const inp = document.getElementById('chatInput');
     inp.value = parts.join('. ');
@@ -2006,8 +2098,8 @@ function buildLetterHtml(data) {
             : '⚠️ Sila semak semula dokumen yang telah dijana sebelum dimuat turun. Pastikan semua maklumat adalah tepat dan lengkap.';
         html += `<div class="doc-review-reminder">${remindMsg}</div>`;
         html += '<div class="doc-actions">';
-        html += `<button class="doc-action-btn download-btn" onclick="downloadDocument()">📥 Muat Turun (.docx)</button>`;
-        html += `<button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()">📄 Muat Turun (.pdf)</button>`;
+        html += `<button class="doc-action-btn download-btn" onclick="downloadDocument()" data-i18n="doc_download_docx">${I18N[currentLang].doc_download_docx}</button>`;
+        html += `<button class="doc-action-btn pdf-btn" onclick="downloadDocumentPdf()" data-i18n="doc_download_pdf">${I18N[currentLang].doc_download_pdf}</button>`;
         html += '</div>';
     }
 
@@ -2024,7 +2116,7 @@ function renderAutoReviewPanel(review) {
 
     let html = `<div class="auto-review-panel">
         <div class="auto-review-header">
-            <span class="auto-review-title">📝 Semakan & Penambahbaikan Automatik</span>
+            <span class="auto-review-title" data-i18n="auto_review_title">${I18N[currentLang].auto_review_title}</span>
             <span class="review-score ${scoreClass}">${score}</span>
         </div>
         <p class="auto-review-summary">${escapeHtml(review.summary || review.message || '')}</p>`;
@@ -2103,7 +2195,7 @@ let _activeChatBubble = null;
 function fixReviewIssue(btn) {
     const prompt = btn.dataset.prompt;
     if (!prompt) return;
-    btn.textContent = '⏳ Sedang diproses...';
+    btn.textContent = I18N[currentLang].btn_processing;
     btn.disabled = true;
     btn.classList.add('fix-processing');
     _pendingFixBtn = btn;
@@ -2120,7 +2212,7 @@ function fixReviewIssue(btn) {
 function fixLetterIssue(btn) {
     const prompt = btn.dataset.prompt;
     if (!prompt) return;
-    btn.textContent = '⏳ Sedang diproses...';
+    btn.textContent = I18N[currentLang].btn_processing;
     btn.disabled = true;
     btn.classList.add('fix-processing');
     _pendingLetterFixBtn = btn;
@@ -2142,7 +2234,7 @@ function undoReviewFix() {
     saveDocumentEdits(content);
     msgDiv.querySelector('.undo-fix-btn')?.remove();
     _undoReviewState = null;
-    showToast('Pembetulan telah dibatalkan.', true);
+    showToast(I18N[currentLang].toast_fix_undone, 'ok');
 }
 
 function undoLetterFix() {
@@ -2154,7 +2246,7 @@ function undoLetterFix() {
     if (previewHtmlEl && htmlContent) previewHtmlEl.innerHTML = htmlContent;
     msgDiv.querySelector('.undo-fix-btn')?.remove();
     _undoLetterState = null;
-    showToast('Pembetulan telah dibatalkan.', true);
+    showToast(I18N[currentLang].toast_fix_undone, 'ok');
 }
 
 // ═══ Report image upload ═══
@@ -2171,7 +2263,7 @@ async function handleReportImageUpload(input) {
         const img = new Image();
         img.onload = async () => {
             if (img.naturalWidth <= img.naturalHeight) {
-                showToast('Gambar mesti landscape (lebar > tinggi). Sila pilih gambar landscape.', false);
+                showToast(I18N[currentLang].toast_img_landscape, 'err');
                 input.value = '';
                 return;
             }
@@ -2182,12 +2274,12 @@ async function handleReportImageUpload(input) {
                 const res = await fetch('/api/report/upload-image', { method: 'POST', body: fd });
                 const result = await res.json();
                 if (result.ok) {
-                    showToast(`Gambar ${result.count}/${result.max} berjaya dimuat naik.`, true);
+                    showToast(`${I18N[currentLang].toast_img_ok} (${result.count}/${result.max})`, 'ok');
                     await _refreshReportImages();
                 } else {
-                    showToast(result.error || 'Gagal muat naik gambar.', false);
+                    showToast(result.error || I18N[currentLang].toast_img_fail, 'err');
                 }
-            } catch (_) { showToast('Gagal muat naik gambar.', false); }
+            } catch (_) { showToast(I18N[currentLang].toast_img_fail, 'err'); }
             input.value = '';
         };
         img.src = e.target.result;
@@ -2240,14 +2332,14 @@ async function downloadReviewDocument() {
         const match = cd.match(/filename="?([^"]+)"?/);
         a.download = match ? match[1] : 'dokumen_diperbetulkan.docx';
         a.click(); URL.revokeObjectURL(url);
-        showToast('Dokumen berjaya dimuat turun.', 'ok');
+        showToast(I18N[currentLang].toast_doc_downloaded, 'ok');
     } catch (err) { showToast(err.message, 'err'); }
 }
 
 async function downloadDocument() {
     const btn = document.querySelector('.doc-action-btn.download-btn');
     const origText = btn ? btn.innerHTML : null;
-    if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Menyediakan...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = I18N[currentLang].btn_preparing; }
     const previewHtml = document.getElementById('docPreviewHtml');
     if (previewHtml) await saveDocumentEdits(previewHtml.innerText);
     const endpoint = currentAgent === 'report_generator' ? '/api/report/download' : '/api/document/download';
@@ -2262,7 +2354,7 @@ async function downloadDocument() {
         const match = cd.match(/filename="?([^"]+)"?/);
         a.download = match ? match[1] : 'dokumen_rasmi.docx';
         a.click(); URL.revokeObjectURL(url);
-        showToast('Dokumen berjaya dimuat turun.', 'ok');
+        showToast(I18N[currentLang].toast_doc_downloaded, 'ok');
     } catch (err) { showToast(err.message, 'err'); }
     finally { if (btn) { btn.disabled = false; btn.innerHTML = origText; } }
 }
@@ -2283,7 +2375,7 @@ function onPreviewEdit() {
     if (!btn) return;
     btn.style.display = 'inline-flex';
     btn.classList.add('unsaved');
-    btn.textContent = '💾 Simpan*';
+    btn.textContent = I18N[currentLang].btn_save_unsaved;
 }
 
 // Save inline pratonton edits
@@ -2292,13 +2384,13 @@ async function savePreviewEdits(btn) {
     const preview = document.getElementById('docPreview') || document.getElementById('reviewDocPreview');
     const content = previewHtml ? previewHtml.innerText : (preview ? preview.innerText : '');
     await saveDocumentEdits(content);
-    showToast('Perubahan telah disimpan.', 'ok');
+    showToast(I18N[currentLang].toast_changes_saved, 'ok');
     if (btn) {
-        btn.textContent = '✅ Tersimpan';
+        btn.textContent = I18N[currentLang].btn_save_saved;
         btn.classList.remove('unsaved');
         btn.classList.add('saved');
         setTimeout(() => {
-            btn.textContent = '💾 Simpan';
+            btn.textContent = I18N[currentLang].btn_save;
             btn.style.display = 'none';
             btn.classList.remove('saved');
         }, 2200);
@@ -2314,7 +2406,7 @@ function onOverlayEdit() {
     const saveBtn = document.getElementById('overlaySaveBtn');
     if (saveBtn) {
         saveBtn.classList.add('unsaved');
-        saveBtn.textContent = '💾 Simpan*';
+        saveBtn.textContent = I18N[currentLang].btn_save_unsaved;
     }
 }
 
@@ -2325,11 +2417,11 @@ async function saveOverlayEdits(btn) {
     const content = editEl ? editEl.innerText : (previewText ? previewText.innerText : '');
     await saveDocumentEdits(content);
     if (btn) {
-        btn.textContent = '✅ Tersimpan';
+        btn.textContent = I18N[currentLang].btn_save_saved;
         btn.classList.remove('unsaved');
         btn.classList.add('saved');
         setTimeout(() => {
-            btn.textContent = '💾 Simpan';
+            btn.textContent = I18N[currentLang].btn_save;
             btn.classList.remove('saved', 'unsaved');
         }, 2200);
     }
@@ -2367,7 +2459,7 @@ async function downloadDocumentPdf() {
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            showToast(err.error || 'Gagal hasilkan PDF. Sila cuba semula.', 'err');
+            showToast(err.error || I18N[currentLang].toast_pdf_fail, 'err');
             return;
         }
         const blob = await res.blob();
@@ -2378,9 +2470,9 @@ async function downloadDocumentPdf() {
         document.body.appendChild(a);
         a.click();
         setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
-        showToast('PDF berjaya dimuat turun.', 'ok');
+        showToast(I18N[currentLang].toast_pdf_downloaded, 'ok');
     } catch (e) {
-        showToast('Ralat muat turun PDF: ' + e.message, 'err');
+        showToast(I18N[currentLang].err_prefix + e.message, 'err');
     } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = origText; }
     }
@@ -2392,13 +2484,14 @@ function showEmailDialog() {
 
     const overlay = document.createElement('div');
     overlay.className = 'email-dialog-overlay';
+    const _ed = I18N[currentLang];
     overlay.innerHTML = `<div class="email-dialog">
-        <h3>\u{1F4E7} Hantar Dokumen Melalui Emel</h3>
-        <div class="email-field"><label>Emel Penerima</label><input type="email" id="emailTo" placeholder="contoh@email.com"></div>
-        <div class="email-field"><label>Subjek</label><input type="text" id="emailSubject" placeholder="Subjek emel"></div>
+        <h3>📧 ${_ed.email_title}</h3>
+        <div class="email-field"><label>${_ed.email_to_label}</label><input type="email" id="emailTo" placeholder="${_ed.email_to_ph}"></div>
+        <div class="email-field"><label>${_ed.email_subject_label}</label><input type="text" id="emailSubject" placeholder="${_ed.email_subject_ph}"></div>
         <div class="email-dialog-actions">
-            <button class="email-cancel-btn" onclick="this.closest('.email-dialog-overlay').remove()">Batal</button>
-            <button class="email-send-btn" onclick="confirmSendEmail()">Hantar</button>
+            <button class="email-cancel-btn" onclick="this.closest('.email-dialog-overlay').remove()">${_ed.email_cancel}</button>
+            <button class="email-send-btn" onclick="confirmSendEmail()">${_ed.email_send}</button>
         </div>
     </div>`;
     document.body.appendChild(overlay);
@@ -2408,7 +2501,7 @@ function showEmailDialog() {
 async function confirmSendEmail() {
     const to = document.getElementById('emailTo').value.trim();
     const subject = document.getElementById('emailSubject').value.trim();
-    if (!to) { showToast('Sila masukkan emel penerima.', false); return; }
+    if (!to) { showToast(I18N[currentLang].toast_email_no_recipient, 'err'); return; }
     const endpoint = currentAgent === 'report_generator' ? '/api/report/send-email' : '/api/document/send-email';
     try {
         const res = await fetch(endpoint, {
@@ -2416,8 +2509,8 @@ async function confirmSendEmail() {
             body: JSON.stringify({ session_id: sessionId, to_email: to, subject: subject || 'Dokumen SMARTAssist Hub' }),
         });
         const data = await res.json();
-        showToast(data.ok ? (data.message || 'Emel berjaya dihantar.') : (data.error || 'Gagal menghantar emel.'), data.ok);
-    } catch (err) { showToast('Ralat: ' + err.message, false); }
+        showToast(data.ok ? (data.message || I18N[currentLang].toast_email_ok) : (data.error || I18N[currentLang].toast_email_fail), data.ok ? 'ok' : 'err');
+    } catch (err) { showToast(I18N[currentLang].err_prefix + err.message, 'err'); }
     document.querySelector('.email-dialog-overlay')?.remove();
 }
 
@@ -2560,7 +2653,7 @@ async function downloadAnalysis(format) {
     if (!lastStructuredData) return;
     if (format === 'csv') {
         const table = lastStructuredData.table;
-        if (!table) { showToast('Tiada jadual untuk dimuat turun.', 'err'); return; }
+        if (!table) { showToast(I18N[currentLang].toast_no_table, 'err'); return; }
         let csv = '﻿' + table.headers.join(',') + '\n';
         table.rows.forEach(row => { csv += row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',') + '\n'; });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2579,7 +2672,7 @@ async function downloadAnalysis(format) {
         const blob = await res.blob();
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
         a.download = format === 'pptx' ? 'analisis_data.pptx' : 'analisis_data.pdf'; a.click();
-        showToast('Fail berjaya dimuat turun.', 'ok');
+        showToast(I18N[currentLang].toast_file_downloaded, 'ok');
     } catch (err) { showToast(err.message, 'err'); }
 }
 
@@ -2684,10 +2777,10 @@ async function handleDataUpload(file) {
                 susulan: ['Tunjukkan ringkasan statistik', 'Paparkan 10 baris pertama', 'Buat carta berdasarkan data ini'],
             });
         } else {
-            addMessage(data.error || 'Gagal memuat naik fail.', 'assistant', '\u{26A0}\u{FE0F}', 'Sistem');
+            addMessage(data.error || I18N[currentLang].err_upload_fail, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
         }
     } catch (err) {
-        addMessage(`Ralat muat naik: ${err.message}`, 'assistant', '\u{26A0}\u{FE0F}', 'Sistem');
+        addMessage(I18N[currentLang].err_prefix + err.message, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
     } finally { setProcessing(false); }
 }
 
@@ -2720,10 +2813,10 @@ async function handleReviewUpload(file) {
             canvasWelcome.style.display = 'none';
             await sendReviewRequest(file.name, data.doc_type);
         } else {
-            addMessage(data.error || 'Gagal memuat naik fail.', 'assistant', '⚠️', 'Sistem');
+            addMessage(data.error || I18N[currentLang].err_upload_fail, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
         }
     } catch (err) {
-        addMessage(`Ralat muat naik: ${err.message}`, 'assistant', '⚠️', 'Sistem');
+        addMessage(I18N[currentLang].err_prefix + err.message, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
     } finally { setProcessing(false); }
 }
 
@@ -2752,7 +2845,7 @@ async function sendReviewRequest(filename, docType) {
         // Never dump raw JSON into the chat if parsing failed
         let chatContent = result.response;
         if (!structured && typeof chatContent === 'string' && chatContent.trim().startsWith('{')) {
-            chatContent = 'Maaf, semakan menghasilkan output yang tidak lengkap. Sila cuba semak semula dokumen.';
+            chatContent = I18N[currentLang].err_review_incomplete;
         }
         addMessage(chatContent, 'assistant', info.icon, info.name, structured);
     } catch (err) {
@@ -2760,7 +2853,7 @@ async function sendReviewRequest(filename, docType) {
         if (err.name === 'AbortError') {
             _showRetryMessage('⚠️', 'Sistem');
         } else {
-            addMessage(`Ralat: ${err.message}`, 'assistant', '⚠️', 'Sistem');
+            addMessage(I18N[currentLang].err_prefix + err.message, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
         }
     } finally { setProcessing(false); }
 }
@@ -2768,7 +2861,7 @@ async function sendReviewRequest(filename, docType) {
 async function lgHandleLetterPdfUpload(file) {
     // Had saiz 10MB — semak di frontend sebelum hantar
     if (file.size > 10 * 1024 * 1024) {
-        addMessage('Fail terlalu besar (melebihi 10MB). Sila gunakan PDF yang lebih kecil.', 'assistant', '⚠️', 'Sistem');
+        addMessage(I18N[currentLang].err_pdf_too_large, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
         return;
     }
     setProcessing(true);
@@ -2797,10 +2890,10 @@ async function lgHandleLetterPdfUpload(file) {
             addMessage(summaryMsg, 'assistant', '📄', 'Penjana Surat Rasmi');
             await lgSendPdfAnalysisRequest(file.name, data.analysis_summary, data.suggested_type, data.extracted_fields);
         } else {
-            addMessage(data.error || 'Gagal memproses PDF.', 'assistant', '⚠️', 'Sistem');
+            addMessage(data.error || I18N[currentLang].error_generic, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
         }
     } catch (err) {
-        addMessage(`Ralat muat naik: ${err.message}`, 'assistant', '⚠️', 'Sistem');
+        addMessage(I18N[currentLang].err_prefix + err.message, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
     } finally { setProcessing(false); }
 }
 
@@ -2833,7 +2926,7 @@ async function lgSendPdfAnalysisRequest(filename, summary, suggestedType, extrac
         if (err.name === 'AbortError') {
             _showRetryMessage('⚠️', 'Sistem');
         } else {
-            addMessage(`Ralat: ${err.message}`, 'assistant', '⚠️', 'Sistem');
+            addMessage(I18N[currentLang].err_prefix + err.message, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
         }
     } finally { setProcessing(false); }
 }
@@ -3352,9 +3445,9 @@ async function openWordPreview() {
         <div class="word-preview-toolbar">
             <div class="word-preview-title">📄 ${dict.word_preview}</div>
             <div class="word-preview-actions">
-                <button class="word-preview-save-btn" id="overlaySaveBtn" onclick="saveOverlayEdits(this)">💾 Simpan</button>
+                <button class="word-preview-save-btn" id="overlaySaveBtn" onclick="saveOverlayEdits(this)">${dict.word_save}</button>
                 <button class="word-preview-pdf-btn" onclick="downloadDocumentPdf()">📄 PDF</button>
-                <button class="word-preview-dl-btn" onclick="downloadDocument()">📥 ${currentLang === 'bm' ? 'Muat Turun .docx' : 'Download .docx'}</button>
+                <button class="word-preview-dl-btn" onclick="downloadDocument()">📥 ${dict.word_download_docx}</button>
                 <button class="word-preview-close-btn" onclick="closeWordPreview()">${dict.word_close}</button>
             </div>
         </div>
@@ -3565,7 +3658,7 @@ async function loadAdminStats() {
                     <td>${s.message_count || 0}</td>
                     <td>${t}</td>
                 </tr>`;
-            }).join('') || '<tr><td colspan="5" style="color:var(--text-secondary);text-align:center;">Tiada sesi lagi.</td></tr>';
+            }).join('') || `<tr><td colspan="5" style="color:var(--text-secondary);text-align:center;">${I18N[currentLang].admin_no_sessions}</td></tr>`;
         }
     } catch (e) {
         console.error('Admin stats error:', e);
