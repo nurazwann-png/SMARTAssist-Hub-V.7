@@ -12,6 +12,7 @@ let lastActiveAgent = 'fallback';
 let lastStructuredData = null;
 let currentLang = localStorage.getItem('smartassist_lang') || 'bm';
 let _msgIndex = 0;
+let _awaitingFollowup = false;  // true selepas dokumen siap — tunggu jawapan ya/tidak
 let _reviewDocText = null;
 let _reviewDocHtml      = null;
 let _reviewIsPdf        = false;
@@ -306,6 +307,7 @@ initParticles();
 
 function openAgent(agentKey, existingSessionId) {
     currentAgent = agentKey;
+    _awaitingFollowup = false;
     _activeLetterMsgDiv = null;
     _activeWorkItem = null;
     _activeChatBubble = null;
@@ -2578,11 +2580,38 @@ fileRemoveBtn.addEventListener('click', () => {
 
 // ═══ Chat Send ═══
 
+const _FOLLOWUP_NO_RE  = /^(tidak|tak|no\b|nope|tidak perlu|tiada|sudah cukup|dah cukup|ok terima kasih|ok thanks|tidak ada|tiada lagi|itu sahaja|that'?s? all|selesai|habis|bye|selamat tinggal|tq\b|terima kasih sahaja)/i;
+const _FOLLOWUP_YES_RE = /^(ya\b|yes\b|ada\b|ada lagi|boleh|okay|ok\b|nak\b|mahu\b|ingin\b|please\b|tolong\b|saya nak|saya mahu|saya ada)/i;
+
 async function sendMessage() {
     const message = chatInput.value.trim();
     if (!message || isProcessing) return;
     chatInput.value = '';
     chatInput.style.height = 'auto';
+
+    // ── Followup handling: ya/tidak selepas dokumen siap ──
+    if (_awaitingFollowup) {
+        _awaitingFollowup = false;
+        if (!_suppressUserMsg) addMessage(message, 'user');
+        _suppressUserMsg = false;
+
+        if (_FOLLOWUP_NO_RE.test(message.trim())) {
+            await sendFarewell();
+            setProcessing(false);
+            return;
+        }
+        if (_FOLLOWUP_YES_RE.test(message.trim())) {
+            const info = getAgentInfo(currentAgent);
+            const yesMsg = currentLang === 'en'
+                ? 'Sure! Please tell me what you need and I will help you right away.'
+                : 'Baik! Sila beritahu apa yang perlu dan saya akan bantu dengan segera.';
+            addMessage(yesMsg, 'assistant', info.icon, info.name);
+            setProcessing(false);
+            return;
+        }
+        // Jawapan lain — hantar ke AI seperti biasa (fall through)
+    }
+
     if (!_suppressUserMsg) addMessage(message, 'user');
     _suppressUserMsg = false;
     setProcessing(true);
@@ -2600,6 +2629,16 @@ async function sendMessage() {
         const data = await res.json();
         lastActiveAgent = data.agent || currentAgent || 'fallback';
         addMessage(data.response, 'assistant', data.agent_icon, data.agent_name, data.structured);
+
+        // Tanya followup jika dokumen baru sahaja siap
+        if (data.structured?.ready_to_save && !_awaitingFollowup) {
+            _awaitingFollowup = true;
+            const info = getAgentInfo(currentAgent || lastActiveAgent);
+            const followupMsg = currentLang === 'en'
+                ? 'Is there anything else I can help you with?'
+                : 'Adakah terdapat perkara lain yang boleh saya bantu?';
+            setTimeout(() => addMessage(followupMsg, 'assistant', info.icon, info.name), 600);
+        }
     } catch (err) {
         addMessage(`${currentLang === 'en' ? 'Error' : 'Ralat'}: ${err.message}. ${I18N[currentLang].error_conn}`, 'assistant', '⚠️', currentLang === 'en' ? 'System' : 'Sistem');
     } finally { setProcessing(false); }
