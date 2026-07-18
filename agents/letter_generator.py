@@ -291,7 +291,11 @@ def _get_field_schema(doc_type: str) -> list[dict]:
 
 def _find_missing_fields(doc_type: str, collected: dict) -> list[dict]:
     schema = _get_field_schema(doc_type)
-    base = [f for f in schema if not f.get("optional") and (f["key"] not in collected or not collected[f["key"]])]
+    # isi_user dianggap cukup untuk jana isi — jangan minta isi lagi
+    _effective = dict(collected)
+    if _effective.get("isi_user") and not _effective.get("isi"):
+        _effective["isi"] = _effective["isi_user"]
+    base = [f for f in schema if not f.get("optional") and (f["key"] not in _effective or not _effective[f["key"]])]
     # When penerima is missing, inject penerima_organisasi/penerima_alamat right after it
     # so the form renders them as hideable fields (JS shows/hides based on penerima value)
     if doc_type == "surat" and any(f["key"] == "penerima" for f in base):

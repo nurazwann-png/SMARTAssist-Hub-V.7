@@ -845,6 +845,40 @@ def _render_html_to_pdf(html_content: str) -> bytes:
 
     flow = []
 
+    def _walk_into(node, target):
+        """Walk node children and append flowables into target list."""
+        _prev, _flow_ref = flow, None
+        # Temporarily redirect flow to target
+        flow.clear() if target is flow else None
+        _orig = flow
+        # Use closure trick: walk with a local accumulator
+        _acc = target
+        for c in node.children:
+            if isinstance(c, NavigableString):
+                continue
+            nm = (c.name or '').lower()
+            if nm == 'img':
+                el = _make_image(c)
+                if el:
+                    _acc.append(el)
+            elif nm == 'hr':
+                _acc.append(HRFlowable(width='100%', thickness=1.5,
+                                       color=colors.black, spaceBefore=4, spaceAfter=8))
+            elif nm == 'br':
+                _acc.append(Spacer(1, FONT_PT * 1.6))
+            elif nm == 'p':
+                txt = _inline(c).strip()
+                st = _parse_style(c.get('style', ''))
+                if not txt:
+                    mt, mb = _margin_tb(st.get('margin', ''))
+                    _acc.append(Spacer(1, max(6.0, mt + mb)))
+                else:
+                    _acc.append(Paragraph(txt, _para_style(st)))
+            elif nm in ('div', 'span', 'section', 'article'):
+                _walk_into(c, _acc)
+            else:
+                _walk_into(c, _acc)
+
     def _walk(node):
         for c in node.children:
             if isinstance(c, NavigableString):
@@ -889,7 +923,14 @@ def _render_html_to_pdf(html_content: str) -> bytes:
                 if st.get('page-break-before') == 'always':
                     from reportlab.platypus import PageBreak as _PB
                     flow.append(_PB())
-                _walk(c)
+                if st.get('page-break-inside') == 'avoid':
+                    from reportlab.platypus import KeepTogether as _KT
+                    sub = []
+                    _walk_into(c, sub)
+                    if sub:
+                        flow.append(_KT(sub))
+                else:
+                    _walk(c)
             else:
                 _walk(c)
 
