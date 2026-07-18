@@ -844,15 +844,11 @@ def _render_html_to_pdf(html_content: str) -> bytes:
         return t
 
     flow = []
+    from reportlab.platypus import PageBreak as _PB, KeepTogether as _KT
 
-    def _walk_into(node, target):
-        """Walk node children and append flowables into target list."""
-        _prev, _flow_ref = flow, None
-        # Temporarily redirect flow to target
-        flow.clear() if target is flow else None
-        _orig = flow
-        # Use closure trick: walk with a local accumulator
-        _acc = target
+    def _walk(node, target=None):
+        if target is None:
+            target = flow
         for c in node.children:
             if isinstance(c, NavigableString):
                 continue
@@ -860,52 +856,25 @@ def _render_html_to_pdf(html_content: str) -> bytes:
             if nm == 'img':
                 el = _make_image(c)
                 if el:
-                    _acc.append(el)
+                    target.append(el)
             elif nm == 'hr':
-                _acc.append(HRFlowable(width='100%', thickness=1.5,
-                                       color=colors.black, spaceBefore=4, spaceAfter=8))
+                target.append(HRFlowable(width='100%', thickness=1.5,
+                                         color=colors.black, spaceBefore=4, spaceAfter=8))
             elif nm == 'br':
-                _acc.append(Spacer(1, FONT_PT * 1.6))
+                target.append(Spacer(1, FONT_PT * 1.6))
             elif nm == 'p':
                 txt = _inline(c).strip()
                 st = _parse_style(c.get('style', ''))
                 if not txt:
                     mt, mb = _margin_tb(st.get('margin', ''))
-                    _acc.append(Spacer(1, max(6.0, mt + mb)))
+                    target.append(Spacer(1, max(6.0, mt + mb)))
                 else:
-                    _acc.append(Paragraph(txt, _para_style(st)))
-            elif nm in ('div', 'span', 'section', 'article'):
-                _walk_into(c, _acc)
-            else:
-                _walk_into(c, _acc)
-
-    def _walk(node):
-        for c in node.children:
-            if isinstance(c, NavigableString):
-                continue
-            nm = (c.name or '').lower()
-            if nm == 'img':
-                el = _make_image(c)
-                if el:
-                    flow.append(el)
-            elif nm == 'hr':
-                flow.append(HRFlowable(width='100%', thickness=1.5,
-                                       color=colors.black, spaceBefore=4, spaceAfter=8))
-            elif nm == 'br':
-                flow.append(Spacer(1, FONT_PT * 1.6))
-            elif nm == 'p':
-                txt = _inline(c).strip()
-                st = _parse_style(c.get('style', ''))
-                if not txt:
-                    mt, mb = _margin_tb(st.get('margin', ''))
-                    flow.append(Spacer(1, max(6.0, mt + mb)))
-                else:
-                    flow.append(Paragraph(txt, _para_style(st)))
+                    target.append(Paragraph(txt, _para_style(st)))
             elif nm in ('h1', 'h2', 'h3', 'h4'):
                 size = {'h1': 18, 'h2': 15, 'h3': 13, 'h4': 12}[nm]
                 st = _parse_style(c.get('style', ''))
-                flow.append(Paragraph(_inline(c) or '&nbsp;',
-                                      _para_style(st, size, bold_default=True)))
+                target.append(Paragraph(_inline(c) or '&nbsp;',
+                                        _para_style(st, size, bold_default=True)))
             elif nm in ('ul', 'ol'):
                 ordered = nm == 'ol'
                 for i, li in enumerate(c.find_all('li', recursive=False), 1):
@@ -913,26 +882,24 @@ def _render_html_to_pdf(html_content: str) -> bytes:
                     ps = ParagraphStyle('li', fontName='Helvetica', fontSize=FONT_PT,
                                         leading=FONT_PT * 1.4, leftIndent=18,
                                         firstLineIndent=-12, spaceAfter=2)
-                    flow.append(Paragraph(f'{bullet}&nbsp;&nbsp;{_inline(li)}', ps))
+                    target.append(Paragraph(f'{bullet}&nbsp;&nbsp;{_inline(li)}', ps))
             elif nm == 'table':
                 el = _make_table(c)
                 if el:
-                    flow.append(el)
+                    target.append(el)
             elif nm in ('div', 'body', 'html', 'span', 'section', 'article'):
                 st = _parse_style(c.get('style', ''))
                 if st.get('page-break-before') == 'always':
-                    from reportlab.platypus import PageBreak as _PB
-                    flow.append(_PB())
+                    target.append(_PB())
                 if st.get('page-break-inside') == 'avoid':
-                    from reportlab.platypus import KeepTogether as _KT
                     sub = []
-                    _walk_into(c, sub)
+                    _walk(c, sub)
                     if sub:
-                        flow.append(_KT(sub))
+                        target.append(_KT(sub))
                 else:
-                    _walk(c)
+                    _walk(c, target)
             else:
-                _walk(c)
+                _walk(c, target)
 
     soup = BeautifulSoup(html_content, 'html.parser')
     root = soup.body or soup
