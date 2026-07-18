@@ -2095,9 +2095,16 @@ async function downloadDocumentPdf() {
     const html = previewHtml ? previewHtml.innerHTML : (preview ? `<pre style="font-family:Arial,sans-serif;font-size:12pt;white-space:pre-wrap">${preview.innerText}</pre>` : '');
     if (!html) return;
 
-    // Determine filename from agent
-    const agentNames = { letter_generator: 'surat_rasmi', report_generator: 'laporan', data_analysis: 'analisis', document_reviewer: 'semakan' };
-    const filename = (agentNames[currentAgent] || 'dokumen') + '.pdf';
+    // Determine filename from agent and document type
+    let filename;
+    if (currentAgent === 'letter_generator') {
+        // Distinguish memo from surat rasmi by content
+        filename = html.includes('MEMO DALAMAN') ? 'memo' : 'surat_rasmi';
+    } else {
+        const agentNames = { report_generator: 'laporan', data_analysis: 'analisis', document_reviewer: 'semakan' };
+        filename = agentNames[currentAgent] || 'dokumen';
+    }
+    filename += '.pdf';
 
     try {
         const res = await fetch('/api/export/pdf', {

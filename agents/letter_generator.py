@@ -1149,7 +1149,9 @@ def _build_memo_html(f: dict) -> str:
     ahli_list = [a.strip() for a in ahli_str.split(',') if a.strip()] if ahli_str else []
     pengerusi = f.get('pengerusi', '')
 
-    TD = 'style="padding:4px 8px;border:1px solid #000;vertical-align:top"'
+    TD1 = 'style="padding:4px 8px;border:1px solid #000;vertical-align:top;width:110px"'
+    TD2 = 'style="padding:4px 6px;border:1px solid #000;vertical-align:top;width:18px;text-align:center"'
+    TD3 = 'style="padding:4px 8px;border:1px solid #000;vertical-align:top"'
     rows = []
     if pengerusi:
         rows.append((f'<b>Kepada</b>', ':', pengerusi))
@@ -1163,9 +1165,9 @@ def _build_memo_html(f: dict) -> str:
 
     rows_html = ''.join(
         f'<tr>'
-        f'<td {TD} style="padding:4px 8px;border:1px solid #000;vertical-align:top;width:110px">{r[0]}</td>'
-        f'<td {TD} style="padding:4px 6px;border:1px solid #000;vertical-align:top;width:18px;text-align:center">{r[1]}</td>'
-        f'<td {TD} style="padding:4px 8px;border:1px solid #000;vertical-align:top">{r[2]}</td>'
+        f'<td {TD1}>{r[0]}</td>'
+        f'<td {TD2}>{r[1]}</td>'
+        f'<td {TD3}>{r[2]}</td>'
         f'</tr>'
         for r in rows
     )

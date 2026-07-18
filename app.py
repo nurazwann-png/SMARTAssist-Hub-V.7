@@ -627,6 +627,15 @@ def _render_html_to_pdf(html_content: str) -> bytes:
                     out.append(inner)
         return ''.join(out)
 
+    def _margin_left(val):
+        """Extract left margin from CSS margin shorthand (top right bottom left)."""
+        toks = (val or '').split()
+        if len(toks) == 4:
+            return _css_len(toks[3])
+        if len(toks) == 2:
+            return _css_len(toks[1])
+        return 0.0
+
     def _para_style(st, default_size=FONT_PT, bold_default=False):
         align = {'right': TA_RIGHT, 'center': TA_CENTER,
                  'justify': TA_JUSTIFY, 'left': TA_LEFT}.get(
@@ -635,13 +644,21 @@ def _render_html_to_pdf(html_content: str) -> bytes:
         leading = (float(lh) * default_size) if _re.match(r'^[\d.]+$', lh or '') else default_size * 1.4
         bold = bold_default or st.get('font-weight', '') in ('bold', '700')
         mt, mb = _margin_tb(st.get('margin', ''))
+        # Left indent: explicit padding-left takes priority, else margin-left / margin shorthand
+        pl = st.get('padding-left', '')
+        ml_explicit = st.get('margin-left', '')
+        left_indent = (
+            _css_len(pl) if pl else
+            _css_len(ml_explicit) if ml_explicit else
+            _margin_left(st.get('margin', ''))
+        )
         return ParagraphStyle(
             'p',
             fontName='Helvetica-Bold' if bold else 'Helvetica',
             fontSize=default_size,
             leading=leading,
             alignment=align,
-            leftIndent=_css_len(st.get('padding-left', '0')),
+            leftIndent=left_indent,
             firstLineIndent=_css_len(st.get('text-indent', '0')),
             spaceBefore=mt,
             spaceAfter=mb,
@@ -705,17 +722,71 @@ def _render_html_to_pdf(html_content: str) -> bytes:
         except Exception:
             return None
 
+    def _parse_color(val):
+        """Convert CSS color (#rgb, #rrggbb, named) to reportlab Color."""
+        if not val:
+            return None
+        val = val.strip().lower()
+        named = {'black': colors.black, 'white': colors.white, 'red': colors.red,
+                 'blue': colors.blue, 'green': colors.green, 'gray': colors.gray,
+                 'grey': colors.gray, 'silver': colors.silver}
+        if val in named:
+            return named[val]
+        if val.startswith('#'):
+            h = val[1:]
+            if len(h) == 3:
+                h = h[0]*2 + h[1]*2 + h[2]*2
+            if len(h) == 6:
+                try:
+                    r, g, b = int(h[0:2],16)/255, int(h[2:4],16)/255, int(h[4:6],16)/255
+                    return colors.Color(r, g, b)
+                except Exception:
+                    pass
+        return None
+
     def _make_table(tbl):
-        # First pass: determine total column count across all rows
+        # First pass: determine total column count and collect explicit widths
         num_cols = 1
+        col_widths_px = {}  # col_index -> width in px
         for tr in tbl.find_all('tr'):
             cells = tr.find_all(['td', 'th'])
             total = sum(int(c.get('colspan', 1)) for c in cells)
             if total > num_cols:
                 num_cols = total
+            # Collect widths from first data row (non-spanning cells)
+            ci = 0
+            for c in cells:
+                cs = int(c.get('colspan', 1))
+                if cs == 1 and ci not in col_widths_px:
+                    st = _parse_style(c.get('style', ''))
+                    w_str = st.get('width', '') or c.get('width', '')
+                    if w_str:
+                        m = _re.match(r'([\d.]+)\s*(px)?', w_str)
+                        if m:
+                            col_widths_px[ci] = float(m.group(1))
+                ci += cs
+
+        # Build column widths: use explicit px widths where available
+        if col_widths_px and len(col_widths_px) == num_cols:
+            total_px = sum(col_widths_px.values())
+            col_widths = [CONTENT_W * col_widths_px[i] / total_px for i in range(num_cols)]
+        elif col_widths_px:
+            # Partial: fixed px cols, rest shares remaining space
+            known_pt = sum(_css_len(f'{col_widths_px[i]}px') for i in col_widths_px)
+            remaining = max(CONTENT_W - known_pt, 10)
+            unknown_cols = num_cols - len(col_widths_px)
+            col_widths = []
+            for i in range(num_cols):
+                if i in col_widths_px:
+                    col_widths.append(_css_len(f'{col_widths_px[i]}px'))
+                else:
+                    col_widths.append(remaining / max(unknown_cols, 1))
+        else:
+            col_widths = [CONTENT_W / num_cols] * num_cols
 
         rows = []
         span_cmds = []
+        color_cmds = []
         row_idx = 0
         for tr in tbl.find_all('tr'):
             cells = tr.find_all(['td', 'th'])
@@ -728,18 +799,30 @@ def _render_html_to_pdf(html_content: str) -> bytes:
                 rs = int(c.get('rowspan', 1))
                 st = _parse_style(c.get('style', ''))
                 bold_default = c.name == 'th' or st.get('font-weight', '') in ('bold', '700')
-                para = Paragraph(_inline(c) or '&nbsp;',
-                                 _para_style(st, 10.0, bold_default=bold_default))
+                # Apply text color from style
+                txt_color = _parse_color(st.get('color', ''))
+                cell_style = _para_style(st, 10.0, bold_default=bold_default)
+                if txt_color:
+                    cell_style = ParagraphStyle('pc', parent=cell_style, textColor=txt_color)
+                para = Paragraph(_inline(c) or '&nbsp;', cell_style)
                 row_data.append(para)
                 if cs > 1 or rs > 1:
                     span_cmds.append(('SPAN', (col_idx, row_idx),
                                       (col_idx + cs - 1, row_idx + rs - 1)))
-                # Pad placeholder cells for spanned columns
+                # Background color
+                bg = _parse_color(st.get('background', '') or st.get('background-color', ''))
+                if bg:
+                    color_cmds.append(('BACKGROUND', (col_idx, row_idx),
+                                       (col_idx + cs - 1, row_idx + rs - 1), bg))
+                # Text color for entire cell span
+                if txt_color:
+                    color_cmds.append(('TEXTCOLOR', (col_idx, row_idx),
+                                       (col_idx + cs - 1, row_idx + rs - 1), txt_color))
+                # Padding overrides from style
                 for _ in range(cs - 1):
                     row_data.append(Paragraph('', _para_style({})))
                     col_idx += 1
                 col_idx += 1
-            # Pad row to num_cols
             while len(row_data) < num_cols:
                 row_data.append(Paragraph('', _para_style({})))
             rows.append(row_data)
@@ -748,8 +831,7 @@ def _render_html_to_pdf(html_content: str) -> bytes:
         if not rows:
             return None
 
-        col_w = CONTENT_W / num_cols
-        t = Table(rows, hAlign='LEFT', colWidths=[col_w] * num_cols)
+        t = Table(rows, hAlign='LEFT', colWidths=col_widths)
         style_cmds = [
             ('GRID', (0, 0), (-1, -1), 0.75, colors.black),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -757,7 +839,7 @@ def _render_html_to_pdf(html_content: str) -> bytes:
             ('RIGHTPADDING', (0, 0), (-1, -1), 5),
             ('TOPPADDING', (0, 0), (-1, -1), 3),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ] + span_cmds
+        ] + span_cmds + color_cmds
         t.setStyle(TableStyle(style_cmds))
         return t
 
