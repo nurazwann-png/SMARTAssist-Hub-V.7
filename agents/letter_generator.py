@@ -762,8 +762,9 @@ Status sesi semasa:
                     form_extras.append(f["label"])
 
     _missing_all = _find_missing_fields(session["doc_type"], session["fields"]) if session["doc_type"] else []
-    # GENERATED_FIELD_KEYS dijana oleh AI — jangan tunjuk dalam borang, biar AI jana
-    _missing_form = [f["label"] for f in _missing_all if f["key"] not in GENERATED_FIELD_KEYS]
+    # Jangan tunjuk 'isi' dalam borang lagi jika isi_user sudah ada (user dah isi sekali)
+    _has_isi_user = bool(session["fields"].get("isi_user"))
+    _missing_form = [f["label"] for f in _missing_all if not (f["key"] == "isi" and _has_isi_user)]
     parsed["fields_status"] = {
         "collected": session["fields"],
         "missing": _missing_form,
