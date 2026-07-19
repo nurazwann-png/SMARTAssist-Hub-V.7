@@ -19,6 +19,76 @@
     --glass: rgba(255,255,255,0.035);
     --glass-indigo: rgba(99,102,241,0.07);
 }
+/* ── Light theme overrides ── */
+html[data-theme="light"] {
+    --bg-primary: #f0f4fb;
+    --bg-secondary: #e4eaf8;
+    --bg-tertiary: #d6dff2;
+    --bg-card: rgba(255,255,255,0.88);
+    --text-primary: #1a1a2e;
+    --text-secondary: #4a5080;
+    --border: rgba(0,0,0,0.1);
+    --border-glow: rgba(99,102,241,0.35);
+    --glass: rgba(255,255,255,0.75);
+    --glass-indigo: rgba(99,102,241,0.08);
+}
+html[data-theme="light"] body {
+    background-color: var(--bg-primary);
+    background-image:
+        radial-gradient(ellipse 70% 55% at 12% 15%, rgba(99,102,241,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 55% 45% at 88% 10%, rgba(139,92,246,0.08) 0%, transparent 55%),
+        radial-gradient(ellipse 65% 50% at 65% 90%, rgba(6,182,212,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 30% at 30% 75%, rgba(245,158,11,0.04) 0%, transparent 50%);
+}
+html[data-theme="light"] .canvas-area,
+html[data-theme="light"] .canvas-messages,
+html[data-theme="light"] .canvas-input-bar,
+html[data-theme="light"] .work-panel,
+html[data-theme="light"] .admin-body,
+html[data-theme="light"] .admin-page {
+    background: var(--bg-secondary);
+}
+html[data-theme="light"] .message.assistant .message-bubble,
+html[data-theme="light"] .message-bubble.structured-response,
+html[data-theme="light"] .da-section,
+html[data-theme="light"] .admin-stat-card,
+html[data-theme="light"] .admin-chart-card,
+html[data-theme="light"] .admin-table-card {
+    background: var(--bg-card);
+    border-color: var(--border);
+    color: var(--text-primary);
+}
+html[data-theme="light"] .message.user .message-bubble {
+    background: rgba(99,102,241,0.15);
+    color: var(--text-primary);
+}
+html[data-theme="light"] .canvas-input,
+html[data-theme="light"] .history-search-input,
+html[data-theme="light"] .da-table-filter {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+html[data-theme="light"] .history-panel,
+html[data-theme="light"] .profile-panel {
+    background: var(--bg-secondary);
+    border-color: var(--border);
+}
+html[data-theme="light"] .admin-table th,
+html[data-theme="light"] .da-table th {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+html[data-theme="light"] .admin-table td,
+html[data-theme="light"] .da-table td {
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+html[data-theme="light"] .canvas-header {
+    background: rgba(240,244,251,0.95);
+    border-color: var(--border);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -128,6 +198,13 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
     transition: all 0.25s; cursor: pointer;
 }
 .lang-toggle:hover { background: var(--glass-indigo); color: var(--text-primary); border-color: var(--border-glow); }
+.theme-toggle-btn {
+    font-size: 16px; background: var(--glass); border: 1px solid var(--border);
+    border-radius: 8px; width: 38px; height: 38px; color: var(--text-secondary);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; cursor: pointer;
+}
+.theme-toggle-btn:hover { background: var(--bg-tertiary); color: var(--accent); }
 .lang-flag { font-size: 16px; }
 .lang-code { letter-spacing: 1px; }
 

@@ -96,6 +96,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 _jinja_env = Environment(loader=FileSystemLoader("templates"), autoescape=True)
 
 _feedback: list[dict] = []
+_docs_generated: dict[str, int] = {}  # agent → count
 
 AGENT_LABELS = {
     "data_analysis": {"icon": "\U0001f4ca", "name": "Analisis Data"},
@@ -988,6 +989,7 @@ async def export_pdf(request: Request):
             return JSONResponse({"ok": False, "error": "Tiada kandungan HTML."}, status_code=400)
 
         pdf_bytes = _render_html_to_pdf(html_content, top_margin_mm=top_m, bottom_margin_mm=bottom_m)
+        _docs_generated[agent] = _docs_generated.get(agent, 0) + 1
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
@@ -1226,6 +1228,7 @@ async def download_document(session_id: str = "default"):
     info = lg_get_session(session_id)
     doc_type = info.get("doc_type", "dokumen") if info else "dokumen"
     filename = f"{doc_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+    _docs_generated["letter_generator"] = _docs_generated.get("letter_generator", 0) + 1
     return Response(
         content=docx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -1239,6 +1242,7 @@ async def download_report(session_id: str = "default"):
     if not docx_bytes:
         return JSONResponse({"error": "Tiada laporan sedia untuk dimuat turun."}, status_code=404)
     filename = f"laporan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+    _docs_generated["report_generator"] = _docs_generated.get("report_generator", 0) + 1
     return Response(
         content=docx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -1519,6 +1523,16 @@ async def get_stats():
             fb_by_agent[a] = {"up": 0, "down": 0}
         fb_by_agent[a][f["feedback"]] = fb_by_agent[a].get(f["feedback"], 0) + 1
 
+    from collections import defaultdict
+    day_counts: dict[str, int] = defaultdict(int)
+    for meta in all_sessions:
+        upd = meta.get("updated") or meta.get("created") or ""
+        if upd:
+            day = upd[:10]  # YYYY-MM-DD
+            day_counts[day] += 1
+    # Last 14 days sorted
+    sorted_days = sorted(day_counts.items())[-14:]
+
     recent = all_sessions[:10]
     return JSONResponse({
         "total_sessions": len(all_sessions),
@@ -1529,7 +1543,31 @@ async def get_stats():
         "feedback_by_agent": fb_by_agent,
         "recent_sessions": [{"session_id": s["session_id"], **s} for s in recent],
         "agent_labels": {k: v["name"] for k, v in AGENT_LABELS.items()},
+        "docs_generated": _docs_generated,
+        "sessions_by_day": {"labels": [d for d, _ in sorted_days], "counts": [c for _, c in sorted_days]},
     })
+
+
+@app.get("/api/data/executive-summary")
+async def data_executive_summary(session_id: str = "default", lang: str = "bm"):
+    """Generate a concise executive summary paragraph from EDA session data."""
+    from agents.data_analysis import get_session_data as da_get_data
+    from backend.deepseek_client import chat_completion
+    data = da_get_data(session_id)
+    if not data:
+        return JSONResponse({"ok": False, "error": "Tiada data untuk sesi ini." if lang != "en" else "No data for this session."})
+    EN = lang == "en"
+    summary_text = data.get("summary", "")[:3000]
+    prompt = (
+        f"Based on this dataset summary, write a concise executive summary paragraph (3-5 sentences) in {'English' if EN else 'formal Bahasa Malaysia'}. "
+        f"Cover: total records, key data types, notable insights, and one actionable recommendation. "
+        f"Write ONLY the paragraph, no headings or extra text.\n\nDataset summary:\n{summary_text}"
+    )
+    try:
+        result = chat_completion(messages=[{"role": "user", "content": prompt}], temperature=0.3, max_tokens=300)
+        return JSONResponse({"ok": True, "summary": result.strip()})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)})
 
 
 @app.get("/api/sessions")

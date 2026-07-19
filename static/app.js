@@ -10,6 +10,7 @@ let chartCounter = 0;
 let hasUploadedData = false;
 let lastActiveAgent = 'fallback';
 let lastStructuredData = null;
+let _chartQaContext = null;  // set when user clicks "Ask about chart"
 let currentLang = localStorage.getItem('smartassist_lang') || 'bm';
 let _msgIndex = 0;
 let _awaitingFollowup = false;  // true selepas dokumen siap — tunggu jawapan ya/tidak
@@ -236,6 +237,7 @@ const I18N = {
         admin_total_sessions: 'Jumlah Sesi', admin_total_messages: 'Jumlah Mesej',
         admin_feedback_pos: '👍 Maklum Balas Positif', admin_feedback_neg: '👎 Maklum Balas Negatif',
         admin_chart_usage: '📊 Penggunaan Mengikut Ejen', admin_chart_feedback: '💬 Maklum Balas Mengikut Ejen',
+        admin_docs_generated: '📄 Dokumen Dijana', admin_chart_activity: '📈 Aktiviti Sesi (14 Hari)',
         admin_recent_sessions: '🕓 Sesi Terkini',
         admin_th_session: 'Sesi', admin_th_agent: 'Ejen', admin_th_title: 'Tajuk',
         admin_th_messages: 'Mesej', admin_th_updated: 'Dikemaskini',
@@ -348,6 +350,7 @@ const I18N = {
         admin_total_sessions: 'Total Sessions', admin_total_messages: 'Total Messages',
         admin_feedback_pos: '👍 Positive Feedback', admin_feedback_neg: '👎 Negative Feedback',
         admin_chart_usage: '📊 Usage by Agent', admin_chart_feedback: '💬 Feedback by Agent',
+        admin_docs_generated: '📄 Documents Generated', admin_chart_activity: '📈 Session Activity (14 Days)',
         admin_recent_sessions: '🕓 Recent Sessions',
         admin_th_session: 'Session', admin_th_agent: 'Agent', admin_th_title: 'Title',
         admin_th_messages: 'Messages', admin_th_updated: 'Updated',
@@ -1099,6 +1102,15 @@ function buildStructuredHtml(data) {
         html += '</div></div>';
     }
 
+    if (data.suggested_charts && data.suggested_charts.length) {
+        html += `<div class="da-section"><div class="da-section-title">📊 ${currentLang === 'en' ? 'Suggested Charts' : 'Carta Dicadangkan'}</div>`;
+        html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+        data.suggested_charts.forEach(sc => {
+            html += `<button class="canvas-quick-btn chart-suggest-btn" onclick="useQuickAction('${escapeAttr(sc.query)}')">${escapeHtml(sc.label)}</button>`;
+        });
+        html += '</div></div>';
+    }
+
     if (data.table) {
         html += buildTableHtml(data.table);
     }
@@ -1110,15 +1122,20 @@ function buildStructuredHtml(data) {
     if (data.chart) {
         const chartId = 'chart_' + (++chartCounter);
         html += `<div class="da-section da-chart-wrapper" id="wrap_${chartId}">`;
+        const _cid = 'chart_' + (chartCounter + 1);  // preview the ID that will be assigned
+        const _chartTitle = (data.chart.title || '').replace(/'/g, "\\'");
+        const _chartLabels = JSON.stringify(data.chart.labels || []).replace(/'/g, "\\'");
         html += `<div class="da-chart-toolbar">`
             + `<button class="chart-tool-btn" onclick="downloadChartPng(this)" title="${currentLang === 'en' ? 'Download PNG' : 'Muat turun PNG'}">\u{2B07}</button>`
             + `<button class="chart-tool-btn" onclick="toggleChartSize(this)" title="${currentLang === 'en' ? 'Expand/Collapse' : 'Kembang/Kecilkan'}">\u{1F50D}</button>`
+            + `<button class="chart-tool-btn" onclick="askAboutChart(${JSON.stringify(data.chart.title || '')}, ${JSON.stringify(data.chart.labels||[])})" title="${currentLang === 'en' ? 'Ask about this chart' : 'Tanya tentang carta ini'}">❓</button>`
             + `</div>`;
         html += `<div class="da-chart-container"><canvas id="${chartId}"></canvas></div></div>`;
     }
 
     // Export buttons
     html += '<div class="da-export-actions">';
+    html += `<button class="da-export-btn" style="background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.4);color:#a5b4fc" onclick="showExecutiveSummary()">📋 ${currentLang === 'en' ? 'Executive Summary' : 'Ringkasan Eksekutif'}</button>`;
     html += `<button class="da-export-btn compare-btn" onclick="triggerCompareUpload()">\u{21C4} ${currentLang === 'en' ? 'Compare File' : 'Bandingkan Fail'}</button>`;
     html += `<button class="da-export-btn pptx-btn" onclick="downloadAnalysis('pptx')">\u{1F4CA} PowerPoint</button>`;
     html += `<button class="da-export-btn pdf-btn" onclick="downloadAnalysis('pdf')">\u{1F4C4} PDF</button>`;
@@ -2785,6 +2802,45 @@ function downloadChartPng(btn) {
     a.href = tmp.toDataURL('image/png'); a.download = 'carta.png'; a.click();
 }
 
+function askAboutChart(title, labels) {
+    const labelsStr = (labels || []).slice(0, 8).join(', ');
+    _chartQaContext = `[Carta: "${title}", Kategori: ${labelsStr}] `;
+    const inp = document.getElementById('canvasInput');
+    if (inp) {
+        inp.value = currentLang === 'en' ? `Regarding the chart "${title}": ` : `Berkenaan carta "${title}": `;
+        inp.focus();
+    }
+    showToast(currentLang === 'en' ? 'Ask your question about the chart.' : 'Taip soalan anda tentang carta ini.', 'info');
+}
+
+async function showExecutiveSummary() {
+    showToast(currentLang === 'en' ? 'Generating executive summary...' : 'Menjana ringkasan eksekutif...', 'info', 5000);
+    try {
+        const res = await fetch(`/api/data/executive-summary?session_id=${encodeURIComponent(sessionId)}&lang=${currentLang}`);
+        const data = await res.json();
+        if (!data.ok) { showToast(data.error || 'Error', 'err'); return; }
+        // Show in a modal
+        let overlay = document.querySelector('.chart-overlay');
+        if (!overlay) { overlay = document.createElement('div'); overlay.className = 'chart-overlay'; document.body.appendChild(overlay); }
+        overlay.classList.add('active');
+        const modal = document.createElement('div');
+        modal.className = 'drilldown-modal';
+        modal.innerHTML = `<div class="drilldown-head">
+            <span>📋 ${currentLang === 'en' ? 'Executive Summary' : 'Ringkasan Eksekutif'}</span>
+            <button class="drilldown-close" onclick="this.closest('.drilldown-modal').remove();document.querySelector('.chart-overlay')?.classList.remove('active')">✕</button>
+        </div>
+        <div class="drilldown-body" style="padding:16px;line-height:1.7;color:var(--text-primary)">
+            <p style="margin-bottom:12px">${escapeHtml(data.summary)}</p>
+            <button onclick="navigator.clipboard.writeText(${JSON.stringify(data.summary)}).then(()=>showToast('${currentLang === 'en' ? 'Copied!' : 'Disalin!'}','ok'))"
+                style="background:var(--accent);color:#000;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px">
+                📋 ${currentLang === 'en' ? 'Copy' : 'Salin'}
+            </button>
+        </div>`;
+        document.body.appendChild(modal);
+        overlay.onclick = e => { if (e.target === overlay) { modal.remove(); overlay.classList.remove('active'); } };
+    } catch (_) { showToast(currentLang === 'en' ? 'Failed to generate summary.' : 'Gagal menjana ringkasan.', 'err'); }
+}
+
 function toggleChartSize(btn) {
     const wrapper = btn.closest('.da-chart-wrapper');
     // container may have been moved to body — use stored ref or find it
@@ -3182,10 +3238,16 @@ const _FOLLOWUP_NO_RE  = /^(tidak|tak|no\b|nope|tidak perlu|tiada|sudah cukup|da
 const _FOLLOWUP_YES_RE = /^(ya\b|yes\b|ada\b|ada lagi|boleh|okay|ok\b|nak\b|mahu\b|ingin\b|please\b|tolong\b|saya nak|saya mahu|saya ada)/i;
 
 async function sendMessage() {
-    const message = chatInput.value.trim();
+    let message = chatInput.value.trim();
     if (!message || isProcessing) return;
     chatInput.value = '';
     chatInput.style.height = 'auto';
+
+    // Prepend chart QA context if set
+    if (_chartQaContext) {
+        message = _chartQaContext + message;
+        _chartQaContext = null;
+    }
 
     // ── Followup handling: ya/tidak selepas dokumen siap ──
     if (_awaitingFollowup) {
@@ -3882,6 +3944,13 @@ async function loadAdminStats() {
         document.getElementById('statFeedbackUp').textContent = data.feedback_total?.up ?? 0;
         document.getElementById('statFeedbackDown').textContent = data.feedback_total?.down ?? 0;
 
+        // Docs generated
+        const docsEl = document.getElementById('statDocsGenerated');
+        if (docsEl) {
+            const total = Object.values(data.docs_generated || {}).reduce((a, b) => a + b, 0);
+            docsEl.textContent = total;
+        }
+
         const _agentLabel = k => getAgentInfo(k).name || data.agent_labels?.[k] || k;
         const labels = Object.keys(data.agent_counts).map(_agentLabel);
         const counts = Object.values(data.agent_counts);
@@ -3944,6 +4013,34 @@ async function loadAdminStats() {
                 },
             },
         });
+
+        // Activity timeline chart
+        if (data.sessions_by_day && data.sessions_by_day.labels.length) {
+            const actCtx = document.getElementById('adminActivityChart')?.getContext('2d');
+            if (actCtx) {
+                if (window._adminActivityChart) window._adminActivityChart.destroy();
+                window._adminActivityChart = new Chart(actCtx, {
+                    type: 'line',
+                    data: {
+                        labels: data.sessions_by_day.labels,
+                        datasets: [{
+                            label: currentLang === 'en' ? 'Sessions' : 'Sesi',
+                            data: data.sessions_by_day.counts,
+                            borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)',
+                            borderWidth: 2, fill: true, tension: 0.4, pointRadius: 4, pointHoverRadius: 6,
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#94a3b8', cornerRadius: 8 } },
+                        scales: {
+                            x: { ticks: { color: '#94a3b8', maxRotation: 45 }, grid: { color: '#1e293b' } },
+                            y: { beginAtZero: true, ticks: { color: '#94a3b8', precision: 0 }, grid: { color: '#1e293b' } },
+                        },
+                    },
+                });
+            }
+        }
 
         const tbody = document.querySelector('#adminRecentTable tbody');
         if (tbody) {
@@ -4048,3 +4145,20 @@ document.getElementById('profileForm').addEventListener('submit', async (e) => {
 if (profileBtn)     profileBtn.addEventListener('click', openProfilePanel);
 if (profileCloseBtn) profileCloseBtn.addEventListener('click', closeProfilePanel);
 if (profileOverlay)  profileOverlay.addEventListener('click', closeProfilePanel);
+
+// ── Theme toggle (M) ──
+function _applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = theme === 'light' ? '☀️' : '🌙';
+    localStorage.setItem('smartassist_theme', theme);
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    _applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
+// Init theme on load
+_applyTheme(localStorage.getItem('smartassist_theme') || 'dark');
+document.getElementById('themeToggleBtn')?.addEventListener('click', toggleTheme);

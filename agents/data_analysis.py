@@ -585,6 +585,28 @@ def _compute_eda(df: pd.DataFrame, filename: str, lang: str = "bm") -> dict:
          "Kesan anomali dan outlier", "Tunjukkan korelasi antara lajur numerik"]
     )
 
+    # Auto-chart suggestions (deterministic, based on column types)
+    suggested = []
+    if numeric_cols and n_rows >= 5:
+        best_num = max(numeric_cols, key=lambda c: df[c].nunique(dropna=True))
+        suggested.append({
+            "label": (f"Taburan {best_num}" if not EN else f"Distribution of {best_num}"),
+            "query": (f"tunjukkan taburan lajur {best_num}" if not EN else f"show distribution of {best_num}")
+        })
+    if len(numeric_cols) >= 2:
+        suggested.append({
+            "label": ("Korelasi lajur numerik" if not EN else "Correlation of numeric columns"),
+            "query": ("tunjukkan korelasi antara semua lajur numerik" if not EN else "show correlation between numeric columns")
+        })
+    if cat_cols and n_rows >= 3:
+        best_cat = max(cat_cols, key=lambda c: df[c].nunique(dropna=True))
+        vc = df[best_cat].nunique(dropna=True)
+        if 2 <= vc <= 30:
+            suggested.append({
+                "label": (f"Kategori {best_cat}" if not EN else f"Categories: {best_cat}"),
+                "query": (f"tunjukkan carta bar untuk {best_cat}" if not EN else f"show bar chart for {best_cat}")
+            })
+
     payload = {
         "response_type": "papar",
         "message": msg,
@@ -592,6 +614,7 @@ def _compute_eda(df: pd.DataFrame, filename: str, lang: str = "bm") -> dict:
         "amaran": amaran,
         "table": {"headers": headers, "rows": rows},
         "susulan": susulan,
+        "suggested_charts": suggested,
     }
     if chart:
         payload["chart"] = chart

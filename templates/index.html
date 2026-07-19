@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMARTAssist Hub</title>
-    <link rel="stylesheet" href="/static/style.css?v=46">
+    <link rel="stylesheet" href="/static/style.css?v=47">
     <script src="/static/chart.min.js"></script>
 </head>
 <body>
@@ -113,6 +113,10 @@
                     <div class="admin-stat-value" id="statFeedbackDown">—</div>
                     <div class="admin-stat-label" data-i18n="admin_feedback_neg">👎 Maklum Balas Negatif</div>
                 </div>
+                <div class="admin-stat-card">
+                    <div class="admin-stat-value" id="statDocsGenerated">—</div>
+                    <div class="admin-stat-label" data-i18n="admin_docs_generated">📄 Dokumen Dijana</div>
+                </div>
             </div>
             <div class="admin-charts-row">
                 <div class="admin-chart-card">
@@ -122,6 +126,10 @@
                 <div class="admin-chart-card">
                     <div class="admin-chart-title" data-i18n="admin_chart_feedback">💬 Maklum Balas Mengikut Ejen</div>
                     <div class="admin-chart-wrap"><canvas id="adminFeedbackChart"></canvas></div>
+                </div>
+                <div class="admin-chart-card" style="width:100%">
+                    <div class="admin-chart-title" data-i18n="admin_chart_activity">📈 Aktiviti Sesi (14 Hari)</div>
+                    <div class="admin-chart-wrap" style="height:160px"><canvas id="adminActivityChart"></canvas></div>
                 </div>
             </div>
             <div class="admin-table-card">
@@ -142,6 +150,7 @@
             <button class="nav-btn" id="historyBtn">&#9776;</button>
 
             <div class="nav-right">
+                <button class="theme-toggle-btn" id="themeToggleBtn" title="Tukar Tema">🌙</button>
                 <button class="lang-toggle" id="langToggle" title="Tukar Bahasa">
                     <span class="lang-flag">🇲🇾</span>
                     <span class="lang-code">BM</span>
@@ -760,6 +769,6 @@
     </div>
 
 
-    <script src="/static/app.js?v=89"></script>
+    <script src="/static/app.js?v=90"></script>
 </body>
 </html>
