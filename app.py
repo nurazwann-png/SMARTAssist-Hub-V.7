@@ -1190,6 +1190,14 @@ async def review_download_edited(request: Request):
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
+@app.post("/api/data/compare")
+async def data_compare(file: UploadFile = File(...), session_id: str = Form("default"), lang: str = Form("bm")):
+    """Upload a second dataset and compare it against the session's first dataset."""
+    from agents.data_analysis import compare_upload
+    contents = await file.read()
+    return JSONResponse(compare_upload(contents, file.filename, session_id, lang=lang))
+
+
 @app.get("/api/data/rows")
 async def data_rows(session_id: str = "default", col: str = "", val: str = "", limit: int = 200):
     """Drill-down: return rows of the uploaded dataset where col == val."""
@@ -1333,7 +1341,7 @@ class ExportRequest(BaseModel):
 
 @app.post("/api/analysis/export")
 async def export_analysis(req: ExportRequest):
-    from agents.data_analysis_export import build_pptx, build_pdf
+    from agents.data_analysis_export import build_pptx, build_pdf, build_xlsx
     try:
         if req.format == "pptx":
             content = build_pptx(req.data, chart_image_b64=req.chart_image)
@@ -1348,6 +1356,14 @@ async def export_analysis(req: ExportRequest):
                 content=content,
                 media_type="application/pdf",
                 headers={"Content-Disposition": 'attachment; filename="analisis_data.pdf"'},
+            )
+        elif req.format == "xlsx":
+            from agents.data_analysis import _get_df
+            content = build_xlsx(req.data, df=_get_df(req.session_id))
+            return Response(
+                content=content,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": 'attachment; filename="analisis_data.xlsx"'},
             )
         else:
             return JSONResponse({"error": "Format tidak disokong."}, status_code=400)

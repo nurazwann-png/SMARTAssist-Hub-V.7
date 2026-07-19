@@ -883,6 +883,8 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
 }
 .da-export-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
 .pptx-btn:hover { border-color: #f97316; color: #f97316; }
+.xlsx-btn:hover { border-color: #16a34a; color: #16a34a; }
+.compare-btn:hover { border-color: var(--blue); color: var(--blue); }
 .pdf-btn:hover { border-color: var(--red); color: var(--red); }
 .csv-btn:hover { border-color: var(--green); color: var(--green); }
 

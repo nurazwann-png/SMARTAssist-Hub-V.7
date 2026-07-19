@@ -3,6 +3,7 @@
 import json
 import io
 import os
+import re
 import pathlib
 import pandas as pd
 from backend.deepseek_client import chat_completion
@@ -74,6 +75,7 @@ NOTA:
 _explored_topics: dict[str, list[str]] = {}
 _session_data: dict[str, dict] = {}
 _session_df: dict[str, "pd.DataFrame"] = {}
+_compute_cache: dict[str, dict] = {}  # session_id → {cache_key: computed_block}
 
 
 def _df_path(session_id: str) -> pathlib.Path:
@@ -138,17 +140,179 @@ def _build_data_context(session_id: str) -> str:
     )
 
 
+# ═══════════════════════════════════════════════════════════════════
+#  Ingestion robustness — encoding fallback, multi-sheet Excel, header
+#  row detection, identity-card masking, inconsistent-category hints.
+# ═══════════════════════════════════════════════════════════════════
+
+_IC_RE = re.compile(r"^\s*\d{6}-\d{2}-\d{4}\s*$|^\s*\d{12}\s*$")
+
+
+def _is_ic_column(s: pd.Series) -> bool:
+    vals = s.dropna().astype(str)
+    if len(vals) < 3:
+        return False
+    return bool(vals.str.match(_IC_RE).mean() >= 0.7)
+
+
+def _mask_ic(v) -> str:
+    digits = re.sub(r"\D", "", str(v))
+    if len(digits) >= 4:
+        return "•" * (len(digits) - 4) + digits[-4:]
+    return "••••"
+
+
+def _norm_cat(v) -> str:
+    return re.sub(r"[^\w]", "", str(v)).upper()
+
+
+def _inconsistent_category_notices(df: pd.DataFrame, lang: str = "bm") -> list[str]:
+    notices = []
+    for col in df.select_dtypes(include=["object", "category"]).columns:
+        vals = df[col].dropna().astype(str)
+        if vals.empty or vals.nunique() > 200:
+            continue
+        groups: dict[str, set] = {}
+        for v in vals.unique():
+            groups.setdefault(_norm_cat(v), set()).add(v)
+        clashes = {k: g for k, g in groups.items() if len(g) > 1}
+        if clashes:
+            example = "; ".join(" / ".join(sorted(g)) for g in list(clashes.values())[:2])
+            notices.append(
+                (f"Column '{col}' has values that look like the same category written differently "
+                 f"(e.g. {example}). Consider cleaning them for accurate grouping." if lang == "en" else
+                 f"Lajur '{col}' mempunyai nilai yang kelihatan seperti kategori sama tetapi ditulis berbeza "
+                 f"(cth. {example}). Pertimbangkan untuk membersihkannya bagi pengumpulan yang tepat.")
+            )
+    return notices[:3]
+
+
+def _looks_unnamed(cols) -> bool:
+    unnamed = sum(1 for c in cols if str(c).startswith("Unnamed") or str(c).strip() == "")
+    return unnamed >= max(1, len(cols) // 2)
+
+
+def _coerce_numeric(df: pd.DataFrame) -> pd.DataFrame:
+    for c in df.columns:
+        if df[c].dtype == object:
+            conv = pd.to_numeric(df[c], errors="coerce")
+            if conv.notna().mean() >= 0.8:  # mostly numeric → adopt
+                df[c] = conv
+    return df
+
+
+def _scan_header(raw: pd.DataFrame):
+    """Given a header-less frame, find the real header row (skips title/blank
+    rows common in system exports). Returns a cleaned DataFrame or None."""
+    limit = min(8, len(raw))
+    for i in range(limit):
+        row = raw.iloc[i]
+        nonnull = int(row.notna().sum())
+        if nonnull < raw.shape[1] * 0.6:
+            continue
+        strish = sum(1 for v in row if isinstance(v, str) and str(v).strip())
+        if strish >= max(1, nonnull * 0.6):
+            body = raw.iloc[i + 1:].copy()
+            if body.empty:
+                return None
+            body.columns = [str(v).strip() if pd.notna(v) and str(v).strip() else f"Lajur{j + 1}"
+                            for j, v in enumerate(row)]
+            body = body.reset_index(drop=True).dropna(how="all")
+            return _coerce_numeric(body), i
+    return None
+
+
+def _read_csv_bytes(file_bytes: bytes):
+    """Try a sequence of encodings; latin-1 never fails as a last resort."""
+    last_err = None
+    for enc in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+        try:
+            return pd.read_csv(io.BytesIO(file_bytes), encoding=enc), enc
+        except (UnicodeDecodeError, ValueError) as e:
+            last_err = e
+            continue
+    raise last_err or ValueError("Tidak dapat membaca CSV")
+
+
+def _load_dataframe(file_bytes: bytes, ext: str, lang: str = "bm"):
+    """Robustly load a CSV/Excel upload. Returns (df, notices)."""
+    EN = lang == "en"
+    notices: list[str] = []
+
+    if ext == "csv":
+        df, enc = _read_csv_bytes(file_bytes)
+        if enc not in ("utf-8", "utf-8-sig"):
+            notices.append(
+                f"File was read using the '{enc}' encoding." if EN
+                else f"Fail dibaca menggunakan pengekodan '{enc}'."
+            )
+    else:
+        xls = pd.ExcelFile(io.BytesIO(file_bytes))
+        sheets = xls.sheet_names
+        if len(sheets) == 1:
+            df = pd.read_excel(xls, sheet_name=sheets[0])
+        else:
+            frames = {}
+            for s in sheets:
+                try:
+                    frames[s] = pd.read_excel(xls, sheet_name=s)
+                except Exception:
+                    continue
+            active = max(frames, key=lambda s: frames[s].shape[0]) if frames else sheets[0]
+            df = frames.get(active, pd.read_excel(xls, sheet_name=sheets[0]))
+            others = [s for s in sheets if s != active]
+            notices.append(
+                (f"Workbook has {len(sheets)} sheets. Analysing the largest sheet '{active}'. "
+                 f"Other sheets: {', '.join(others)}." if EN else
+                 f"Buku kerja mempunyai {len(sheets)} sheet. Menganalisis sheet terbesar '{active}'. "
+                 f"Sheet lain: {', '.join(others)}.")
+            )
+
+    # Header-row detection: if columns look blank/Unnamed, rescan for the header
+    if _looks_unnamed(df.columns):
+        try:
+            raw = None
+            if ext == "csv":
+                for enc in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
+                    try:
+                        raw = pd.read_csv(io.BytesIO(file_bytes), header=None, encoding=enc)
+                        break
+                    except (UnicodeDecodeError, ValueError):
+                        continue
+            else:
+                raw = pd.read_excel(io.BytesIO(file_bytes), header=None)
+            scanned = _scan_header(raw) if raw is not None else None
+            if scanned:
+                df, hdr_row = scanned
+                if hdr_row > 0:
+                    notices.append(
+                        f"Detected the header on row {hdr_row + 1}; earlier rows were skipped." if EN
+                        else f"Baris tajuk dikesan pada baris {hdr_row + 1}; baris sebelumnya dilangkau."
+                    )
+        except Exception:
+            pass
+
+    # Drop fully-empty columns/rows that pad many exports
+    df = df.dropna(axis=1, how="all").dropna(axis=0, how="all").reset_index(drop=True)
+    return df, notices
+
+
 def upload_file(file_bytes: bytes, filename: str, session_id: str = "default", lang: str = "bm") -> dict:
     """Parse uploaded CSV/Excel file, store the FULL data for pandas computation,
     and return an auto-EDA profile the frontend can render immediately."""
     try:
         ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
-        if ext == "csv":
-            df = pd.read_csv(io.BytesIO(file_bytes))
-        elif ext in ("xlsx", "xls"):
-            df = pd.read_excel(io.BytesIO(file_bytes))
-        else:
+        if ext not in ("csv", "xlsx", "xls"):
             return {"ok": False, "error": f"Format fail '{ext}' tidak disokong. Sila muat naik CSV atau Excel (.xlsx)."}
+
+        df, notices = _load_dataframe(file_bytes, ext, lang=lang)
+        if df is None or df.shape[1] == 0:
+            return {"ok": False, "error": "Fail kelihatan kosong atau tiada lajur yang boleh dibaca."}
+
+        # Privacy: mask columns that look like identity-card numbers before storing/showing
+        ic_cols = [c for c in df.columns if _is_ic_column(df[c])]
+        for c in ic_cols:
+            df[c] = df[c].map(lambda v: _mask_ic(v) if pd.notna(v) else v)
 
         summary = _summarize_dataframe(df, filename)
         full_data = df.to_csv(index=False)
@@ -164,6 +328,7 @@ def upload_file(file_bytes: bytes, filename: str, session_id: str = "default", l
         }
         _session_data[session_id] = entry
         _session_df[session_id] = df
+        _compute_cache.pop(session_id, None)  # new data invalidates cached computations
         try:
             _DATA_DIR.mkdir(parents=True, exist_ok=True)
             (_DATA_DIR / f"{session_id}.json").write_text(
@@ -185,6 +350,16 @@ def upload_file(file_bytes: bytes, filename: str, session_id: str = "default", l
                 edu_chips.append("Analisis kehadiran" if lang != "en" else "Analyse attendance")
             if edu_chips and isinstance(eda, dict):
                 eda["susulan"] = edu_chips + eda.get("susulan", [])
+            # Ingestion notices (multi-sheet, encoding, header shift, IC masking,
+            # inconsistent categories) surfaced as extra warnings
+            if ic_cols:
+                notices.append(
+                    (f"Identity-card column(s) masked for privacy: {', '.join(ic_cols)}." if lang == "en"
+                     else f"Lajur nombor kad pengenalan ditopeng untuk privasi: {', '.join(ic_cols)}.")
+                )
+            notices += _inconsistent_category_notices(df, lang)
+            if notices and isinstance(eda, dict):
+                eda["amaran"] = notices + eda.get("amaran", [])
         except Exception:
             eda = None
 
@@ -437,6 +612,130 @@ def get_session_data(session_id: str) -> dict | None:
     return None
 
 
+def _compare_datasets(df1: pd.DataFrame, df2: pd.DataFrame, name1: str, name2: str, lang: str = "bm") -> dict:
+    """Compare two datasets and return deltas for common numeric columns
+    (plus per-subject pass % when both look like school data)."""
+    EN = lang == "en"
+    headers = (["Metric", name1, name2, "Change", "Change %"] if EN
+               else ["Metrik", name1, name2, "Perubahan", "Perubahan %"])
+    rows = []
+    labels, v1, v2 = [], [], []
+
+    # Row count
+    rows.append([("Row count" if EN else "Bilangan baris"), df1.shape[0], df2.shape[0],
+                 df2.shape[0] - df1.shape[0], _pct_change(df1.shape[0], df2.shape[0])])
+
+    edu1, edu2 = _detect_education_columns(df1), _detect_education_columns(df2)
+    common_subjects = [c for c in edu1["subjects"] if c in edu2["subjects"]]
+    metric_label = "mean" if EN else "purata"
+
+    if common_subjects:
+        # Compare pass % per common subject (more meaningful for schools)
+        metric_label = "% pass" if EN else "% lulus"
+        for c in common_subjects:
+            p1 = round((df1[c] >= 40).mean() * 100, 1)
+            p2 = round((df2[c] >= 40).mean() * 100, 1)
+            rows.append([f"{c} ({metric_label})", p1, p2, round(p2 - p1, 1), _pct_change(p1, p2)])
+            labels.append(c); v1.append(p1); v2.append(p2)
+    else:
+        common_num = [c for c in df1.columns if c in df2.columns
+                      and pd.api.types.is_numeric_dtype(df1[c]) and pd.api.types.is_numeric_dtype(df2[c])]
+        for c in common_num[:12]:
+            m1 = round(float(df1[c].mean()), 2)
+            m2 = round(float(df2[c].mean()), 2)
+            rows.append([f"{c} ({metric_label})", m1, m2, round(m2 - m1, 2), _pct_change(m1, m2)])
+            labels.append(c); v1.append(m1); v2.append(m2)
+
+    # Attendance
+    if edu1.get("attendance_col") and edu2.get("attendance_col"):
+        a1 = pd.to_numeric(df1[edu1["attendance_col"]], errors="coerce")
+        a2 = pd.to_numeric(df2[edu2["attendance_col"]], errors="coerce")
+        if a1.max() <= 1.5:
+            a1 = a1 * 100
+        if a2.max() <= 1.5:
+            a2 = a2 * 100
+        m1, m2 = round(float(a1.mean()), 1), round(float(a2.mean()), 1)
+        rows.append([("Avg attendance %" if EN else "Purata kehadiran %"), m1, m2, round(m2 - m1, 1), _pct_change(m1, m2)])
+
+    if not labels:
+        return {
+            "response_type": "pandangan",
+            "message": ("The two files share no common numeric columns to compare." if EN
+                        else "Kedua-dua fail tiada lajur numerik yang sama untuk dibandingkan."),
+            "table": {"headers": headers, "rows": rows},
+            "susulan": (["Upload another file"] if EN else ["Muat naik fail lain"]),
+        }
+
+    # Findings: biggest improvement / biggest drop
+    deltas = [(labels[i], round(v2[i] - v1[i], 2)) for i in range(len(labels))]
+    up = max(deltas, key=lambda x: x[1])
+    down = min(deltas, key=lambda x: x[1])
+    penemuan = [
+        (f"Biggest gain: {up[0]} ({'+' if up[1] >= 0 else ''}{up[1]})." if EN
+         else f"Peningkatan terbesar: {up[0]} ({'+' if up[1] >= 0 else ''}{up[1]})."),
+        (f"Biggest drop: {down[0]} ({down[1]})." if EN
+         else f"Penurunan terbesar: {down[0]} ({down[1]})."),
+    ]
+
+    chart = {
+        "type": "bar",
+        "title": (f"{name1} vs {name2}" if EN else f"{name1} lwn {name2}"),
+        "labels": labels,
+        "datasets": [
+            {"label": name1, "data": v1, "backgroundColor": "#3b82f6"},
+            {"label": name2, "data": v2, "backgroundColor": "#22c55e"},
+        ],
+    }
+    return {
+        "response_type": "rumusan",
+        "message": (f"Comparison of '{name1}' and '{name2}' complete." if EN
+                    else f"Perbandingan '{name1}' dan '{name2}' selesai."),
+        "penemuan": penemuan,
+        "tafsiran": ("Positive change means the second file scored higher on that metric." if EN
+                     else "Perubahan positif bermakna fail kedua mencatat nilai lebih tinggi pada metrik itu."),
+        "table": {"headers": headers, "rows": rows},
+        "chart": chart,
+        "amaran": [("Comparison assumes both files use the same columns and grading scale." if EN
+                    else "Perbandingan menganggap kedua-dua fail menggunakan lajur dan skala pemarkahan yang sama.")],
+        "susulan": (["Analyse the first file in detail", "Analyse exam results"] if EN
+                    else ["Analisis fail pertama dengan terperinci", "Analisis keputusan peperiksaan"]),
+    }
+
+
+def _pct_change(a, b) -> str:
+    try:
+        a = float(a)
+        if a == 0:
+            return "—"
+        return f"{round((float(b) - a) / abs(a) * 100, 1):+g}%"
+    except (TypeError, ValueError, ZeroDivisionError):
+        return "—"
+
+
+def compare_upload(file_bytes: bytes, filename: str, session_id: str = "default", lang: str = "bm") -> dict:
+    """Load a second file and compare it against the session's current dataset."""
+    df1 = _get_df(session_id)
+    if df1 is None:
+        return {"ok": False, "error": "Sila muat naik fail pertama dahulu sebelum membandingkan."}
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+    if ext not in ("csv", "xlsx", "xls"):
+        return {"ok": False, "error": f"Format fail '{ext}' tidak disokong."}
+    try:
+        df2, _ = _load_dataframe(file_bytes, ext, lang=lang)
+    except Exception as e:
+        return {"ok": False, "error": f"Gagal membaca fail kedua: {e}"}
+    if df2 is None or df2.empty:
+        return {"ok": False, "error": "Fail kedua kelihatan kosong."}
+    name1 = (_session_data.get(session_id, {}) or {}).get("filename", "Fail 1")
+    payload = _compare_datasets(df1, df2, _short_name(name1), _short_name(filename), lang=lang)
+    return {"ok": True, "comparison": payload}
+
+
+def _short_name(fn: str) -> str:
+    base = str(fn).rsplit(".", 1)[0]
+    return base[:24]
+
+
 def get_rows_where(session_id: str, col: str, val: str, limit: int = 200) -> dict:
     """Return rows of the full dataset where `col` equals `val` (drill-down)."""
     df = _get_df(session_id)
@@ -468,6 +767,7 @@ def clear_session_data(session_id: str):
     _session_data.pop(session_id, None)
     _explored_topics.pop(session_id, None)
     _session_df.pop(session_id, None)
+    _compute_cache.pop(session_id, None)
     for p in (_DATA_DIR / f"{session_id}.json", _df_path(session_id)):
         try:
             p.unlink(missing_ok=True)
@@ -638,18 +938,44 @@ def _execute_ops(df: pd.DataFrame, ops: list[dict]) -> list[str]:
     return blocks
 
 
-def _plan_and_compute(query: str, df: pd.DataFrame) -> str | None:
+def _recent_user_turns(history: list[dict] | None, n: int = 3) -> list[str]:
+    if not history:
+        return []
+    return [m["content"] for m in history if m.get("role") == "user"][-n:]
+
+
+def _plan_and_compute(query: str, df: pd.DataFrame,
+                      history: list[dict] | None = None,
+                      session_id: str = "default") -> str | None:
     """Ask the LLM to plan pandas operations, execute them on the full dataset,
-    and return a computed-results context block. None on failure."""
+    and return a computed-results context block. None on failure.
+
+    Idea C: recent user turns are given to the planner so follow-ups like
+    "what about class 5B only?" resolve against the previous question.
+    Idea D: identical (query + recent-context) pairs reuse the cached result
+    instead of re-planning and re-computing.
+    """
+    prior = _recent_user_turns(history)
+    prior_prev = prior[:-1] if prior and prior[-1] == query else prior
+    cache_key = "‖".join(prior_prev[-2:] + [query.strip().lower()])
+    cache = _compute_cache.setdefault(session_id, {})
+    if cache_key in cache:
+        return cache[cache_key]
+
     col_lines = []
     for col in df.columns[:40]:
         s = df[col]
         samples = ", ".join(str(v)[:30] for v in s.dropna().unique()[:3])
         col_lines.append(f"- {col} ({s.dtype}): cth. {samples}")
+    context_block = ""
+    if prior_prev:
+        context_block = ("\n\nSoalan sebelum ini dalam perbualan (untuk merungkai rujukan seperti "
+                         "'kelas itu' atau 'bagaimana pula dengan…'):\n- " + "\n- ".join(prior_prev[-2:]))
     plan_user = (
         f"Dataset: {df.shape[0]} baris x {df.shape[1]} lajur\n"
         f"Lajur:\n" + "\n".join(col_lines) +
-        f"\n\nSoalan pengguna: {query}"
+        context_block +
+        f"\n\nSoalan pengguna semasa: {query}"
     )
     try:
         raw = chat_completion(
@@ -664,13 +990,15 @@ def _plan_and_compute(query: str, df: pd.DataFrame) -> str | None:
         blocks = _execute_ops(df, ops)
         if not blocks:
             return None
-        return (
+        result = (
             f"\n\nHASIL PENGIRAAN SEBENAR (dikira oleh pandas ke atas KESEMUA {df.shape[0]} baris):\n\n"
             + "\n\n".join(blocks)
             + "\n\nPENTING: Setiap nombor dalam respons anda MESTI diambil terus daripada "
               "HASIL PENGIRAAN di atas atau RINGKASAN DATA. JANGAN kira sendiri, "
               "JANGAN anggar, dan JANGAN reka sebarang nilai."
         )
+        cache[cache_key] = result
+        return result
     except Exception:
         return None
 
@@ -1076,7 +1404,7 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
     # Plan→Execute→Narrate: LLM plans pandas ops, server computes them on the
     # FULL dataset, and the narration below may only use those real numbers.
     if df is not None and data_context:
-        computed = _plan_and_compute(query, df)
+        computed = _plan_and_compute(query, df, history=history, session_id=session_id)
         if computed:
             data = get_session_data(session_id) or {}
             raw_block = ""

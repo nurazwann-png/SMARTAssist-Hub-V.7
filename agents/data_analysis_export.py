@@ -244,3 +244,49 @@ def build_pdf(data: dict, chart_image_b64: str | None = None) -> bytes:
 
     doc.build(elements)
     return buf.getvalue()
+
+
+def build_xlsx(data: dict, df=None) -> bytes:
+    """Export the analysis to an .xlsx workbook: summary, analysis table(s),
+    an auto-computed pivot, and the full dataset."""
+    import pandas as pd
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        # ── Summary sheet ──
+        rows = []
+        if data.get("message"):
+            rows.append(["Ringkasan", data["message"]])
+        for label, key in [("Penemuan", "penemuan"), ("Cadangan", "cadangan"), ("Amaran", "amaran")]:
+            for item in (data.get(key) or []):
+                rows.append([label, item])
+        if data.get("tafsiran"):
+            rows.append(["Tafsiran", data["tafsiran"]])
+        summary_df = pd.DataFrame(rows or [["Ringkasan", "Analisis Data"]], columns=["Bahagian", "Butiran"])
+        summary_df.to_excel(writer, sheet_name="Ringkasan", index=False)
+
+        # ── Analysis table(s) ──
+        for i, key in enumerate(["table", "table2"]):
+            tbl = data.get(key)
+            if tbl and tbl.get("headers") and tbl.get("rows"):
+                tdf = pd.DataFrame(tbl["rows"], columns=tbl["headers"])
+                tdf.to_excel(writer, sheet_name=("Jadual Analisis" if i == 0 else "Jadual Perbandingan"), index=False)
+
+        # ── Auto pivot from the full dataset (first category × mean of numerics) ──
+        if df is not None and not df.empty:
+            cats = df.select_dtypes(include=["object", "category"]).columns.tolist()
+            nums = df.select_dtypes(include=["number"]).columns.tolist()
+            cats = [c for c in cats if 1 < df[c].nunique(dropna=True) <= 50]
+            if cats and nums:
+                try:
+                    pivot = df.groupby(cats[0])[nums].mean().round(2)
+                    pivot.to_excel(writer, sheet_name="Pivot")
+                except Exception:
+                    pass
+            # ── Full dataset ──
+            safe = df.copy()
+            if safe.shape[0] > 100000:
+                safe = safe.head(100000)
+            safe.to_excel(writer, sheet_name="Data Penuh", index=False)
+
+    return buf.getvalue()

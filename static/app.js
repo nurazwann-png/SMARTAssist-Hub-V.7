@@ -1119,8 +1119,10 @@ function buildStructuredHtml(data) {
 
     // Export buttons
     html += '<div class="da-export-actions">';
+    html += `<button class="da-export-btn compare-btn" onclick="triggerCompareUpload()">\u{21C4} ${currentLang === 'en' ? 'Compare File' : 'Bandingkan Fail'}</button>`;
     html += `<button class="da-export-btn pptx-btn" onclick="downloadAnalysis('pptx')">\u{1F4CA} PowerPoint</button>`;
     html += `<button class="da-export-btn pdf-btn" onclick="downloadAnalysis('pdf')">\u{1F4C4} PDF</button>`;
+    html += `<button class="da-export-btn xlsx-btn" onclick="downloadAnalysis('xlsx')">\u{1F4C8} Excel</button>`;
     html += `<button class="da-export-btn csv-btn" onclick="downloadAnalysis('csv')">\u{1F4E5} CSV</button>`;
     html += '</div>';
 
@@ -2376,6 +2378,46 @@ async function handleReportImageUpload(input) {
     reader.readAsDataURL(file);
 }
 
+// ═══ Two-file comparison (Idea B) ═══
+function triggerCompareUpload() {
+    if (!hasUploadedData) {
+        showToast(currentLang === 'en' ? 'Please upload the first file first.' : 'Sila muat naik fail pertama dahulu.', 'err');
+        return;
+    }
+    let inp = document.getElementById('compareFileInput');
+    if (!inp) {
+        inp = document.createElement('input');
+        inp.type = 'file'; inp.id = 'compareFileInput';
+        inp.accept = '.csv,.xlsx,.xls'; inp.style.display = 'none';
+        inp.addEventListener('change', handleCompareUpload);
+        document.body.appendChild(inp);
+    }
+    inp.value = '';
+    inp.click();
+}
+
+async function handleCompareUpload() {
+    const file = this.files[0];
+    if (!file) return;
+    setProcessing(true);
+    addMessage(`\u{21C4} ${currentLang === 'en' ? 'Comparing with' : 'Membandingkan dengan'}: ${file.name}`, 'user');
+    const fd = new FormData();
+    fd.append('file', file); fd.append('session_id', sessionId); fd.append('lang', currentLang);
+    try {
+        const res = await fetch('/api/data/compare', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.ok) {
+            addMessage('', 'assistant', '\u{1F4CA}', 'Analisis Data', data.comparison);
+        } else {
+            addMessage(data.error || (currentLang === 'en' ? 'Comparison failed.' : 'Perbandingan gagal.'), 'assistant', '\u{26A0}\u{FE0F}', I18N[currentLang].agent_kpm_name);
+        }
+    } catch (e) {
+        addMessage(I18N[currentLang].err_prefix + e.message, 'assistant', '\u{26A0}\u{FE0F}', I18N[currentLang].agent_kpm_name);
+    } finally {
+        setProcessing(false);
+    }
+}
+
 async function _refreshReportImages() {
     try {
         const res = await fetch(`/api/report/images?session_id=${encodeURIComponent(sessionId)}`);
@@ -2853,7 +2895,8 @@ async function downloadAnalysis(format) {
         if (!res.ok) throw new Error('Gagal menjana fail.');
         const blob = await res.blob();
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-        a.download = format === 'pptx' ? 'analisis_data.pptx' : 'analisis_data.pdf'; a.click();
+        const _ext = { pptx: 'pptx', pdf: 'pdf', xlsx: 'xlsx' }[format] || 'pdf';
+        a.download = `analisis_data.${_ext}`; a.click();
         showToast(I18N[currentLang].toast_file_downloaded, 'ok');
     } catch (err) { showToast(err.message, 'err'); }
 }
