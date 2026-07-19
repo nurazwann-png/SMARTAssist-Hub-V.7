@@ -3921,6 +3921,21 @@ function closeWordPreview() {
 let _adminAgentChart = null;
 let _adminFeedbackChart = null;
 
+// Returns chart colour tokens that match current light/dark theme
+function _chartTheme() {
+    const light = document.documentElement.getAttribute('data-theme') === 'light';
+    return {
+        tooltipBg:    light ? '#ffffff' : '#1e293b',
+        tooltipTitle: light ? '#1a1a2e' : '#f1f5f9',
+        tooltipBody:  light ? '#4a5080' : '#94a3b8',
+        tooltipBorder:light ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0)',
+        tickX:        light ? '#64748b' : '#94a3b8',
+        tickY:        light ? '#1a1a2e' : '#e2e8f0',
+        gridColor:    light ? 'rgba(0,0,0,0.08)' : '#1e293b',
+        legendColor:  light ? '#4a5080' : '#94a3b8',
+    };
+}
+
 
 function openAdminPage() {
     closeProfilePanel();
@@ -3956,6 +3971,7 @@ async function loadAdminStats() {
         const counts = Object.values(data.agent_counts);
         const agentColors = ['#7c3aed', '#d97706', '#16a34a', '#0891b2', '#dc2626', '#6b7280'];
 
+        const ct = _chartTheme();
         const agentCtx = document.getElementById('adminAgentChart').getContext('2d');
         if (_adminAgentChart) _adminAgentChart.destroy();
         _adminAgentChart = new Chart(agentCtx, {
@@ -3967,9 +3983,7 @@ async function loadAdminStats() {
                     data: counts,
                     backgroundColor: agentColors.map(c => c + 'cc'),
                     borderColor: agentColors,
-                    borderWidth: 2,
-                    borderRadius: 6,
-                    borderSkipped: false,
+                    borderWidth: 2, borderRadius: 6, borderSkipped: false,
                 }]
             },
             options: {
@@ -3977,11 +3991,11 @@ async function loadAdminStats() {
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
-                    tooltip: { backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#94a3b8', padding: 10, cornerRadius: 8 },
+                    tooltip: { backgroundColor: ct.tooltipBg, titleColor: ct.tooltipTitle, bodyColor: ct.tooltipBody, borderColor: ct.tooltipBorder, borderWidth: 1, padding: 10, cornerRadius: 8 },
                 },
                 scales: {
-                    x: { ticks: { color: '#94a3b8', precision: 0 }, grid: { color: '#1e293b' }, beginAtZero: true, suggestedMax: Math.max(...counts, 5) },
-                    y: { ticks: { color: '#e2e8f0', font: { size: 12 } }, grid: { display: false } },
+                    x: { ticks: { color: ct.tickX, precision: 0 }, grid: { color: ct.gridColor }, beginAtZero: true, suggestedMax: Math.max(...counts, 5) },
+                    y: { ticks: { color: ct.tickY, font: { size: 12 } }, grid: { display: false } },
                 },
             },
         });
@@ -4004,12 +4018,12 @@ async function loadAdminStats() {
                 indexAxis: 'y',
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
-                    legend: { labels: { color: '#94a3b8', boxWidth: 12, boxHeight: 12, borderRadius: 4 } },
-                    tooltip: { backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#94a3b8', padding: 10, cornerRadius: 8 },
+                    legend: { labels: { color: ct.legendColor, boxWidth: 12, boxHeight: 12, borderRadius: 4 } },
+                    tooltip: { backgroundColor: ct.tooltipBg, titleColor: ct.tooltipTitle, bodyColor: ct.tooltipBody, borderColor: ct.tooltipBorder, borderWidth: 1, padding: 10, cornerRadius: 8 },
                 },
                 scales: {
-                    x: { ticks: { color: '#94a3b8', precision: 0 }, grid: { color: '#1e293b' }, beginAtZero: true, suggestedMax: Math.max(...fbUp, ...fbDown, 5) },
-                    y: { ticks: { color: '#e2e8f0', font: { size: 12 } }, grid: { display: false } },
+                    x: { ticks: { color: ct.tickX, precision: 0 }, grid: { color: ct.gridColor }, beginAtZero: true, suggestedMax: Math.max(...fbUp, ...fbDown, 5) },
+                    y: { ticks: { color: ct.tickY, font: { size: 12 } }, grid: { display: false } },
                 },
             },
         });
@@ -4032,10 +4046,10 @@ async function loadAdminStats() {
                     },
                     options: {
                         responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#94a3b8', cornerRadius: 8 } },
+                        plugins: { legend: { display: false }, tooltip: { backgroundColor: ct.tooltipBg, titleColor: ct.tooltipTitle, bodyColor: ct.tooltipBody, borderColor: ct.tooltipBorder, borderWidth: 1, cornerRadius: 8 } },
                         scales: {
-                            x: { ticks: { color: '#94a3b8', maxRotation: 45 }, grid: { color: '#1e293b' } },
-                            y: { beginAtZero: true, ticks: { color: '#94a3b8', precision: 0 }, grid: { color: '#1e293b' } },
+                            x: { ticks: { color: ct.tickX, maxRotation: 45 }, grid: { color: ct.gridColor } },
+                            y: { beginAtZero: true, ticks: { color: ct.tickX, precision: 0 }, grid: { color: ct.gridColor } },
                         },
                     },
                 });
@@ -4157,6 +4171,10 @@ function _applyTheme(theme) {
 function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
     _applyTheme(current === 'dark' ? 'light' : 'dark');
+    // Redraw admin charts with new theme colours if dashboard is visible
+    if (document.getElementById('adminPage')?.style.display !== 'none') {
+        loadAdminStats();
+    }
 }
 
 // Init theme on load
