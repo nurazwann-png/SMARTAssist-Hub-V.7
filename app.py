@@ -1190,6 +1190,13 @@ async def review_download_edited(request: Request):
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
+@app.get("/api/data/rows")
+async def data_rows(session_id: str = "default", col: str = "", val: str = "", limit: int = 200):
+    """Drill-down: return rows of the uploaded dataset where col == val."""
+    from agents.data_analysis import get_rows_where
+    return JSONResponse(get_rows_where(session_id, col, val, limit))
+
+
 @app.get("/api/data-status")
 async def data_status(session_id: str = "default"):
     data = da_get_data(session_id)

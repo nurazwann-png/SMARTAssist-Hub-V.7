@@ -385,6 +385,7 @@ def _compute_eda(df: pd.DataFrame, filename: str, lang: str = "bm") -> dict:
                 "labels": [str(i) for i in vc.index],
                 "datasets": [{"label": col, "data": [int(v) for v in vc.values],
                               "backgroundColor": _PALETTE[:len(vc)]}],
+                "drilldown": {"column": str(col)},
             }
     except Exception:
         chart = None
@@ -434,6 +435,33 @@ def get_session_data(session_id: str) -> dict | None:
         except Exception:
             pass
     return None
+
+
+def get_rows_where(session_id: str, col: str, val: str, limit: int = 200) -> dict:
+    """Return rows of the full dataset where `col` equals `val` (drill-down)."""
+    df = _get_df(session_id)
+    if df is None:
+        return {"ok": False, "error": "Tiada data untuk sesi ini."}
+    if col not in df.columns:
+        return {"ok": False, "error": f"Lajur '{col}' tiada."}
+    s = df[col]
+    if pd.api.types.is_numeric_dtype(s):
+        try:
+            mask = s == float(val)
+        except (TypeError, ValueError):
+            mask = s.astype(str) == str(val)
+    else:
+        mask = s.astype(str).str.strip() == str(val).strip()
+    sub = df[mask].head(max(1, min(int(limit), 500)))
+    sub = sub.where(pd.notnull(sub), "")
+    return {
+        "ok": True,
+        "column": col,
+        "value": val,
+        "count": int(mask.sum()),
+        "headers": [str(c) for c in sub.columns],
+        "rows": sub.astype(object).values.tolist(),
+    }
 
 
 def clear_session_data(session_id: str):
@@ -963,6 +991,7 @@ def _attendance_analysis(df: pd.DataFrame, edu: dict, lang: str = "bm") -> dict:
                 "datasets": [{"label": "% " + ("Attendance" if EN else "Kehadiran"),
                               "data": [float(v) for v in by.values],
                               "backgroundColor": [_PALETTE[i % len(_PALETTE)] for i in range(len(by))]}],
+                "drilldown": {"column": str(group_col)},
             }
         except Exception:
             chart = None

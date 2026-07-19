@@ -1110,7 +1110,10 @@ function buildStructuredHtml(data) {
     if (data.chart) {
         const chartId = 'chart_' + (++chartCounter);
         html += `<div class="da-section da-chart-wrapper" id="wrap_${chartId}">`;
-        html += `<div class="da-chart-toolbar"><button class="chart-tool-btn" onclick="toggleChartSize(this)" title="Kembang/Kecilkan">\u{1F50D}</button></div>`;
+        html += `<div class="da-chart-toolbar">`
+            + `<button class="chart-tool-btn" onclick="downloadChartPng(this)" title="${currentLang === 'en' ? 'Download PNG' : 'Muat turun PNG'}">\u{2B07}</button>`
+            + `<button class="chart-tool-btn" onclick="toggleChartSize(this)" title="${currentLang === 'en' ? 'Expand/Collapse' : 'Kembang/Kecilkan'}">\u{1F50D}</button>`
+            + `</div>`;
         html += `<div class="da-chart-container"><canvas id="${chartId}"></canvas></div></div>`;
     }
 
@@ -1125,15 +1128,18 @@ function buildStructuredHtml(data) {
     return html;
 }
 
+const _TABLE_PAGE_SIZE = 12;
+
 function buildTableHtml(table) {
     if (!table || !table.headers || !table.rows) return '';
     const tblId = 'tbl_' + (++chartCounter);
+    const paged = table.rows.length > _TABLE_PAGE_SIZE;
     let html = '<div class="da-section da-table-section">';
     html += '<div class="da-table-toolbar">';
-    html += `<input class="da-table-filter" placeholder="Cari..." oninput="filterTable('${tblId}', this.value)">`;
+    html += `<input class="da-table-filter" placeholder="${currentLang === 'en' ? 'Search...' : 'Cari...'}" oninput="filterTable('${tblId}', this.value)">`;
     html += `<button class="da-export-btn csv-btn" onclick="downloadTableCSV('${tblId}')" style="flex-shrink:0">\u{1F4E5} CSV</button>`;
     html += '</div>';
-    html += `<table class="da-table" id="${tblId}"><thead><tr>`;
+    html += `<table class="da-table" id="${tblId}" data-page-size="${_TABLE_PAGE_SIZE}"><thead><tr>`;
     table.headers.forEach((h, i) => {
         html += `<th class="sortable-th" onclick="sortTable('${tblId}', ${i})">${escapeHtml(h)} <span class="sort-icon">\u{21C5}</span></th>`;
     });
@@ -1141,8 +1147,55 @@ function buildTableHtml(table) {
     table.rows.forEach(row => {
         html += '<tr>' + row.map(c => `<td>${escapeHtml(String(c))}</td>`).join('') + '</tr>';
     });
-    html += '</tbody></table></div>';
+    html += '</tbody></table>';
+    if (paged) html += `<div class="da-table-pager" id="pager_${tblId}"></div>`;
+    html += '</div>';
+    // Initialise pagination after the DOM node exists
+    if (paged) requestAnimationFrame(() => _repaginate(tblId));
     return html;
+}
+
+// Pagination state keyed by table id
+const _tableState = {};
+
+function _visibleRows(tblId) {
+    const tbl = document.getElementById(tblId);
+    const q = (_tableState[tblId]?.filter || '').toLowerCase();
+    return Array.from(tbl.querySelectorAll('tbody tr')).filter(r =>
+        !q || r.textContent.toLowerCase().includes(q));
+}
+
+function _repaginate(tblId) {
+    const tbl = document.getElementById(tblId);
+    if (!tbl) return;
+    const pageSize = parseInt(tbl.dataset.pageSize) || _TABLE_PAGE_SIZE;
+    const st = _tableState[tblId] || (_tableState[tblId] = { page: 1, filter: '' });
+    const all = Array.from(tbl.querySelectorAll('tbody tr'));
+    const matches = _visibleRows(tblId);
+    const pages = Math.max(1, Math.ceil(matches.length / pageSize));
+    if (st.page > pages) st.page = pages;
+    const start = (st.page - 1) * pageSize;
+    const end = start + pageSize;
+    // Hide everything, then show only this page's slice of the matching rows
+    all.forEach(r => { r.style.display = 'none'; });
+    matches.slice(start, end).forEach(r => { r.style.display = ''; });
+
+    const pager = document.getElementById('pager_' + tblId);
+    if (!pager) return;
+    if (matches.length <= pageSize) { pager.innerHTML = ''; return; }
+    const info = currentLang === 'en'
+        ? `${start + 1}–${Math.min(end, matches.length)} of ${matches.length}`
+        : `${start + 1}–${Math.min(end, matches.length)} drpd ${matches.length}`;
+    pager.innerHTML =
+        `<button class="da-pager-btn" ${st.page <= 1 ? 'disabled' : ''} onclick="_gotoPage('${tblId}',${st.page - 1})">‹</button>`
+        + `<span class="da-pager-info">${info}</span>`
+        + `<button class="da-pager-btn" ${st.page >= pages ? 'disabled' : ''} onclick="_gotoPage('${tblId}',${st.page + 1})">›</button>`;
+}
+
+function _gotoPage(tblId, page) {
+    const st = _tableState[tblId] || (_tableState[tblId] = { page: 1, filter: '' });
+    st.page = page;
+    _repaginate(tblId);
 }
 
 // Split doc into individual lines — each line is its own matchable unit
@@ -2598,31 +2651,96 @@ function showToast(msg, ok = true) {
 function renderChart(container, chartConfig) {
     const canvasEl = container.querySelector('canvas');
     if (!canvasEl) return;
-    new Chart(canvasEl.getContext('2d'), {
-        type: chartConfig.type || 'bar',
+    const type = chartConfig.type || 'bar';
+    const isScatter = type === 'scatter' || type === 'bubble';
+    const isCircular = type === 'pie' || type === 'doughnut';
+    const stacked = !!chartConfig.stacked;
+    const drilldown = chartConfig.drilldown;
+
+    const chart = new Chart(canvasEl.getContext('2d'), {
+        type,
         data: {
             labels: chartConfig.labels || [],
-            datasets: (chartConfig.datasets || []).map(ds => ({
+            datasets: (chartConfig.datasets || []).map((ds, i) => ({
                 label: ds.label || '', data: ds.data || [],
-                backgroundColor: ds.backgroundColor || '#3b82f6',
-                borderColor: ds.borderColor || 'transparent', borderWidth: ds.borderWidth || 1,
+                backgroundColor: ds.backgroundColor || (isScatter ? 'rgba(59,130,246,0.6)' : '#3b82f6'),
+                borderColor: ds.borderColor || (type === 'line' ? '#3b82f6' : (isScatter ? '#3b82f6' : 'transparent')),
+                borderWidth: ds.borderWidth || (type === 'line' ? 2 : 1),
+                ...(type === 'line' ? { tension: 0.3, fill: false, pointRadius: 3 } : {}),
+                ...(isScatter ? { pointRadius: 5, pointHoverRadius: 7 } : {}),
             })),
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
+            interaction: { mode: isScatter ? 'nearest' : 'index', intersect: isScatter },
             plugins: {
                 title: { display: !!chartConfig.title, text: chartConfig.title || '', color: '#f1f5f9', font: { size: 14, weight: 'bold' } },
                 legend: { labels: { color: '#94a3b8', font: { size: 12 }, usePointStyle: true } },
                 tooltip: { backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#94a3b8', borderColor: '#334155', borderWidth: 1, padding: 10, cornerRadius: 8 },
+                subtitle: drilldown ? { display: true, text: currentLang === 'en' ? 'Tip: click a bar to see the underlying rows' : 'Petua: klik bar untuk lihat baris asas', color: '#64748b', font: { size: 11, style: 'italic' }, padding: { bottom: 6 } } : { display: false },
             },
-            scales: chartConfig.type === 'pie' || chartConfig.type === 'doughnut' ? {} : {
-                x: { ticks: { color: '#94a3b8', maxRotation: 45 }, grid: { color: '#334155' } },
-                y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, beginAtZero: true },
+            scales: isCircular ? {} : {
+                x: { stacked, ticks: { color: '#94a3b8', maxRotation: 45 }, grid: { color: '#334155' },
+                     ...(isScatter ? { type: 'linear', title: { display: !!chartConfig.x_label, text: chartConfig.x_label || '', color: '#94a3b8' } } : {}) },
+                y: { stacked, beginAtZero: !isScatter, ticks: { color: '#94a3b8' }, grid: { color: '#334155' },
+                     ...(isScatter && chartConfig.y_label ? { title: { display: true, text: chartConfig.y_label, color: '#94a3b8' } } : {}) },
             },
+            onClick: drilldown ? (evt, els) => {
+                if (!els || !els.length) return;
+                const lbl = chart.data.labels[els[0].index];
+                if (lbl !== undefined) openChartDrilldown(drilldown.column, lbl);
+            } : undefined,
             animation: { duration: 800, easing: 'easeOutQuart' },
         },
     });
+    return chart;
+}
+
+// Drill-down: fetch and show the source rows behind a clicked chart category
+async function openChartDrilldown(column, value) {
+    try {
+        const res = await fetch(`/api/data/rows?session_id=${encodeURIComponent(sessionId)}&col=${encodeURIComponent(column)}&val=${encodeURIComponent(value)}&limit=200`);
+        const data = await res.json();
+        if (!data.ok || !data.rows || !data.rows.length) {
+            showToast(currentLang === 'en' ? 'No matching rows found.' : 'Tiada baris sepadan ditemui.', 'err');
+            return;
+        }
+        let overlay = document.querySelector('.chart-overlay');
+        if (!overlay) { overlay = document.createElement('div'); overlay.className = 'chart-overlay'; document.body.appendChild(overlay); }
+        overlay.classList.add('active');
+        const modal = document.createElement('div');
+        modal.className = 'drilldown-modal';
+        const title = currentLang === 'en'
+            ? `${data.rows.length} row(s) where ${column} = ${value}`
+            : `${data.rows.length} baris di mana ${column} = ${value}`;
+        let html = `<div class="drilldown-head"><span>${escapeHtml(title)}</span>`
+            + `<button class="drilldown-close" onclick="this.closest('.drilldown-modal').remove();document.querySelector('.chart-overlay')?.classList.remove('active')">✕</button></div>`;
+        html += '<div class="drilldown-body"><table class="da-table"><thead><tr>';
+        data.headers.forEach(h => { html += `<th>${escapeHtml(String(h))}</th>`; });
+        html += '</tr></thead><tbody>';
+        data.rows.forEach(r => { html += '<tr>' + r.map(c => `<td>${escapeHtml(String(c))}</td>`).join('') + '</tr>'; });
+        html += '</tbody></table></div>';
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+        overlay.onclick = () => { modal.remove(); overlay.classList.remove('active'); };
+    } catch (_) {
+        showToast(currentLang === 'en' ? 'Could not load rows.' : 'Tidak dapat memuatkan baris.', 'err');
+    }
+}
+
+function downloadChartPng(btn) {
+    const wrap = btn.closest('.da-chart-wrapper');
+    const src = (wrap && wrap._expandedContainer ? wrap._expandedContainer : wrap)?.querySelector('canvas')
+        || wrap?.querySelector('canvas');
+    if (!src) return;
+    // Composite onto a white background so the exported PNG is readable anywhere
+    const tmp = document.createElement('canvas');
+    tmp.width = src.width; tmp.height = src.height;
+    const ctx = tmp.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, tmp.width, tmp.height);
+    ctx.drawImage(src, 0, 0);
+    const a = document.createElement('a');
+    a.href = tmp.toDataURL('image/png'); a.download = 'carta.png'; a.click();
 }
 
 function toggleChartSize(btn) {
@@ -2745,9 +2863,18 @@ async function downloadAnalysis(format) {
 function filterTable(tblId, query) {
     const tbl = document.getElementById(tblId);
     if (!tbl) return;
-    const rows = tbl.querySelectorAll('tbody tr');
-    const q = query.toLowerCase();
-    rows.forEach(r => { r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none'; });
+    const st = _tableState[tblId] || (_tableState[tblId] = { page: 1, filter: '' });
+    st.filter = query;
+    st.page = 1;
+    if (document.getElementById('pager_' + tblId)) {
+        _repaginate(tblId);
+    } else {
+        // Small tables (no pager): plain show/hide filter
+        const q = query.toLowerCase();
+        tbl.querySelectorAll('tbody tr').forEach(r => {
+            r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    }
 }
 
 function sortTable(tblId, colIdx) {
@@ -2768,6 +2895,8 @@ function sortTable(tblId, colIdx) {
         return asc ? av.localeCompare(bv) : bv.localeCompare(av);
     });
     rows.forEach(r => tbody.appendChild(r));
+    // Re-apply pagination after re-ordering
+    if (document.getElementById('pager_' + tblId)) _repaginate(tblId);
 }
 
 function downloadTableCSV(tblId) {
