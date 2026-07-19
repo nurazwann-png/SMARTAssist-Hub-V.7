@@ -1103,6 +1103,10 @@ function buildStructuredHtml(data) {
         html += buildTableHtml(data.table);
     }
 
+    if (data.table2) {
+        html += buildTableHtml(data.table2);
+    }
+
     if (data.chart) {
         const chartId = 'chart_' + (++chartCounter);
         html += `<div class="da-section da-chart-wrapper" id="wrap_${chartId}">`;

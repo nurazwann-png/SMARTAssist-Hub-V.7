@@ -176,6 +176,15 @@ def upload_file(file_bytes: bytes, filename: str, session_id: str = "default", l
 
         try:
             eda = _compute_eda(df, filename, lang=lang)
+            # Surface one-click education templates when school data is detected
+            edu = _detect_education_columns(df)
+            edu_chips = []
+            if _has_education_data(edu):
+                edu_chips.append("Analisis keputusan peperiksaan" if lang != "en" else "Analyse exam results")
+            if edu.get("attendance_col"):
+                edu_chips.append("Analisis kehadiran" if lang != "en" else "Analyse attendance")
+            if edu_chips and isinstance(eda, dict):
+                eda["susulan"] = edu_chips + eda.get("susulan", [])
         except Exception:
             eda = None
 
@@ -638,6 +647,380 @@ def _plan_and_compute(query: str, df: pd.DataFrame) -> str | None:
         return None
 
 
+# ═══════════════════════════════════════════════════════════════════
+#  Education templates — one-click analysis for KPM/PPD school data.
+#  All figures are computed deterministically with pandas (no LLM),
+#  so every number is exact. The KPM grade scale below is stated in
+#  each result so the user can verify the assumption.
+# ═══════════════════════════════════════════════════════════════════
+
+# Markah → Gred → Mata (skala standard SPM; GPMP/GPS rendah = lebih baik)
+_GRADE_BANDS = [
+    (90, "A+", 0), (80, "A", 1), (70, "A-", 2), (65, "B+", 3),
+    (60, "B", 4), (55, "C+", 5), (50, "C", 6), (45, "D", 7),
+    (40, "E", 8), (0, "G", 9),
+]
+_GRADE_ORDER = ["A+", "A", "A-", "B+", "B", "C+", "C", "D", "E", "G"]
+_GRADE_POINT = {g: p for _, g, p in _GRADE_BANDS}
+_EXTRA_GRADE_POINT = {"B-": 4, "C-": 6, "F": 9, "TH": 9, "TP": 9}
+_PASS_GRADES = {"A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D", "E"}
+_EXCELLENT_GRADES = {"A+", "A", "A-"}
+
+_SUBJECT_HINTS = {
+    "bm", "bi", "bahasa melayu", "bahasa inggeris", "english", "matematik", "mate", "mt",
+    "mat", "sains", "sn", "sejarah", "sej", "geografi", "geo", "pendidikan islam", "pi",
+    "pai", "pjk", "pjpk", "rbt", "prinsip perakaunan", "ekonomi", "fizik", "kimia",
+    "biologi", "bio", "matematik tambahan", "add math", "addmath", "pendidikan moral",
+    "moral", "tasawwur", "psv", "pendidikan seni", "reka bentuk", "asas sains komputer",
+    "ask", "physics", "chemistry", "biology", "mathematics", "science", "history", "geography",
+}
+
+
+def _mark_to_grade(mark) -> str | None:
+    if pd.isna(mark):
+        return None
+    for lo, g, _ in _GRADE_BANDS:
+        if mark >= lo:
+            return g
+    return "G"
+
+
+def _detect_education_columns(df: pd.DataFrame) -> dict:
+    """Best-effort detection of KPM school-data columns."""
+    lower = {c: str(c).strip().lower() for c in df.columns}
+    numeric = df.select_dtypes(include=["number"]).columns.tolist()
+
+    def find(patterns):
+        for c in df.columns:
+            if any(p in lower[c] for p in patterns):
+                return c
+        return None
+
+    school_col = find(["sekolah", "school"])
+    class_col = find(["kelas", "class", "tingkatan", "darjah"])
+    name_col = find(["nama", "name", "murid", "pelajar", "student"])
+    attendance_col = find(["kehadiran", "attendance", "hadir"])
+
+    id_like = {school_col, class_col, name_col, attendance_col}
+
+    def looks_id(c):
+        toks = lower[c].replace("_", " ").split()
+        return ("id" in toks or "no" in toks or "bil" in toks or
+                "tahun" in lower[c] or "year" in lower[c] or "umur" in lower[c] or "age" in lower[c])
+
+    def name_match(c):
+        l = lower[c]
+        toks = set(l.replace("_", " ").split())
+        return any(h == l or h in toks for h in _SUBJECT_HINTS)
+
+    named = [c for c in numeric if c not in id_like and name_match(c) and not looks_id(c)]
+    if named:
+        subjects = named
+    else:
+        subjects = []
+        for c in numeric:
+            if c in id_like or looks_id(c):
+                continue
+            s = df[c].dropna()
+            if not s.empty and s.between(0, 100).mean() >= 0.95 and s.max() <= 100:
+                subjects.append(c)
+
+    grade_cols = []
+    known = set(_GRADE_ORDER) | set(_EXTRA_GRADE_POINT)
+    for c in df.select_dtypes(include=["object", "category"]).columns:
+        vals = df[c].dropna().astype(str).str.strip().str.upper()
+        if not vals.empty and vals.isin(known).mean() >= 0.8:
+            grade_cols.append(c)
+
+    return {
+        "subjects": subjects, "grade_cols": grade_cols, "attendance_col": attendance_col,
+        "school_col": school_col, "class_col": class_col, "name_col": name_col,
+    }
+
+
+def _has_education_data(edu: dict) -> bool:
+    return bool(edu.get("subjects") or edu.get("grade_cols"))
+
+
+def _grade_series_for(df: pd.DataFrame, col: str, is_numeric: bool) -> pd.Series:
+    if is_numeric:
+        return df[col].map(_mark_to_grade)
+    return df[col].dropna().astype(str).str.strip().str.upper()
+
+
+def _grade_stats(grades: pd.Series) -> dict:
+    g = grades.dropna()
+    n = len(g)
+    if n == 0:
+        return {"n": 0}
+    points = g.map(lambda x: _GRADE_POINT.get(x, _EXTRA_GRADE_POINT.get(x)))
+    valid_points = points.dropna()
+    lulus = g.isin(_PASS_GRADES).sum()
+    cemerlang = g.isin(_EXCELLENT_GRADES).sum()
+    dist = g.value_counts()
+    top_grade = dist.index[0] if not dist.empty else "-"
+    return {
+        "n": n,
+        "lulus_pct": round(lulus / n * 100, 1),
+        "cemerlang_pct": round(cemerlang / n * 100, 1),
+        "gpmp": round(float(valid_points.mean()), 2) if not valid_points.empty else None,
+        "top_grade": top_grade,
+    }
+
+
+def _exam_analysis(df: pd.DataFrame, edu: dict, lang: str = "bm") -> dict:
+    EN = lang == "en"
+    subject_cols = [(c, True) for c in edu["subjects"]] + [(c, False) for c in edu["grade_cols"]]
+
+    headers = (["Subject", "Sat", "Pass %", "Distinction (A) %", "GPMP", "Top Grade"] if EN
+               else ["Subjek", "Bil", "Lulus %", "Cemerlang (A) %", "GPMP", "Gred Terbanyak"])
+    rows = []
+    gpmp_pairs = []
+    pass_pairs = []
+    all_points = []
+    for col, is_num in subject_cols:
+        grades = _grade_series_for(df, col, is_num)
+        st = _grade_stats(grades)
+        if st["n"] == 0:
+            continue
+        rows.append([str(col), st["n"], st["lulus_pct"], st["cemerlang_pct"],
+                     st["gpmp"] if st["gpmp"] is not None else "-", st["top_grade"]])
+        if st["gpmp"] is not None:
+            gpmp_pairs.append((str(col), st["gpmp"]))
+        pass_pairs.append((str(col), st["lulus_pct"]))
+        pts = grades.dropna().map(lambda x: _GRADE_POINT.get(x, _EXTRA_GRADE_POINT.get(x))).dropna()
+        all_points.extend(pts.tolist())
+
+    if not rows:
+        return {
+            "response_type": "pandangan",
+            "message": ("No exam subjects could be detected in this dataset." if EN
+                        else "Tiada subjek peperiksaan dapat dikesan dalam dataset ini."),
+            "susulan": (["Show summary statistics"] if EN else ["Tunjukkan ringkasan statistik"]),
+        }
+
+    gps = round(sum(all_points) / len(all_points), 2) if all_points else None
+
+    penemuan = []
+    penemuan.append(
+        (f"Overall school GPS: {gps} (lower is better; best = 0)." if EN
+         else f"GPS keseluruhan sekolah: {gps} (rendah lebih baik; terbaik = 0).")
+        if gps is not None else
+        ("GPS could not be computed." if EN else "GPS tidak dapat dikira.")
+    )
+    best = min(gpmp_pairs, key=lambda x: x[1]) if gpmp_pairs else None
+    worst = max(gpmp_pairs, key=lambda x: x[1]) if gpmp_pairs else None
+    if best:
+        penemuan.append(
+            f"Strongest subject: {best[0]} (GPMP {best[1]}). Needs most attention: {worst[0]} (GPMP {worst[1]})."
+            if EN else
+            f"Subjek terbaik: {best[0]} (GPMP {best[1]}). Paling perlu perhatian: {worst[0]} (GPMP {worst[1]})."
+        )
+    low_pass = [c for c, p in pass_pairs if p < 50]
+    if low_pass:
+        penemuan.append(
+            f"Subjects with pass rate below 50%: {', '.join(low_pass)}." if EN
+            else f"Subjek dengan peratus lulus di bawah 50%: {', '.join(low_pass)}."
+        )
+
+    tafsiran = (
+        "GPMP measures average grade points per subject and GPS averages across all subjects. "
+        "These figures help identify which subjects need targeted intervention." if EN else
+        "GPMP mengukur purata mata gred bagi setiap subjek dan GPS purata merentas semua subjek. "
+        "Angka ini membantu mengenal pasti subjek yang memerlukan intervensi bersasar."
+    )
+    cadangan = (
+        ["Focus intervention programmes on subjects with the highest GPMP and lowest pass rates.",
+         "Share best practices from the strongest subject's teachers with other panels.",
+         "Track these figures each term to measure improvement."] if EN else
+        ["Fokuskan program intervensi pada subjek dengan GPMP tertinggi dan peratus lulus terendah.",
+         "Kongsi amalan terbaik guru subjek terbaik dengan panel lain.",
+         "Pantau angka ini setiap penggal untuk mengukur penambahbaikan."]
+    )
+    amaran = [
+        ("Grade scale used — A+:90-100, A:80-89, A-:70-79, B+:65-69, B:60-64, C+:55-59, "
+         "C:50-54, D:45-49, E:40-44, G:0-39. Pass = grade E and above; Distinction = A-/A/A+."
+         if EN else
+         "Skala gred digunakan — A+:90-100, A:80-89, A-:70-79, B+:65-69, B:60-64, C+:55-59, "
+         "C:50-54, D:45-49, E:40-44, G:0-39. Lulus = gred E ke atas; Cemerlang = A-/A/A+.")
+    ]
+
+    # Chart: pass rate per subject (easy to read)
+    pass_pairs_sorted = sorted(pass_pairs, key=lambda x: -x[1])
+    chart = {
+        "type": "bar",
+        "title": ("Pass rate by subject (%)" if EN else "Peratus Lulus Mengikut Subjek (%)"),
+        "labels": [c for c, _ in pass_pairs_sorted],
+        "datasets": [{
+            "label": "% Lulus" if not EN else "% Pass",
+            "data": [p for _, p in pass_pairs_sorted],
+            "backgroundColor": [_PALETTE[i % len(_PALETTE)] for i in range(len(pass_pairs_sorted))],
+        }],
+    }
+
+    payload = {
+        "response_type": "rumusan",
+        "message": (f"Exam results analysis complete. School GPS: {gps}." if EN
+                    else f"Analisis keputusan peperiksaan selesai. GPS sekolah: {gps}."),
+        "penemuan": penemuan,
+        "tafsiran": tafsiran,
+        "cadangan": cadangan,
+        "amaran": amaran,
+        "table": {"headers": headers, "rows": rows},
+        "chart": chart,
+    }
+
+    # Optional: GPS comparison by school or class
+    group_col = edu.get("school_col") or edu.get("class_col")
+    if group_col and edu["subjects"]:
+        try:
+            long_points = []
+            for c in edu["subjects"]:
+                pts = df[c].map(_mark_to_grade).map(lambda x: _GRADE_POINT.get(x))
+                tmp = pd.DataFrame({"grp": df[group_col], "pt": pts}).dropna()
+                long_points.append(tmp)
+            allp = pd.concat(long_points, ignore_index=True)
+            gps_by = allp.groupby("grp")["pt"].mean().round(2).sort_values()
+            grp_label = ("School" if EN else "Sekolah") if group_col == edu.get("school_col") else ("Class" if EN else "Kelas")
+            payload["table2"] = {
+                "headers": [grp_label, "GPS"],
+                "rows": [[str(k), float(v)] for k, v in gps_by.items()],
+            }
+            payload["penemuan"].append(
+                f"Best-performing {grp_label.lower()}: {gps_by.index[0]} (GPS {gps_by.iloc[0]})."
+                if EN else
+                f"{grp_label} berprestasi terbaik: {gps_by.index[0]} (GPS {gps_by.iloc[0]})."
+            )
+        except Exception:
+            pass
+
+    payload["susulan"] = (
+        ["Analyse attendance", "Show grade distribution for each subject", "Compare classes"] if EN else
+        ["Analisis kehadiran", "Tunjukkan taburan gred setiap subjek", "Bandingkan kelas"]
+    )
+    return payload
+
+
+def _attendance_analysis(df: pd.DataFrame, edu: dict, lang: str = "bm") -> dict:
+    EN = lang == "en"
+    col = edu.get("attendance_col")
+    if not col:
+        return {
+            "response_type": "pandangan",
+            "message": ("No attendance column was detected in this dataset." if EN
+                        else "Tiada lajur kehadiran dapat dikesan dalam dataset ini."),
+            "susulan": (["Analyse exam results"] if EN else ["Analisis keputusan peperiksaan"]),
+        }
+    s = pd.to_numeric(df[col], errors="coerce")
+    if s.dropna().empty:
+        return {
+            "response_type": "pandangan",
+            "message": ("The attendance column has no numeric values to analyse." if EN
+                        else "Lajur kehadiran tiada nilai numerik untuk dianalisis."),
+            "susulan": (["Analyse exam results"] if EN else ["Analisis keputusan peperiksaan"]),
+        }
+    # Normalise fraction (0-1) to percentage
+    if s.max() <= 1.5:
+        s = s * 100
+    avg = round(float(s.mean()), 1)
+    at_risk_mask = s < 80
+    n_risk = int(at_risk_mask.sum())
+    n_total = int(s.notna().sum())
+    risk_pct = round(n_risk / max(1, n_total) * 100, 1)
+
+    penemuan = [
+        (f"Average attendance: {avg}%." if EN else f"Purata kehadiran: {avg}%."),
+        (f"{n_risk} of {n_total} students ({risk_pct}%) are at risk with attendance below 80%."
+         if EN else
+         f"{n_risk} daripada {n_total} murid ({risk_pct}%) berisiko dengan kehadiran di bawah 80%."),
+    ]
+
+    # At-risk list
+    name_col = edu.get("name_col")
+    class_col = edu.get("class_col")
+    show_cols, headers = [], []
+    if name_col:
+        show_cols.append(name_col); headers.append("Name" if EN else "Nama")
+    if class_col:
+        show_cols.append(class_col); headers.append("Class" if EN else "Kelas")
+    headers.append("Attendance %" if EN else "Kehadiran %")
+    risk_df = df.loc[at_risk_mask, show_cols].copy() if show_cols else pd.DataFrame(index=df.index[at_risk_mask])
+    risk_df["_att"] = s[at_risk_mask].round(1)
+    risk_df = risk_df.sort_values("_att").head(25)
+    rows = [[*(str(r[c]) for c in show_cols), float(r["_att"])] for _, r in risk_df.iterrows()]
+
+    # Average by class or school
+    chart = None
+    group_col = edu.get("class_col") or edu.get("school_col")
+    if group_col:
+        try:
+            by = pd.DataFrame({"grp": df[group_col], "att": s}).dropna().groupby("grp")["att"].mean().round(1).sort_values()
+            chart = {
+                "type": "bar",
+                "title": (f"Average attendance by {group_col} (%)" if EN
+                          else f"Purata Kehadiran Mengikut {group_col} (%)"),
+                "labels": [str(k) for k in by.index],
+                "datasets": [{"label": "% " + ("Attendance" if EN else "Kehadiran"),
+                              "data": [float(v) for v in by.values],
+                              "backgroundColor": [_PALETTE[i % len(_PALETTE)] for i in range(len(by))]}],
+            }
+        except Exception:
+            chart = None
+
+    payload = {
+        "response_type": "rumusan",
+        "message": (f"Attendance analysis complete. Average attendance is {avg}%, with {n_risk} at-risk students."
+                    if EN else
+                    f"Analisis kehadiran selesai. Purata kehadiran ialah {avg}%, dengan {n_risk} murid berisiko."),
+        "penemuan": penemuan,
+        "tafsiran": (
+            "Students below 80% attendance are flagged as at-risk, in line with common KPM practice. "
+            "Low attendance often correlates with weaker academic performance." if EN else
+            "Murid dengan kehadiran di bawah 80% ditanda sebagai berisiko, selaras dengan amalan lazim KPM. "
+            "Kehadiran rendah sering berkait dengan pencapaian akademik yang lebih lemah."),
+        "cadangan": (
+            ["Contact the guardians of at-risk students to understand the causes.",
+             "Run a targeted attendance-improvement programme for the flagged classes.",
+             "Review attendance again next month to measure progress."] if EN else
+            ["Hubungi penjaga murid berisiko untuk memahami puncanya.",
+             "Jalankan program peningkatan kehadiran bersasar untuk kelas yang ditanda.",
+             "Semak semula kehadiran bulan hadapan untuk mengukur kemajuan."]),
+        "amaran": [
+            ("At-risk threshold set at 80%. Adjust if your school uses a different benchmark." if EN
+             else "Ambang berisiko ditetapkan pada 80%. Laraskan jika sekolah anda menggunakan penanda aras berbeza.")
+        ],
+        "susulan": (["Analyse exam results", "List students below 60% attendance"] if EN
+                    else ["Analisis keputusan peperiksaan", "Senaraikan murid berkehadiran bawah 60%"]),
+    }
+    if rows:
+        payload["table"] = {"headers": headers, "rows": rows}
+    if chart:
+        payload["chart"] = chart
+    return payload
+
+
+# Keyword → template routing (checked before the LLM plan-execute stage)
+_EXAM_KEYWORDS = (
+    "analisis keputusan peperiksaan", "keputusan peperiksaan", "analisis peperiksaan",
+    "analisa peperiksaan", "taburan gred", "gpmp", "gps sekolah", "peratus lulus",
+    "analyse exam", "analyze exam", "exam result", "exam analysis", "grade distribution",
+)
+_ATTENDANCE_KEYWORDS = (
+    "analisis kehadiran", "analisa kehadiran", "murid berisiko", "kehadiran rendah",
+    "attendance analysis", "analyse attendance", "analyze attendance", "at-risk", "at risk student",
+)
+
+
+def _maybe_run_education_template(query: str, df: pd.DataFrame, lang: str) -> dict | None:
+    q = query.lower()
+    edu = _detect_education_columns(df)
+    if any(k in q for k in _EXAM_KEYWORDS) and _has_education_data(edu):
+        return _exam_analysis(df, edu, lang)
+    if any(k in q for k in _ATTENDANCE_KEYWORDS) and edu.get("attendance_col"):
+        return _attendance_analysis(df, edu, lang)
+    return None
+
+
 def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm", user_name: str = "") -> str:
     sapaan = f", {user_name.split()[0]}" if user_name else ""
     if query == '__INTRO__':
@@ -651,9 +1034,18 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
     data_context = _build_data_context(session_id)
     lang_note = "\n\nIMPORTANT: The user has selected English. You MUST respond entirely in English. All text fields in your JSON response must be in English." if lang == "en" else ""
 
+    df = _get_df(session_id)
+
+    # Education templates (exam/attendance) — deterministic, computed with pandas.
+    if df is not None and data_context:
+        template = _maybe_run_education_template(query, df, lang)
+        if template is not None:
+            topic_hint = query[:60]
+            _add_explored(session_id, topic_hint)
+            return json.dumps(template, ensure_ascii=False)
+
     # Plan→Execute→Narrate: LLM plans pandas ops, server computes them on the
     # FULL dataset, and the narration below may only use those real numbers.
-    df = _get_df(session_id)
     if df is not None and data_context:
         computed = _plan_and_compute(query, df)
         if computed:
