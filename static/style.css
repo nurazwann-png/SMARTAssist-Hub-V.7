@@ -88,6 +88,98 @@ html[data-theme="light"] .canvas-header {
     background: rgba(240,244,251,0.95);
     border-color: var(--border);
 }
+/* ── Profile panel ── */
+html[data-theme="light"] .profile-panel {
+    background: #ffffff;
+    border-left-color: rgba(0,0,0,0.1);
+}
+html[data-theme="light"] .profile-panel-header {
+    border-bottom-color: rgba(0,0,0,0.08);
+}
+html[data-theme="light"] .profile-panel-header h3 {
+    color: #1a1a2e;
+}
+html[data-theme="light"] .profile-close-btn {
+    color: #64748b;
+}
+html[data-theme="light"] .profile-close-btn:hover { color: #1a1a2e; }
+html[data-theme="light"] .profile-google-info {
+    border-bottom-color: rgba(0,0,0,0.08);
+}
+html[data-theme="light"] .profile-google-name {
+    color: #1a1a2e;
+}
+html[data-theme="light"] .profile-google-email {
+    color: #64748b;
+}
+html[data-theme="light"] .profile-field label {
+    color: #64748b;
+}
+html[data-theme="light"] .profile-field input,
+html[data-theme="light"] .profile-field select {
+    background: #f8fafc;
+    border-color: rgba(0,0,0,0.15);
+    color: #1a1a2e;
+}
+html[data-theme="light"] .profile-field input::placeholder { color: #94a3b8; }
+html[data-theme="light"] .profile-field select option {
+    background: #ffffff;
+    color: #1a1a2e;
+}
+html[data-theme="light"] .profile-bottom-actions {
+    border-top-color: rgba(0,0,0,0.08);
+}
+html[data-theme="light"] .profile-overlay {
+    background: rgba(0,0,0,0.25);
+}
+/* ── Admin / Dashboard page ── */
+html[data-theme="light"] .admin-page {
+    background: #f0f4fb;
+}
+html[data-theme="light"] .admin-header {
+    background: #f0f4fb;
+    border-bottom-color: rgba(0,0,0,0.1);
+}
+html[data-theme="light"] .back-btn {
+    color: #4a5080;
+    background: rgba(255,255,255,0.8);
+    border: 1px solid rgba(0,0,0,0.1);
+    padding: 6px 14px; border-radius: 8px;
+}
+html[data-theme="light"] .back-btn:hover { color: #1a1a2e; }
+html[data-theme="light"] .admin-stat-card {
+    background: #ffffff;
+    border-color: rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+html[data-theme="light"] .admin-stat-label {
+    color: #4a5080;
+}
+html[data-theme="light"] .admin-chart-card,
+html[data-theme="light"] .admin-table-card {
+    background: #ffffff;
+    border-color: rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+html[data-theme="light"] .admin-chart-title {
+    color: #1a1a2e;
+}
+html[data-theme="light"] .admin-table th {
+    color: #4a5080;
+    border-bottom-color: rgba(0,0,0,0.1);
+}
+html[data-theme="light"] .admin-table td {
+    color: #1a1a2e;
+    border-bottom-color: rgba(0,0,0,0.06);
+}
+html[data-theme="light"] .admin-table tr:hover td {
+    background: rgba(99,102,241,0.04);
+}
+html[data-theme="light"] .admin-refresh-btn {
+    background: rgba(255,255,255,0.8);
+    border-color: rgba(0,0,0,0.12);
+    color: #4a5080;
+}
 /* Landing page — hero & agent cards */
 html[data-theme="light"] .hero-username {
     color: #1a1a2e;
