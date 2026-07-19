@@ -290,6 +290,36 @@ const I18N = {
         // Generic errors
         error_generic: 'Maaf, ralat berlaku. Sila cuba lagi.',
         error_conn: 'Ralat sambungan. Sila cuba lagi.',
+        // Data analysis & charts
+        suggested_charts: '📊 Carta Dicadangkan',
+        chart_download_tip: 'Muat turun PNG',
+        chart_expand_tip: 'Kembang/Kecilkan',
+        chart_ask_tip: 'Tanya tentang carta ini',
+        exec_summary_btn: '📋 Ringkasan Eksekutif',
+        compare_file_btn: '⇄ Bandingkan Fail',
+        table_search_ph: 'Cari...',
+        chart_drilldown_tip: 'Petua: klik bar untuk lihat baris asas',
+        drilldown_no_rows: 'Tiada baris sepadan ditemui.',
+        drilldown_load_fail: 'Tidak dapat memuatkan baris.',
+        chart_ask_toast: 'Taip soalan anda tentang carta ini.',
+        chart_ask_prefix: 'Berkenaan carta',
+        exec_summary_loading: 'Menjana ringkasan eksekutif...',
+        exec_summary_title: '📋 Ringkasan Eksekutif',
+        exec_summary_copy: 'Salin',
+        exec_summary_copied: 'Disalin!',
+        exec_summary_fail: 'Gagal menjana ringkasan.',
+        compare_comparing: '⇄ Membandingkan dengan',
+        compare_fail: 'Perbandingan gagal.',
+        compare_no_file: 'Sila muat naik fail pertama dahulu.',
+        err_system: 'Sistem',
+        admin_sessions_label: 'Sesi',
+        attach_photos_label: '📷 Lampirkan Gambar',
+        attach_photos_min: 'sekurang-kurangnya 2',
+        attach_photos_max: 'sehingga 4',
+        add_photo_btn: '+ Tambah Gambar',
+        form_fill_one: 'Sila isi sekurang-kurangnya satu medan.',
+        form_photo_min: 'Sila muat naik sekurang-kurangnya 2 gambar landscape sebelum menghantar.',
+        kpm_greeting: 'Salam! Saya Sokongan KPM. Apa yang boleh saya bantu?',
     },
     en: {
         nav_home: 'HOME', nav_agents: 'AGENTS',
@@ -403,6 +433,36 @@ const I18N = {
         // Generic errors
         error_generic: 'Sorry, an error occurred. Please try again.',
         error_conn: 'Connection error. Please try again.',
+        // Data analysis & charts
+        suggested_charts: '📊 Suggested Charts',
+        chart_download_tip: 'Download PNG',
+        chart_expand_tip: 'Expand/Collapse',
+        chart_ask_tip: 'Ask about this chart',
+        exec_summary_btn: '📋 Executive Summary',
+        compare_file_btn: '⇄ Compare File',
+        table_search_ph: 'Search...',
+        chart_drilldown_tip: 'Tip: click a bar to see the underlying rows',
+        drilldown_no_rows: 'No matching rows found.',
+        drilldown_load_fail: 'Could not load rows.',
+        chart_ask_toast: 'Ask your question about the chart.',
+        chart_ask_prefix: 'Regarding the chart',
+        exec_summary_loading: 'Generating executive summary...',
+        exec_summary_title: '📋 Executive Summary',
+        exec_summary_copy: 'Copy',
+        exec_summary_copied: 'Copied!',
+        exec_summary_fail: 'Failed to generate summary.',
+        compare_comparing: '⇄ Comparing with',
+        compare_fail: 'Comparison failed.',
+        compare_no_file: 'Please upload the first file first.',
+        err_system: 'System',
+        admin_sessions_label: 'Sessions',
+        attach_photos_label: '📷 Attach Photos',
+        attach_photos_min: 'min. 2 required',
+        attach_photos_max: 'up to 4',
+        add_photo_btn: '+ Add Photo',
+        form_fill_one: 'Please fill in at least one field.',
+        form_photo_min: 'Please upload at least 2 landscape photos before submitting.',
+        kpm_greeting: 'Hello! I am KPM Support. How can I help you?',
     },
 };
 
@@ -1103,7 +1163,7 @@ function buildStructuredHtml(data) {
     }
 
     if (data.suggested_charts && data.suggested_charts.length) {
-        html += `<div class="da-section"><div class="da-section-title">📊 ${currentLang === 'en' ? 'Suggested Charts' : 'Carta Dicadangkan'}</div>`;
+        html += `<div class="da-section"><div class="da-section-title">${I18N[currentLang].suggested_charts}</div>`;
         html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
         data.suggested_charts.forEach(sc => {
             html += `<button class="canvas-quick-btn chart-suggest-btn" onclick="useQuickAction('${escapeAttr(sc.query)}')">${escapeHtml(sc.label)}</button>`;
@@ -1126,17 +1186,17 @@ function buildStructuredHtml(data) {
         const _chartTitle = (data.chart.title || '').replace(/'/g, "\\'");
         const _chartLabels = JSON.stringify(data.chart.labels || []).replace(/'/g, "\\'");
         html += `<div class="da-chart-toolbar">`
-            + `<button class="chart-tool-btn" onclick="downloadChartPng(this)" title="${currentLang === 'en' ? 'Download PNG' : 'Muat turun PNG'}">\u{2B07}</button>`
-            + `<button class="chart-tool-btn" onclick="toggleChartSize(this)" title="${currentLang === 'en' ? 'Expand/Collapse' : 'Kembang/Kecilkan'}">\u{1F50D}</button>`
-            + `<button class="chart-tool-btn" onclick="askAboutChart(${JSON.stringify(data.chart.title || '')}, ${JSON.stringify(data.chart.labels||[])})" title="${currentLang === 'en' ? 'Ask about this chart' : 'Tanya tentang carta ini'}">❓</button>`
+            + `<button class="chart-tool-btn" onclick="downloadChartPng(this)" title="${I18N[currentLang].chart_download_tip}">\u{2B07}</button>`
+            + `<button class="chart-tool-btn" onclick="toggleChartSize(this)" title="${I18N[currentLang].chart_expand_tip}">\u{1F50D}</button>`
+            + `<button class="chart-tool-btn" onclick="askAboutChart(${JSON.stringify(data.chart.title || '')}, ${JSON.stringify(data.chart.labels||[])})" title="${I18N[currentLang].chart_ask_tip}">❓</button>`
             + `</div>`;
         html += `<div class="da-chart-container"><canvas id="${chartId}"></canvas></div></div>`;
     }
 
     // Export buttons
     html += '<div class="da-export-actions">';
-    html += `<button class="da-export-btn" style="background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.4);color:#a5b4fc" onclick="showExecutiveSummary()">📋 ${currentLang === 'en' ? 'Executive Summary' : 'Ringkasan Eksekutif'}</button>`;
-    html += `<button class="da-export-btn compare-btn" onclick="triggerCompareUpload()">\u{21C4} ${currentLang === 'en' ? 'Compare File' : 'Bandingkan Fail'}</button>`;
+    html += `<button class="da-export-btn" style="background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.4);color:#a5b4fc" onclick="showExecutiveSummary()">${I18N[currentLang].exec_summary_btn}</button>`;
+    html += `<button class="da-export-btn compare-btn" onclick="triggerCompareUpload()">${I18N[currentLang].compare_file_btn}</button>`;
     html += `<button class="da-export-btn pptx-btn" onclick="downloadAnalysis('pptx')">\u{1F4CA} PowerPoint</button>`;
     html += `<button class="da-export-btn pdf-btn" onclick="downloadAnalysis('pdf')">\u{1F4C4} PDF</button>`;
     html += `<button class="da-export-btn xlsx-btn" onclick="downloadAnalysis('xlsx')">\u{1F4C8} Excel</button>`;
@@ -1155,7 +1215,7 @@ function buildTableHtml(table) {
     const paged = table.rows.length > _TABLE_PAGE_SIZE;
     let html = '<div class="da-section da-table-section">';
     html += '<div class="da-table-toolbar">';
-    html += `<input class="da-table-filter" placeholder="${currentLang === 'en' ? 'Search...' : 'Cari...'}" oninput="filterTable('${tblId}', this.value)">`;
+    html += `<input class="da-table-filter" placeholder="${I18N[currentLang].table_search_ph}" oninput="filterTable('${tblId}', this.value)">`;
     html += `<button class="da-export-btn csv-btn" onclick="downloadTableCSV('${tblId}')" style="flex-shrink:0">\u{1F4E5} CSV</button>`;
     html += '</div>';
     html += `<table class="da-table" id="${tblId}" data-page-size="${_TABLE_PAGE_SIZE}"><thead><tr>`;
@@ -1930,13 +1990,13 @@ function _buildMissingFieldsForm(missingLabels) {
     const MAX_IMAGES_FORM = 4;
     const imgUploadSection = currentAgent === 'report_generator' ? `
         <div class="ff-img-upload-section">
-            <div class="ff-img-upload-title">📷 ${currentLang === 'en' ? 'Attach Photos' : 'Lampirkan Gambar'} <span class="ff-img-required">(${currentLang === 'en' ? 'min. 2 required' : 'sekurang-kurangnya 2'})</span></div>
+            <div class="ff-img-upload-title">${I18N[currentLang].attach_photos_label} <span class="ff-img-required">(${I18N[currentLang].attach_photos_min})</span></div>
             <p class="ff-img-upload-hint">${currentLang === 'en'
                 ? 'Upload at least <strong>2</strong> and up to <strong>4</strong> <strong>landscape</strong> photos before submitting.'
                 : 'Muat naik sekurang-kurangnya <strong>2</strong> hingga <strong>4</strong> gambar <strong>landscape</strong> sebelum hantar.'}</p>
             <div class="report-img-grid report-img-grid-sm" id="reportImgGrid"></div>
             <div class="ff-img-upload-actions">
-                <button type="button" class="report-img-add-btn" id="reportImgAddBtn" onclick="triggerReportImageUpload()">+ ${currentLang === 'en' ? 'Add Photo' : 'Tambah Gambar'}</button>
+                <button type="button" class="report-img-add-btn" id="reportImgAddBtn" onclick="triggerReportImageUpload()">${I18N[currentLang].add_photo_btn}</button>
                 <span class="ff-img-count-badge" id="ffImgCountBadge">0 / ${MAX_IMAGES_FORM}</span>
             </div>
             <input type="file" id="reportImgInput" accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none" onchange="handleReportImageUpload(this)">
@@ -2110,13 +2170,13 @@ function _submitFieldsForm(fid) {
             parts.push(`${el.dataset.label}: ${val}`);
         }
     });
-    if (parts.length === 0) { showToast(currentLang === 'en' ? 'Please fill in at least one field.' : 'Sila isi sekurang-kurangnya satu medan.', 'err'); return; }
+    if (parts.length === 0) { showToast(I18N[currentLang].form_fill_one, 'err'); return; }
     // Report Generator: require at least 2 images before submitting
     if (currentAgent === 'report_generator') {
         const imgGrid = document.getElementById('reportImgGrid');
         const imgCount = imgGrid ? imgGrid.querySelectorAll('.report-img-thumb').length : 0;
         if (imgCount < 2) {
-            showToast(currentLang === 'en' ? 'Please upload at least 2 landscape photos before submitting.' : 'Sila muat naik sekurang-kurangnya 2 gambar landscape sebelum menghantar.', 'err');
+            showToast(I18N[currentLang].form_photo_min, 'err');
             return;
         }
     }
@@ -2187,13 +2247,13 @@ function buildLetterHtml(data) {
     if (data.show_image_uploader) {
         const _max = data.max_images || 4;
         html += `<div class="da-section ff-img-upload-section">
-            <div class="ff-img-upload-title">📷 ${currentLang === 'en' ? 'Attach Photos' : 'Lampirkan Gambar'} <span class="ff-img-required">(${currentLang === 'en' ? 'up to 4' : 'sehingga 4'})</span></div>
+            <div class="ff-img-upload-title">${I18N[currentLang].attach_photos_label} <span class="ff-img-required">(${I18N[currentLang].attach_photos_max})</span></div>
             <p class="ff-img-upload-hint">${currentLang === 'en'
                 ? 'Upload up to <strong>4</strong> <strong>landscape</strong> photos.'
                 : 'Muat naik sehingga <strong>4</strong> gambar <strong>landscape</strong>.'}</p>
             <div class="report-img-grid report-img-grid-sm" id="reportImgGrid"></div>
             <div class="ff-img-upload-actions">
-                <button type="button" class="report-img-add-btn" id="reportImgAddBtn" onclick="triggerReportImageUpload()">+ ${currentLang === 'en' ? 'Add Photo' : 'Tambah Gambar'}</button>
+                <button type="button" class="report-img-add-btn" id="reportImgAddBtn" onclick="triggerReportImageUpload()">${I18N[currentLang].add_photo_btn}</button>
                 <span class="ff-img-count-badge" id="ffImgCountBadge">${data.image_count || 0} / ${_max}</span>
             </div>
             <input type="file" id="reportImgInput" accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none" onchange="handleReportImageUpload(this)">
@@ -2398,7 +2458,7 @@ async function handleReportImageUpload(input) {
 // ═══ Two-file comparison (Idea B) ═══
 function triggerCompareUpload() {
     if (!hasUploadedData) {
-        showToast(currentLang === 'en' ? 'Please upload the first file first.' : 'Sila muat naik fail pertama dahulu.', 'err');
+        showToast(I18N[currentLang].compare_no_file, 'err');
         return;
     }
     let inp = document.getElementById('compareFileInput');
@@ -2417,7 +2477,7 @@ async function handleCompareUpload() {
     const file = this.files[0];
     if (!file) return;
     setProcessing(true);
-    addMessage(`\u{21C4} ${currentLang === 'en' ? 'Comparing with' : 'Membandingkan dengan'}: ${file.name}`, 'user');
+    addMessage(`${I18N[currentLang].compare_comparing}: ${file.name}`, 'user');
     const fd = new FormData();
     fd.append('file', file); fd.append('session_id', sessionId); fd.append('lang', currentLang);
     try {
@@ -2426,7 +2486,7 @@ async function handleCompareUpload() {
         if (data.ok) {
             addMessage('', 'assistant', '\u{1F4CA}', 'Analisis Data', data.comparison);
         } else {
-            addMessage(data.error || (currentLang === 'en' ? 'Comparison failed.' : 'Perbandingan gagal.'), 'assistant', '\u{26A0}\u{FE0F}', I18N[currentLang].agent_kpm_name);
+            addMessage(data.error || I18N[currentLang].compare_fail, 'assistant', '\u{26A0}\u{FE0F}', I18N[currentLang].agent_kpm_name);
         }
     } catch (e) {
         addMessage(I18N[currentLang].err_prefix + e.message, 'assistant', '\u{26A0}\u{FE0F}', I18N[currentLang].agent_kpm_name);
@@ -2736,7 +2796,7 @@ function renderChart(container, chartConfig) {
                 title: { display: !!chartConfig.title, text: chartConfig.title || '', color: '#f1f5f9', font: { size: 14, weight: 'bold' } },
                 legend: { labels: { color: '#94a3b8', font: { size: 12 }, usePointStyle: true } },
                 tooltip: { backgroundColor: '#1e293b', titleColor: '#f1f5f9', bodyColor: '#94a3b8', borderColor: '#334155', borderWidth: 1, padding: 10, cornerRadius: 8 },
-                subtitle: drilldown ? { display: true, text: currentLang === 'en' ? 'Tip: click a bar to see the underlying rows' : 'Petua: klik bar untuk lihat baris asas', color: '#64748b', font: { size: 11, style: 'italic' }, padding: { bottom: 6 } } : { display: false },
+                subtitle: drilldown ? { display: true, text: I18N[currentLang].chart_drilldown_tip, color: '#64748b', font: { size: 11, style: 'italic' }, padding: { bottom: 6 } } : { display: false },
             },
             scales: isCircular ? {} : {
                 x: { stacked, ticks: { color: '#94a3b8', maxRotation: 45 }, grid: { color: '#334155' },
@@ -2761,7 +2821,7 @@ async function openChartDrilldown(column, value) {
         const res = await fetch(`/api/data/rows?session_id=${encodeURIComponent(sessionId)}&col=${encodeURIComponent(column)}&val=${encodeURIComponent(value)}&limit=200`);
         const data = await res.json();
         if (!data.ok || !data.rows || !data.rows.length) {
-            showToast(currentLang === 'en' ? 'No matching rows found.' : 'Tiada baris sepadan ditemui.', 'err');
+            showToast(I18N[currentLang].drilldown_no_rows, 'err');
             return;
         }
         let overlay = document.querySelector('.chart-overlay');
@@ -2783,7 +2843,7 @@ async function openChartDrilldown(column, value) {
         document.body.appendChild(modal);
         overlay.onclick = () => { modal.remove(); overlay.classList.remove('active'); };
     } catch (_) {
-        showToast(currentLang === 'en' ? 'Could not load rows.' : 'Tidak dapat memuatkan baris.', 'err');
+        showToast(I18N[currentLang].drilldown_load_fail, 'err');
     }
 }
 
@@ -2807,14 +2867,14 @@ function askAboutChart(title, labels) {
     _chartQaContext = `[Carta: "${title}", Kategori: ${labelsStr}] `;
     const inp = document.getElementById('canvasInput');
     if (inp) {
-        inp.value = currentLang === 'en' ? `Regarding the chart "${title}": ` : `Berkenaan carta "${title}": `;
+        inp.value = `${I18N[currentLang].chart_ask_prefix} "${title}": `;
         inp.focus();
     }
-    showToast(currentLang === 'en' ? 'Ask your question about the chart.' : 'Taip soalan anda tentang carta ini.', 'info');
+    showToast(I18N[currentLang].chart_ask_toast, 'info');
 }
 
 async function showExecutiveSummary() {
-    showToast(currentLang === 'en' ? 'Generating executive summary...' : 'Menjana ringkasan eksekutif...', 'info', 5000);
+    showToast(I18N[currentLang].exec_summary_loading, 'info', 5000);
     try {
         const res = await fetch(`/api/data/executive-summary?session_id=${encodeURIComponent(sessionId)}&lang=${currentLang}`);
         const data = await res.json();
@@ -2826,19 +2886,19 @@ async function showExecutiveSummary() {
         const modal = document.createElement('div');
         modal.className = 'drilldown-modal';
         modal.innerHTML = `<div class="drilldown-head">
-            <span>📋 ${currentLang === 'en' ? 'Executive Summary' : 'Ringkasan Eksekutif'}</span>
+            <span>${I18N[currentLang].exec_summary_title}</span>
             <button class="drilldown-close" onclick="this.closest('.drilldown-modal').remove();document.querySelector('.chart-overlay')?.classList.remove('active')">✕</button>
         </div>
         <div class="drilldown-body" style="padding:16px;line-height:1.7;color:var(--text-primary)">
             <p style="margin-bottom:12px">${escapeHtml(data.summary)}</p>
-            <button onclick="navigator.clipboard.writeText(${JSON.stringify(data.summary)}).then(()=>showToast('${currentLang === 'en' ? 'Copied!' : 'Disalin!'}','ok'))"
+            <button onclick="navigator.clipboard.writeText(${JSON.stringify(data.summary)}).then(()=>showToast(I18N[currentLang].exec_summary_copied,'ok'))"
                 style="background:var(--accent);color:#000;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px">
-                📋 ${currentLang === 'en' ? 'Copy' : 'Salin'}
+                📋 ${I18N[currentLang].exec_summary_copy}
             </button>
         </div>`;
         document.body.appendChild(modal);
         overlay.onclick = e => { if (e.target === overlay) { modal.remove(); overlay.classList.remove('active'); } };
-    } catch (_) { showToast(currentLang === 'en' ? 'Failed to generate summary.' : 'Gagal menjana ringkasan.', 'err'); }
+    } catch (_) { showToast(I18N[currentLang].exec_summary_fail, 'err'); }
 }
 
 function toggleChartSize(btn) {
@@ -3304,9 +3364,9 @@ async function sendMessage() {
         }
     } catch (err) {
         if (err.name === 'AbortError') {
-            _showRetryMessage('⚠️', currentLang === 'en' ? 'System' : 'Sistem');
+            _showRetryMessage('⚠️', I18N[currentLang].err_system);
         } else {
-            addMessage(`${currentLang === 'en' ? 'Error' : 'Ralat'}: ${err.message}. ${I18N[currentLang].error_conn}`, 'assistant', '⚠️', currentLang === 'en' ? 'System' : 'Sistem');
+            addMessage(`${I18N[currentLang].err_prefix}${err.message}. ${I18N[currentLang].error_conn}`, 'assistant', '⚠️', I18N[currentLang].err_system);
         }
     } finally { setProcessing(false); }
 }
@@ -3466,7 +3526,7 @@ async function _sendKpmIntro() {
         _appendKpmMsg(data.response || '', 'bot');
     } catch {
         typing.style.display = 'none';
-        _appendKpmMsg(currentLang === 'en' ? 'Hello! I am KPM Support. How can I help you?' : 'Salam! Saya Sokongan KPM. Apa yang boleh saya bantu?', 'bot');
+        _appendKpmMsg(I18N[currentLang].kpm_greeting, 'bot');
     }
 }
 
@@ -4038,7 +4098,7 @@ async function loadAdminStats() {
                     data: {
                         labels: data.sessions_by_day.labels,
                         datasets: [{
-                            label: currentLang === 'en' ? 'Sessions' : 'Sesi',
+                            label: I18N[currentLang].admin_sessions_label,
                             data: data.sessions_by_day.counts,
                             borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)',
                             borderWidth: 2, fill: true, tension: 0.4, pointRadius: 4, pointHoverRadius: 6,
