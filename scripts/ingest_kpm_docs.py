@@ -68,52 +68,119 @@ def chunk_text(text: str, title: str, max_chars: int = 3000) -> list[dict]:
     return chunks
 
 
+def get_indexed_files(conn) -> set:
+    """Return set of source_file names already in the database."""
+    rows = conn.execute("SELECT DISTINCT source_file FROM kpm_documents").fetchall()
+    return {row[0] for row in rows}
+
+
+def remove_document(conn, source_file: str):
+    """Remove all chunks for a given source file."""
+    conn.execute("DELETE FROM kpm_documents WHERE source_file = ?", (source_file,))
+    conn.commit()
+
+
+def ingest_pdf(pdf_path: Path, conn) -> int:
+    """Ingest a single PDF. Returns number of chunks added."""
+    text = extract_text(pdf_path)
+    if not text:
+        print(f"  [SKIP] Tiada teks diekstrak (mungkin PDF imej)")
+        return 0
+
+    category = detect_category(pdf_path.name)
+    title = pdf_path.stem.replace("-", " ").replace("_", " ").strip()
+    chunks = chunk_text(text, title)
+
+    for chunk in chunks:
+        insert_document(
+            title=chunk["title"],
+            content=chunk["content"],
+            category=category,
+            source_file=pdf_path.name,
+        )
+
+    print(f"  [OK] {len(chunks)} bahagian diindeks (kategori: {category}, {len(text)} aksara)")
+    return len(chunks)
+
+
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Ingest KPM PDF documents into knowledge base")
+    parser.add_argument("--reset", action="store_true", help="Kosongkan semua dokumen dan ingest semula")
+    parser.add_argument("--file", type=str, help="Ingest fail PDF tertentu sahaja (nama fail dalam Dokumen KPM_Support/)")
+    parser.add_argument("--remove", type=str, help="Padam dokumen tertentu dari knowledge base (nama fail)")
+    args = parser.parse_args()
+
     conn = _get_conn()
-    existing = conn.execute("SELECT COUNT(*) FROM kpm_documents").fetchone()[0]
-    if existing > 0:
-        print(f"Database sudah mengandungi {existing} dokumen. Kosongkan dahulu? (y/n)")
-        if input().strip().lower() == "y":
-            conn.execute("DELETE FROM kpm_documents")
-            conn.execute("DELETE FROM kpm_documents_fts")
-            conn.commit()
-            print("Database dikosongkan.")
+
+    # Handle --remove
+    if args.remove:
+        indexed = get_indexed_files(conn)
+        if args.remove in indexed:
+            remove_document(conn, args.remove)
+            count = conn.execute("SELECT COUNT(*) FROM kpm_documents").fetchone()[0]
+            print(f"[OK] '{args.remove}' dipadam. Jumlah dokumen dalam indeks: {count}")
         else:
-            print("Menambah dokumen baharu...")
+            print(f"[WARN] '{args.remove}' tidak dijumpai dalam database.")
+            print(f"Fail sedia ada: {sorted(indexed)}")
+        return
 
     if not DOCS_DIR.exists():
         print(f"Direktori tidak ditemui: {DOCS_DIR}")
         return
 
+    # Handle --reset
+    if args.reset:
+        conn.execute("DELETE FROM kpm_documents")
+        conn.execute("DELETE FROM kpm_documents_fts")
+        conn.commit()
+        print("Database dikosongkan. Memulakan ingest semula...")
+
+    # Handle --file (single file)
+    if args.file:
+        pdf_path = DOCS_DIR / args.file
+        if not pdf_path.exists():
+            print(f"[ERR] Fail tidak dijumpai: {pdf_path}")
+            return
+        indexed = get_indexed_files(conn)
+        if args.file in indexed and not args.reset:
+            print(f"[INFO] '{args.file}' sudah ada dalam database. Mengemas kini...")
+            remove_document(conn, args.file)
+        print(f"\nMemproses: {args.file}")
+        try:
+            total_chunks = ingest_pdf(pdf_path, conn)
+        except Exception as e:
+            print(f"  [ERR] Ralat: {e}")
+            return
+        final_count = conn.execute("SELECT COUNT(*) FROM kpm_documents").fetchone()[0]
+        print(f"\nSelesai. Jumlah dokumen dalam indeks: {final_count} ({total_chunks} bahagian baharu)")
+        return
+
+    # Default: ingest all PDFs, skip already-indexed ones (unless --reset)
     pdf_files = list(DOCS_DIR.glob("*.pdf"))
     print(f"Dijumpai {len(pdf_files)} fail PDF dalam {DOCS_DIR}")
+
+    indexed = get_indexed_files(conn)
+    if indexed and not args.reset:
+        new_files = [p for p in pdf_files if p.name not in indexed]
+        skipped = len(pdf_files) - len(new_files)
+        print(f"  Sudah diindeks: {skipped} fail (dilangkau)")
+        print(f"  Akan diindeks: {len(new_files)} fail baharu")
+        pdf_files = new_files
+
+    if not pdf_files:
+        print("\nTiada dokumen baharu untuk diindeks.")
+        final_count = conn.execute("SELECT COUNT(*) FROM kpm_documents").fetchone()[0]
+        print(f"Jumlah dokumen dalam indeks: {final_count}")
+        return
 
     total_chunks = 0
     for pdf_path in sorted(pdf_files):
         print(f"\nMemproses: {pdf_path.name}")
         try:
-            text = extract_text(pdf_path)
-            if not text:
-                print(f"  [SKIP] Tiada teks diekstrak (mungkin PDF imej)")
-                continue
-
-            category = detect_category(pdf_path.name)
-            title = pdf_path.stem.replace("-", " ").replace("_", " ").strip()
-            chunks = chunk_text(text, title)
-
-            for chunk in chunks:
-                insert_document(
-                    title=chunk["title"],
-                    content=chunk["content"],
-                    category=category,
-                    source_file=pdf_path.name,
-                )
-
-            total_chunks += len(chunks)
-            print(f"  [OK]{len(chunks)} bahagian diindeks (kategori: {category}, {len(text)} aksara)")
-
+            total_chunks += ingest_pdf(pdf_path, conn)
         except Exception as e:
-            print(f"  [ERR]Ralat: {e}")
+            print(f"  [ERR] Ralat: {e}")
 
     final_count = conn.execute("SELECT COUNT(*) FROM kpm_documents").fetchone()[0]
     print(f"\nSelesai. Jumlah dokumen dalam indeks: {final_count} ({total_chunks} bahagian baharu)")

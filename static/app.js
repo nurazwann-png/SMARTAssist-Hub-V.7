@@ -12,6 +12,7 @@ let lastActiveAgent = 'fallback';
 let lastStructuredData = null;
 let _chartQaContext = null;  // set when user clicks "Ask about chart"
 let currentLang = localStorage.getItem('smartassist_lang') || 'bm';
+let _fontSize = parseInt(localStorage.getItem('smartassist_fontsize') || '2');
 let _msgIndex = 0;
 let _awaitingFollowup = false;  // true selepas dokumen siap — tunggu jawapan ya/tidak
 let _reviewDocText = null;
@@ -185,7 +186,7 @@ const I18N = {
         agent_report_name: 'Jana Laporan', agent_report_desc: 'Jana laporan satu muka surat format rasmi KPM',
         agent_letter_name: 'Tulis Surat Rasmi', agent_letter_desc: 'Jana surat rasmi, memo dan surat siaran KPM',
         agent_reviewer_name: 'Semak Dokumen', agent_reviewer_desc: 'Semak tatabahasa, format dan pematuhan dokumen',
-        agent_kpm_name: 'Sokongan KPM', agent_kpm_desc: 'Bantuan sistem EMIS, APDM, DTP dan polisi KPM',
+        agent_kpm_name: 'Sokongan KPM', agent_kpm_desc: 'Bantuan sistem EMIS, DELIMa, DTP dan polisi KPM',
         history_title: 'Sejarah Sesi', history_empty: 'Tiada sejarah sesi lagi.',
         input_placeholder: 'Taip mesej anda di sini...',
         back_btn: '← Kembali', new_session: 'Sesi Baharu',
@@ -328,7 +329,7 @@ const I18N = {
         agent_report_name: 'Report Generator', agent_report_desc: 'Generate one-page reports in official KPM format',
         agent_letter_name: 'Official Letter', agent_letter_desc: 'Draft official letters, memos and circulars',
         agent_reviewer_name: 'Document Review', agent_reviewer_desc: 'Check grammar, format and document compliance',
-        agent_kpm_name: 'KPM Support', agent_kpm_desc: 'Help with EMIS, APDM, DTP systems and KPM policies',
+        agent_kpm_name: 'KPM Support', agent_kpm_desc: 'Help with EMIS, DELIMa, DTP systems and KPM policies',
         history_title: 'Session History', history_empty: 'No session history yet.',
         input_placeholder: 'Type your message here...',
         back_btn: '← Back', new_session: 'New Session',
@@ -591,8 +592,8 @@ const AGENT_INFO = {
     kpm_support: {
         icon: AGENT_ICONS.kpm_support,
         name: { bm: 'Sokongan KPM', en: 'KPM Support' },
-        desc: { bm: 'Bantuan untuk sistem EMIS, APDM, DTPCare dan soalan polisi/prosedur KPM.', en: 'Help with EMIS, APDM, DTPCare systems and KPM policies/procedures.' },
-        quick: { bm: ['Cara semak ralat EMIS', 'Masalah login APDM', 'Cara isi modul infrastruktur', 'Panduan pengurusan DTP'], en: ['How to check EMIS errors', 'APDM login issues', 'How to fill infrastructure module', 'DTP management guide'] },
+        desc: { bm: 'Bantuan untuk sistem EMIS, DELIMa, DTPCare dan soalan polisi/prosedur KPM.', en: 'Help with EMIS, DELIMa, DTPCare systems and KPM policies/procedures.' },
+        quick: { bm: ['Cara semak ralat EMIS', 'Masalah login DELIMa', 'Cara isi modul infrastruktur', 'Panduan pengurusan DTP'], en: ['How to check EMIS errors', 'DELIMa login issues', 'How to fill infrastructure module', 'DTP management guide'] },
     },
 };
 
@@ -875,9 +876,9 @@ async function refreshHistory() {
 function _renderHistory(query = '') {
     const d = I18N[currentLang];
     const q = query.trim().toLowerCase();
-    const sessions = q
-        ? _allSessions.filter(s => s.title.toLowerCase().includes(q) || (s.agent || '').toLowerCase().includes(q))
-        : _allSessions;
+    let sessions = _allSessions;
+    if (q) sessions = sessions.filter(s => s.title.toLowerCase().includes(q) || (s.agent || '').toLowerCase().includes(q));
+    if (_hadCurrentFilter) sessions = sessions.filter(s => s.agent === _hadCurrentFilter);
 
     if (sessions.length === 0) {
         historyList.innerHTML = `<div class="history-empty">${q ? 'Tiada hasil carian.' : d.history_empty}</div>`;
@@ -1084,6 +1085,7 @@ function addMessage(content, role, agentIcon, agentName, structured) {
         }
         chatDiv.innerHTML = chatHtml;
         if (chatHtml.trim()) {
+            chatDiv.classList.add('msg-slide-in');
             canvasMessages.insertBefore(chatDiv, typingIndicator);
             scrollToBottom();
         }
@@ -1107,6 +1109,7 @@ function addMessage(content, role, agentIcon, agentName, structured) {
         </div>`;
     }
     msgDiv.innerHTML = html;
+    msgDiv.classList.add('msg-slide-in');
     canvasMessages.insertBefore(msgDiv, typingIndicator);
     scrollToBottom();
 }
@@ -3425,10 +3428,67 @@ historyOverlay.addEventListener('click', toggleHistory);
 const historySearchInput = document.getElementById('historySearchInput');
 if (historySearchInput) {
     historySearchInput.addEventListener('input', () => _renderHistory(historySearchInput.value));
-    // Clear search when panel closes
-    const _origToggle = toggleHistory;
     window._clearHistorySearch = () => { historySearchInput.value = ''; };
 }
+
+// History agent filter — custom dropdown with SVG icons
+let _hadCurrentFilter = '';
+(function _buildAgentDropdown() {
+    const dropdown = document.getElementById('historyAgentDropdown');
+    const menu = document.getElementById('hadMenu');
+    const selIcon = document.getElementById('hadSelIcon');
+    const selLabel = document.getElementById('hadSelLabel');
+    const selected = document.getElementById('hadSelected');
+    if (!dropdown || !menu) return;
+
+    const agentOrder = ['data_analysis', 'report_generator', 'letter_generator', 'document_reviewer', 'kpm_support'];
+    const allItem = document.createElement('div');
+    allItem.className = 'had-item had-item-active';
+    allItem.dataset.value = '';
+    allItem.innerHTML = `<span class="had-item-icon had-all-icon">✦</span><span class="had-item-label">Semua Ejen</span>`;
+    menu.appendChild(allItem);
+
+    agentOrder.forEach(key => {
+        const info = AGENT_INFO[key];
+        if (!info) return;
+        const item = document.createElement('div');
+        item.className = 'had-item';
+        item.dataset.value = key;
+        item.innerHTML = `<span class="had-item-icon">${info.icon}</span><span class="had-item-label">${info.name[currentLang] || info.name.bm}</span>`;
+        menu.appendChild(item);
+    });
+
+    function selectFilter(value, iconHtml, label) {
+        _hadCurrentFilter = value;
+        selIcon.innerHTML = iconHtml;
+        selLabel.textContent = label;
+        menu.querySelectorAll('.had-item').forEach(el => el.classList.toggle('had-item-active', el.dataset.value === value));
+        menu.style.display = 'none';
+        dropdown.classList.remove('had-open');
+        _renderHistory(historySearchInput?.value || '');
+    }
+
+    selected.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const open = menu.style.display !== 'none';
+        menu.style.display = open ? 'none' : 'block';
+        dropdown.classList.toggle('had-open', !open);
+    });
+
+    menu.addEventListener('click', (e) => {
+        const item = e.target.closest('.had-item');
+        if (!item) return;
+        const val = item.dataset.value;
+        const iconEl = item.querySelector('.had-item-icon');
+        const labelEl = item.querySelector('.had-item-label');
+        selectFilter(val, iconEl ? iconEl.innerHTML : '', labelEl ? labelEl.textContent : '');
+    });
+
+    document.addEventListener('click', () => {
+        menu.style.display = 'none';
+        dropdown.classList.remove('had-open');
+    });
+})();
 document.getElementById('langToggle').addEventListener('click', toggleLanguage);
 applyLanguage(currentLang);
 
@@ -4221,6 +4281,21 @@ if (profileCloseBtn) profileCloseBtn.addEventListener('click', closeProfilePanel
 if (profileOverlay)  profileOverlay.addEventListener('click', closeProfilePanel);
 
 // ── Theme toggle (M) ──
+// ── Font Size (A+ / A−) — panel Ruang Kerja sahaja ──
+const _zoomLevels = [0.82, 0.91, 1.0, 1.12, 1.26];
+function _applyFontSize(level) {
+    _fontSize = Math.max(0, Math.min(4, level));
+    const workPanel = document.getElementById('workPanel');
+    if (workPanel) workPanel.style.zoom = _zoomLevels[_fontSize];
+    localStorage.setItem('smartassist_fontsize', _fontSize);
+    const decBtn = document.getElementById('fontDecBtn');
+    const incBtn = document.getElementById('fontIncBtn');
+    if (decBtn) decBtn.disabled = _fontSize === 0;
+    if (incBtn) incBtn.disabled = _fontSize === 4;
+}
+function fontIncrease() { _applyFontSize(_fontSize + 1); }
+function fontDecrease() { _applyFontSize(_fontSize - 1); }
+
 function _applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     const btn = document.getElementById('themeToggleBtn');
@@ -4240,3 +4315,8 @@ function toggleTheme() {
 // Init theme on load
 _applyTheme(localStorage.getItem('smartassist_theme') || 'dark');
 document.getElementById('themeToggleBtn')?.addEventListener('click', toggleTheme);
+
+// Init font size
+_applyFontSize(_fontSize);
+document.getElementById('fontIncBtn')?.addEventListener('click', fontIncrease);
+document.getElementById('fontDecBtn')?.addEventListener('click', fontDecrease);

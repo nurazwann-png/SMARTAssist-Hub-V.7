@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMARTAssist Hub</title>
-    <link rel="stylesheet" href="/static/style.css?v=47">
+    <link rel="stylesheet" href="/static/style.css?v=50">
     <script src="/static/chart.min.js"></script>
 </head>
 <body>
@@ -17,6 +17,16 @@
         <div class="history-search-wrap">
             <span class="history-search-icon">🔍</span>
             <input class="history-search-input" id="historySearchInput" type="text" placeholder="Cari sesi..." autocomplete="off">
+        </div>
+        <div class="history-filter-wrap">
+            <div class="history-agent-dropdown" id="historyAgentDropdown">
+                <div class="had-selected" id="hadSelected">
+                    <span class="had-icon" id="hadSelIcon"></span>
+                    <span class="had-label" id="hadSelLabel">Semua Ejen</span>
+                    <span class="had-arrow">▾</span>
+                </div>
+                <div class="had-menu" id="hadMenu" style="display:none;"></div>
+            </div>
         </div>
         <div class="history-list" id="historyList">
             <div class="history-empty" data-i18n="history_empty">Tiada sejarah sesi lagi.</div>
@@ -370,7 +380,7 @@
                 </svg>
                 </div>
                 <div class="agent-card-name" data-i18n="agent_kpm_name">Sokongan KPM</div>
-                <div class="agent-card-desc" data-i18n="agent_kpm_desc">Bantuan sistem EMIS, APDM, DTP dan polisi KPM</div>
+                <div class="agent-card-desc" data-i18n="agent_kpm_desc">Bantuan sistem EMIS, DELIMa, DTP dan polisi KPM</div>
             </div>
         </div>
 
@@ -606,7 +616,7 @@
                     </span>
                     <div>
                         <div class="kpm-bubble-title" data-i18n="agent_kpm_name">Sokongan KPM</div>
-                        <div class="kpm-bubble-subtitle" data-i18n="agent_kpm_desc">Bantuan sistem EMIS, APDM, DTP dan polisi KPM</div>
+                        <div class="kpm-bubble-subtitle" data-i18n="agent_kpm_desc">Bantuan sistem EMIS, DELIMa, DTP dan polisi KPM</div>
                     </div>
                 </div>
                 <button class="kpm-bubble-close" onclick="closeKpmBubbleWithFarewell()" title="Tutup">&#10005;</button>
@@ -640,6 +650,10 @@
                         </div>
                     </div>
                     <div class="canvas-actions">
+                        <div class="font-size-ctrl">
+                            <button class="font-btn" id="fontDecBtn" title="Kecilkan teks">A−</button>
+                            <button class="font-btn" id="fontIncBtn" title="Besarkan teks">A+</button>
+                        </div>
                         <button class="canvas-action-btn canvas-lang-btn" id="canvasLangBtn" onclick="toggleLanguage()" title="Tukar Bahasa">
                             <span class="canvas-lang-flag">🇲🇾</span><span class="canvas-lang-code">BM</span>
                         </button>
@@ -769,6 +783,6 @@
     </div>
 
 
-    <script src="/static/app.js?v=92"></script>
+    <script src="/static/app.js?v=99"></script>
 </body>
 </html>

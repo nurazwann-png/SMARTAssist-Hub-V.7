@@ -361,6 +361,71 @@ button { cursor: pointer; border: none; background: none; color: var(--text-prim
 .lang-flag { font-size: 16px; }
 .lang-code { letter-spacing: 1px; }
 
+/* ── Font Size Controls ── */
+.font-size-ctrl {
+    display: flex; align-items: center; gap: 4px;
+}
+.font-btn {
+    font-size: 12px; font-weight: 700; background: var(--glass);
+    border: 1px solid var(--border); border-radius: 7px;
+    padding: 0 9px; height: 34px; color: var(--text-secondary);
+    cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px;
+    display: flex; align-items: center; justify-content: center;
+}
+.font-btn:hover:not(:disabled) { background: var(--bg-tertiary); color: var(--accent); border-color: var(--accent); }
+.font-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+html[data-theme="light"] .font-btn { background: rgba(255,255,255,0.7); color: #4a5080; }
+
+
+/* ── History Agent Filter — Custom Dropdown ── */
+.history-filter-wrap {
+    padding: 8px 14px; border-bottom: 1px solid var(--border);
+}
+.history-agent-dropdown {
+    position: relative; width: 100%;
+}
+.had-selected {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; cursor: pointer;
+    transition: border-color 0.2s; user-select: none;
+}
+.had-selected:hover, .had-open .had-selected { border-color: var(--accent); }
+.had-icon { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.had-icon svg { width: 22px; height: 22px; }
+.had-label { flex: 1; font-size: 13px; color: var(--text-primary); }
+.had-arrow { font-size: 11px; color: var(--text-secondary); transition: transform 0.2s; }
+.had-open .had-arrow { transform: rotate(180deg); }
+.had-menu {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 10px; z-index: 200; overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.had-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 12px; cursor: pointer; transition: background 0.15s;
+}
+.had-item:hover { background: var(--glass-indigo); }
+.had-item-active { background: var(--glass-indigo); }
+.had-item-icon { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.had-item-icon svg { width: 26px; height: 26px; }
+.had-all-icon { font-size: 14px; color: var(--accent); }
+.had-item-label { font-size: 13px; color: var(--text-primary); }
+
+html[data-theme="light"] .had-selected { background: #f8fafc; border-color: rgba(0,0,0,0.15); }
+html[data-theme="light"] .had-menu { background: #ffffff; border-color: rgba(0,0,0,0.12); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+html[data-theme="light"] .had-item:hover, html[data-theme="light"] .had-item-active { background: rgba(99,102,241,0.08); }
+
+/* ── Message Slide-in Animation ── */
+@keyframes msgSlideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.msg-slide-in {
+    animation: msgSlideIn 0.22s ease-out forwards;
+}
+
 /* Hero */
 .landing-hero {
     position: relative; z-index: 10;
