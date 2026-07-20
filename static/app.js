@@ -525,6 +525,14 @@ function applyLanguage(lang) {
         if (nameEl) nameEl.textContent = info.name;
     }
 
+    // KPM agent nav labels — update text only (safe for early calls before nav is built)
+    document.querySelectorAll('.kpm-nav-btn[data-agent]').forEach(btn => {
+        const key = btn.dataset.agent;
+        const lbl = btn.querySelector('.kpm-nav-btn-label');
+        if (lbl && _KPM_NAV_LABELS && _KPM_NAV_LABELS[key]) lbl.textContent = _KPM_NAV_LABELS[key][lang] || lbl.textContent;
+        if (btn.title && AGENT_INFO[key]) btn.title = AGENT_INFO[key].name[lang] || btn.title;
+    });
+
     // KPM bubble elements
     const kpmInput = document.getElementById('kpmBubbleInput');
     if (kpmInput) kpmInput.placeholder = dict.kpm_input_ph;
@@ -3509,6 +3517,45 @@ document.querySelectorAll('.agent-card').forEach(card => {
 let _kpmSessionId = null;
 let _kpmReady = false;
 
+const _KPM_NAV_AGENTS = ['data_analysis', 'letter_generator', 'report_generator', 'document_reviewer'];
+const _KPM_NAV_LABELS = {
+    data_analysis:     { bm: 'Analisis', en: 'Analysis' },
+    letter_generator:  { bm: 'Surat', en: 'Letter' },
+    report_generator:  { bm: 'Laporan', en: 'Report' },
+    document_reviewer: { bm: 'Semakan', en: 'Review' },
+};
+
+function _buildKpmAgentNav() {
+    const nav = document.getElementById('kpmAgentNav');
+    if (!nav) return;
+    nav.innerHTML = '';
+    const sectionLabel = currentLang === 'en' ? 'Quick Access' : 'Akses Pantas';
+    const heading = document.createElement('div');
+    heading.className = 'kpm-agent-nav-label';
+    heading.textContent = sectionLabel;
+    nav.appendChild(heading);
+    const row = document.createElement('div');
+    row.className = 'kpm-agent-nav-row';
+    _KPM_NAV_AGENTS.forEach(key => {
+        const info = AGENT_INFO[key];
+        if (!info) return;
+        const label = (_KPM_NAV_LABELS[key] || {})[currentLang] || key;
+        const btn = document.createElement('button');
+        btn.className = 'kpm-nav-btn';
+        btn.dataset.agent = key;
+        btn.title = info.name[currentLang] || info.name.bm;
+        btn.onclick = () => _kpmNavToAgent(key);
+        btn.innerHTML = `<span class="kpm-nav-btn-icon">${info.icon}</span><span class="kpm-nav-btn-label">${label}</span>`;
+        row.appendChild(btn);
+    });
+    nav.appendChild(row);
+}
+
+function _kpmNavToAgent(key) {
+    closeKpmBubble();
+    setTimeout(() => openAgent(key), 450);
+}
+
 function openKpmBubble() {
     const overlay = document.getElementById('kpmChatBubble');
     const avatar = document.getElementById('kpmAvatar');
@@ -4320,3 +4367,6 @@ document.getElementById('themeToggleBtn')?.addEventListener('click', toggleTheme
 _applyFontSize(_fontSize);
 document.getElementById('fontIncBtn')?.addEventListener('click', fontIncrease);
 document.getElementById('fontDecBtn')?.addEventListener('click', fontDecrease);
+
+// Init KPM agent nav (called here because _buildKpmAgentNav is defined after applyLanguage runs at load)
+_buildKpmAgentNav();
