@@ -322,6 +322,59 @@ const I18N = {
         form_fill_one: 'Sila isi sekurang-kurangnya satu medan.',
         form_photo_min: 'Sila muat naik sekurang-kurangnya 2 gambar landscape sebelum menghantar.',
         kpm_greeting: 'Salam! Saya Sokongan KPM. Apa yang boleh saya bantu?',
+        // Typing indicator
+        typing_label: 'Sedang memproses...',
+        // Canvas history
+        canvas_history_label: 'Sesi Lepas', canvas_history_msg_suffix: 'mesej',
+        // History panel search
+        history_no_results: 'Tiada hasil carian.',
+        // History filter dropdown
+        all_agents_label: 'Semua Ejen',
+        // Font size tooltips
+        font_dec_title: 'Kecilkan teks', font_inc_title: 'Besarkan teks', lang_toggle_title: 'Tukar Bahasa',
+        // PPT modal
+        ppt_modal_title: 'Jana Slaid PowerPoint',
+        ppt_modal_subtitle: 'Pilih bahagian yang ingin disertakan dalam pembentangan',
+        ppt_slide_count_label: 'Anggaran:', ppt_slide_count_suffix: 'slaid',
+        ppt_btn_cancel: 'Batal', ppt_btn_generate: '📊 Jana Slaid', ppt_btn_generating: '⏳ Menjana...',
+        ppt_merge_label: 'analisis digabungkan',
+        ppt_turn_prefix: 'Analisis',
+        ppt_section_penemuan: 'Penemuan Utama', ppt_section_tafsiran: 'Tafsiran & Analisis',
+        ppt_section_chart: 'Visualisasi Data', ppt_section_table: 'Jadual Data',
+        ppt_section_table2: 'Jadual Perbandingan', ppt_section_cadangan: 'Cadangan & Tindakan',
+        ppt_section_amaran: 'Amaran & Limitasi',
+        ppt_desc_penemuan: 'penemuan', ppt_desc_cadangan: 'cadangan', ppt_desc_amaran: 'amaran',
+        ppt_desc_tafsiran: 'Huraian terperinci', ppt_desc_rows: 'baris',
+        ppt_err_generate: 'Gagal menjana fail.',
+        // KPM quick access header
+        kpm_quick_access: 'Akses Pantas',
+        // Document review
+        rev_score_prefix: 'Skor',
+        score_label_A: 'Cemerlang', score_label_B: 'Baik',
+        score_label_C: 'Perlu Pembetulan', score_label_D: 'Banyak Isu',
+        rev_summary_title: '📋 Ringkasan', rev_no_issues_title: '✅ Tiada Isu',
+        rev_no_issues_body: 'Dokumen ini dalam keadaan baik.',
+        ann_header_title: '📋 Anotasi', ann_pill_wajib: 'Wajib', ann_pill_cadangan: 'Cadangan',
+        ann_no_issues: '✅ Tiada isu ditemui.', ann_fix_btn: '🔧 Betulkan',
+        ann_hl_goto_tip: 'Pergi ke lokasi dalam PDF',
+        rev_close_preview: '✕ Tutup Pratonton', pdf_page_alt: 'Halaman PDF', pdf_iframe_title: 'Pratonton PDF',
+        // LH image confirm delete
+        lh_confirm_delete: 'Padam imej ini?', lh_upload_too_large: 'fail terlalu besar (maks 5 MB)',
+        // Letter PDF upload flow
+        letter_pdf_analysing: 'Menganalisis PDF',
+        letter_char_count_suffix: 'aksara diekstrak',
+        letter_pdf_ok: 'PDF berjaya dianalisis.',
+        letter_pdf_type_label: 'Jenis dokumen dicadangkan:',
+        letter_pdf_type_memo: 'Memo Dalaman', letter_pdf_type_surat: 'Surat Rasmi',
+        letter_pdf_info_label: 'Maklumat yang diekstrak:',
+        letter_pdf_no_info: 'Tiada maklumat khusus dapat diekstrak. Sila isi borang secara manual.',
+        letter_pdf_fill_form: 'Sila lengkapkan borang di bawah untuk jana surat.',
+        letter_agent_name: 'Penjana Surat Rasmi/Memo',
+        // Farewell
+        farewell_msg_bm: 'Terima kasih kerana menggunakan SMARTAssist Hub! Sesi ini telah tamat. Mulakan sesi baharu untuk terus mendapatkan bantuan.',
+        farewell_msg_en: 'Thank you for using SMARTAssist Hub! This session has ended. Start a new session to continue.',
+        kpm_farewell_bm: 'Terima kasih! Sesi sokongan ini telah tamat.',
+        kpm_farewell_en: 'Thank you! This support session has ended.',
     },
     en: {
         nav_home: 'HOME', nav_agents: 'AGENTS',
@@ -465,6 +518,59 @@ const I18N = {
         form_fill_one: 'Please fill in at least one field.',
         form_photo_min: 'Please upload at least 2 landscape photos before submitting.',
         kpm_greeting: 'Hello! I am KPM Support. How can I help you?',
+        // Typing indicator
+        typing_label: 'Processing...',
+        // Canvas history
+        canvas_history_label: 'Recent Sessions', canvas_history_msg_suffix: 'messages',
+        // History panel search
+        history_no_results: 'No results found.',
+        // History filter dropdown
+        all_agents_label: 'All Agents',
+        // Font size tooltips
+        font_dec_title: 'Decrease font size', font_inc_title: 'Increase font size', lang_toggle_title: 'Change Language',
+        // PPT modal
+        ppt_modal_title: 'Generate PowerPoint Slides',
+        ppt_modal_subtitle: 'Select sections to include in the presentation',
+        ppt_slide_count_label: 'Estimated:', ppt_slide_count_suffix: 'slides',
+        ppt_btn_cancel: 'Cancel', ppt_btn_generate: '📊 Generate Slides', ppt_btn_generating: '⏳ Generating...',
+        ppt_merge_label: 'analyses combined',
+        ppt_turn_prefix: 'Analysis',
+        ppt_section_penemuan: 'Key Findings', ppt_section_tafsiran: 'Interpretation & Analysis',
+        ppt_section_chart: 'Data Visualisation', ppt_section_table: 'Data Table',
+        ppt_section_table2: 'Comparison Table', ppt_section_cadangan: 'Recommendations',
+        ppt_section_amaran: 'Warnings & Limitations',
+        ppt_desc_penemuan: 'findings', ppt_desc_cadangan: 'recommendations', ppt_desc_amaran: 'warnings',
+        ppt_desc_tafsiran: 'Detailed explanation', ppt_desc_rows: 'rows',
+        ppt_err_generate: 'Failed to generate file.',
+        // KPM quick access header
+        kpm_quick_access: 'Quick Access',
+        // Document review
+        rev_score_prefix: 'Score',
+        score_label_A: 'Excellent', score_label_B: 'Good',
+        score_label_C: 'Needs Correction', score_label_D: 'Many Issues',
+        rev_summary_title: '📋 Summary', rev_no_issues_title: '✅ No Issues',
+        rev_no_issues_body: 'This document is in good condition.',
+        ann_header_title: '📋 Annotations', ann_pill_wajib: 'Required', ann_pill_cadangan: 'Suggestion',
+        ann_no_issues: '✅ No issues found.', ann_fix_btn: '🔧 Fix',
+        ann_hl_goto_tip: 'Go to location in PDF',
+        rev_close_preview: '✕ Close Preview', pdf_page_alt: 'PDF Page', pdf_iframe_title: 'PDF Preview',
+        // LH image confirm delete
+        lh_confirm_delete: 'Delete this image?', lh_upload_too_large: 'file too large (max 5 MB)',
+        // Letter PDF upload flow
+        letter_pdf_analysing: 'Analysing PDF',
+        letter_char_count_suffix: 'characters extracted',
+        letter_pdf_ok: 'PDF successfully analysed.',
+        letter_pdf_type_label: 'Suggested document type:',
+        letter_pdf_type_memo: 'Internal Memo', letter_pdf_type_surat: 'Official Letter',
+        letter_pdf_info_label: 'Extracted information:',
+        letter_pdf_no_info: 'No specific information could be extracted. Please fill in the form manually.',
+        letter_pdf_fill_form: 'Please complete the form below to generate the letter.',
+        letter_agent_name: 'Official Letter / Memo Generator',
+        // Farewell
+        farewell_msg_bm: 'Terima kasih kerana menggunakan SMARTAssist Hub! Sesi ini telah tamat. Mulakan sesi baharu untuk terus mendapatkan bantuan.',
+        farewell_msg_en: 'Thank you for using SMARTAssist Hub! This session has ended. Start a new session to continue.',
+        kpm_farewell_bm: 'Terima kasih! Sesi sokongan ini telah tamat.',
+        kpm_farewell_en: 'Thank you! This support session has ended.',
     },
 };
 
@@ -546,6 +652,38 @@ function applyLanguage(lang) {
     if (kpmClose) kpmClose.title = dict.kpm_close_tip;
     const kpmSub = document.querySelector('.kpm-avatar-sublabel');
     if (kpmSub) kpmSub.textContent = dict.kpm_avatar_sub;
+
+    // Typing indicator
+    const typingLbl = document.querySelector('.typing-label');
+    if (typingLbl) typingLbl.textContent = dict.typing_label;
+
+    // Font size & lang toggle tooltips
+    const fontDec = document.getElementById('fontDecBtn');
+    if (fontDec) fontDec.title = dict.font_dec_title;
+    const fontInc = document.getElementById('fontIncBtn');
+    if (fontInc) fontInc.title = dict.font_inc_title;
+    if (canvasLangBtn) canvasLangBtn.title = dict.lang_toggle_title;
+
+    // PPT modal static text (only if modal not open / rebuilt next open via _showPptSelectionModal)
+    const pptSub = document.getElementById('pptModalSubtitle');
+    if (pptSub) pptSub.textContent = dict.ppt_modal_subtitle;
+    const pptCancel = document.querySelector('#pptModal .ppt-btn-cancel');
+    if (pptCancel) pptCancel.textContent = dict.ppt_btn_cancel;
+    const pptGen = document.getElementById('pptGenerateBtn');
+    if (pptGen && pptGen.textContent.indexOf('⏳') === -1) pptGen.textContent = dict.ppt_btn_generate;
+    const pptCountEl = document.getElementById('pptSlideCount');
+    const pptCountLabel = document.querySelector('#pptModal .ppt-slide-count');
+    if (pptCountLabel && pptCountEl) {
+        pptCountLabel.innerHTML = `${dict.ppt_slide_count_label} <span id="pptSlideCount">${pptCountEl.textContent}</span> ${dict.ppt_slide_count_suffix}`;
+    }
+
+    // History filter "All Agents" option
+    const allAgentsOpt = document.querySelector('.agent-filter-option[data-agent="all"] .agent-filter-name');
+    if (allAgentsOpt) allAgentsOpt.textContent = dict.all_agents_label;
+
+    // LH back button
+    const lhBack = document.getElementById('lhBackBtn');
+    if (lhBack) lhBack.innerHTML = `&#8592; ${dict.back_btn.replace('← ', '').replace('← ', '')}`;
 }
 
 function toggleLanguage() {
@@ -801,8 +939,8 @@ async function sendFarewell() {
     if (msgs.length === 0) return;
     const info = getAgentInfo(currentAgent);
     const farewellMsg = currentLang === 'en'
-        ? `Thank you for using SMARTAssist Hub ${info.name}. Have a great day! 😊`
-        : `Terima kasih kerana menggunakan khidmat SMARTAssist Hub ${info.name}. Semoga hari tuan/puan menyenangkan! 😊`;
+        ? I18N.en.farewell_msg_en
+        : I18N.bm.farewell_msg_bm;
     addMessage(farewellMsg, 'assistant', info.icon, info.name);
     await new Promise(r => setTimeout(r, 2500));
 }
@@ -816,7 +954,7 @@ async function loadCanvasHistory(agentKey) {
         const filtered = sessions.filter(s => s.agent === agentKey).slice(0, 5);
         if (filtered.length === 0) return;
 
-        const label = currentLang === 'bm' ? 'Sesi Lepas' : 'Recent Sessions';
+        const label = I18N[currentLang].canvas_history_label;
         const section = document.createElement('div');
         section.id = 'canvasHistorySection';
         section.className = 'canvas-history-section';
@@ -828,7 +966,7 @@ async function loadCanvasHistory(agentKey) {
                     <div class="canvas-history-item-icon">${info.icon}</div>
                     <div class="canvas-history-item-info">
                         <div class="canvas-history-item-title">${escapeHtml(s.title)}</div>
-                        <div class="canvas-history-item-meta">${time} &middot; ${s.message_count} mesej</div>
+                        <div class="canvas-history-item-meta">${time} &middot; ${s.message_count} ${I18N[currentLang].canvas_history_msg_suffix}</div>
                     </div>
                 </div>`;
             }).join('')}</div>`;
@@ -905,7 +1043,7 @@ function _renderHistory(query = '') {
     if (_hadCurrentFilter) sessions = sessions.filter(s => s.agent === _hadCurrentFilter);
 
     if (sessions.length === 0) {
-        historyList.innerHTML = `<div class="history-empty">${q ? 'Tiada hasil carian.' : d.history_empty}</div>`;
+        historyList.innerHTML = `<div class="history-empty">${q ? d.history_no_results : d.history_empty}</div>`;
         return;
     }
     const locale = currentLang === 'en' ? 'en-GB' : 'ms-MY';
@@ -957,7 +1095,7 @@ async function deleteSession(sid) {
             body: JSON.stringify({ session_id: sid, message: '' }),
         });
         refreshHistory();
-        showToast('Sesi telah dipadamkan.', 'ok');
+        showToast(I18N[currentLang].toast_session_deleted, 'ok');
     } catch (_) {}
 }
 
@@ -1402,17 +1540,19 @@ function buildReviewHtml(data) {
     if (data.message) html += `<div class="da-message">${escapeHtml(data.message)}</div>`;
     if (data.summary) {
         const scoreColors = { A: '#22c55e', B: '#3b82f6', C: '#f59e0b', D: '#ef4444' };
-        const scoreLabels = { A: 'Cemerlang', B: 'Baik', C: 'Perlu Pembetulan', D: 'Banyak Isu' };
-        html += `<div class="da-section"><div class="da-section-title">📋 Ringkasan</div>`;
+        const _rd = I18N[currentLang];
+        const scoreLabels = { A: _rd.score_label_A, B: _rd.score_label_B, C: _rd.score_label_C, D: _rd.score_label_D };
+        html += `<div class="da-section"><div class="da-section-title">${_rd.rev_summary_title}</div>`;
         html += `<p style="font-size:13px;color:var(--text-secondary);line-height:1.6">${escapeHtml(data.summary)}</p>`;
         if (data.score) {
             const color = scoreColors[data.score] || '#888';
-            html += `<div class="review-score" style="color:${color};font-weight:bold;margin-top:6px;">Skor: ${data.score} — ${scoreLabels[data.score] || data.score}</div>`;
+            html += `<div class="review-score" style="color:${color};font-weight:bold;margin-top:6px;">${_rd.rev_score_prefix}: ${data.score} — ${scoreLabels[data.score] || data.score}</div>`;
         }
         html += '</div>';
     }
     if (data.issues && data.issues.length === 0) {
-        html += '<div class="da-section"><div class="da-section-title">✅ Tiada Isu</div><p style="font-size:13px;color:var(--text-secondary)">Dokumen ini dalam keadaan baik.</p></div>';
+        const _rd = I18N[currentLang];
+        html += `<div class="da-section"><div class="da-section-title">${_rd.rev_no_issues_title}</div><p style="font-size:13px;color:var(--text-secondary)">${_rd.rev_no_issues_body}</p></div>`;
     }
     if (data.corrected_document) {
         const _d2 = I18N[currentLang];
@@ -1428,35 +1568,37 @@ function buildReviewHtml(data) {
 
 // Build the right-side annotation column HTML
 function _buildAnnColumn(issues) {
+    const _d = I18N[currentLang];
     const wajibCount = issues.filter(i => i.severity === 'WAJIB_BETULKAN').length;
     const cadCount   = issues.length - wajibCount;
 
     let html = `<div class="rev-ann-column">`;
     html += `<div class="rev-ann-header">`;
-    html += `<span class="rev-ann-title">📋 Anotasi</span>`;
+    html += `<span class="rev-ann-title">${_d.ann_header_title}</span>`;
     html += `<div class="rev-ann-counts">`;
-    if (wajibCount) html += `<span class="rev-count-pill wajib">${wajibCount} Wajib</span>`;
-    if (cadCount)   html += `<span class="rev-count-pill cadangan">${cadCount} Cadangan</span>`;
+    if (wajibCount) html += `<span class="rev-count-pill wajib">${wajibCount} ${_d.ann_pill_wajib}</span>`;
+    if (cadCount)   html += `<span class="rev-count-pill cadangan">${cadCount} ${_d.ann_pill_cadangan}</span>`;
     html += `</div></div>`;
 
     if (!issues.length) {
-        html += '<div class="rev-no-issues" style="padding:12px">✅ Tiada isu ditemui.</div>';
+        html += `<div class="rev-no-issues" style="padding:12px">${_d.ann_no_issues}</div>`;
     } else {
         issues.forEach(issue => {
             const bCls = issue.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
+            const fixBase = `${_d.ann_fix_btn.replace('🔧 ', '')} ${issue.location || ''} — ${issue.suggestion || issue.issue || ''}`;
             const fixPrompt = escapeAttr(issue.suggestion
-                ? `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.suggestion}`
-                : `Betulkan isu ini dalam dokumen: ${issue.location || ''} — ${issue.issue || ''}`);
+                ? `${_d.ann_fix_btn.replace('🔧 ', '')} ${issue.location || ''} — ${issue.suggestion}`
+                : `${_d.ann_fix_btn.replace('🔧 ', '')} ${issue.location || ''} — ${issue.issue || ''}`);
             const badgeNav = issue.highlight ? ` onclick="scrollToPdfHighlight(${issue.num})"` : '';
             const badgeCls = issue.highlight ? `${bCls} ann-num clickable` : `${bCls} ann-num`;
             html += `<div class="rev-ann-item" id="annItem_${issue.num}">`;
-            html += `<span class="rev-badge ${badgeCls}"${badgeNav} title="${issue.highlight ? 'Pergi ke lokasi dalam PDF' : ''}">${issue.num}</span>`;
+            html += `<span class="rev-badge ${badgeCls}"${badgeNav} title="${issue.highlight ? _d.ann_hl_goto_tip : ''}">${issue.num}</span>`;
             html += `<div class="rev-ann-body">`;
             if (issue.category) html += `<div class="rev-ann-cat">${escapeHtml(issue.category)}</div>`;
             if (issue.location) html += `<div class="rev-ann-loc">📍 ${escapeHtml(issue.location)}</div>`;
             html += `<div class="rev-ann-desc">${escapeHtml(issue.issue || '')}</div>`;
             if (issue.suggestion) html += `<div class="rev-ann-sug">💡 ${escapeHtml(issue.suggestion)}</div>`;
-            html += `<button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="fixReviewIssue(this)">🔧 Betulkan</button>`;
+            html += `<button class="ann-fix-btn" data-prompt="${fixPrompt}" onclick="fixReviewIssue(this)">${_d.ann_fix_btn}</button>`;
             html += `</div></div>`;
         });
     }
@@ -1468,7 +1610,8 @@ function _buildAnnotatedReview(data, docText) {
     const issues = data.issues || [];
     const allLines = _splitDocLines(docText);
     const scoreColors = { A: '#22c55e', B: '#3b82f6', C: '#f59e0b', D: '#ef4444' };
-    const scoreLabels = { A: 'Cemerlang', B: 'Baik', C: 'Perlu Pembetulan', D: 'Banyak Isu' };
+    const _d = I18N[currentLang];
+    const scoreLabels = { A: _d.score_label_A, B: _d.score_label_B, C: _d.score_label_C, D: _d.score_label_D };
     const scoreColor = scoreColors[data.score] || '#6b7280';
 
     const isPdfImg = _reviewIsPdf && _reviewPdfImages && _reviewPdfImages.length;
@@ -1519,7 +1662,7 @@ function _buildAnnotatedReview(data, docText) {
 
     // ── Score bar ──
     html += '<div class="rev-score-bar">';
-    if (data.score) html += `<span class="rev-score-badge" style="background:${scoreColor}">Skor ${data.score} — ${scoreLabels[data.score] || data.score}</span>`;
+    if (data.score) html += `<span class="rev-score-badge" style="background:${scoreColor}">${_d.rev_score_prefix} ${data.score} — ${scoreLabels[data.score] || data.score}</span>`;
     if (data.summary) html += `<span class="rev-summary-text">${escapeHtml(data.summary)}</span>`;
     html += '</div>';
 
@@ -1543,14 +1686,14 @@ function _buildAnnotatedReview(data, docText) {
 
     // Left: document preview
     html += `<div class="rev-doc-page">`;
-    html += `<button class="rev-close-btn" onclick="toggleRevExpand(this.closest('.rev-annotated').querySelector('.rev-expand-btn'))">✕ Tutup Pratonton</button>`;
+    html += `<button class="rev-close-btn" onclick="toggleRevExpand(this.closest('.rev-annotated').querySelector('.rev-expand-btn'))">${_d.rev_close_preview}</button>`;
 
     if (isPdf) {
         if (_reviewPdfImages && _reviewPdfImages.length) {
             // Faithful PDF preview: each page as an image with error highlights
             _reviewPdfImages.forEach((src, pi) => {
                 html += `<div class="rev-pdf-page-wrap">`;
-                html += `<img class="rev-pdf-page" src="${src}" alt="Halaman PDF ${pi + 1}" loading="lazy">`;
+                html += `<img class="rev-pdf-page" src="${src}" alt="${_d.pdf_page_alt} ${pi + 1}" loading="lazy">`;
                 (pageIssues[pi] || []).forEach(iss => {
                     const h = iss.highlight;
                     const cls = iss.severity === 'WAJIB_BETULKAN' ? 'wajib' : 'cadangan';
@@ -1563,7 +1706,7 @@ function _buildAnnotatedReview(data, docText) {
             });
         } else {
             const pdfSrc = _reviewPdfObjectUrl || '';
-            html += `<iframe class="rev-pdf-embed" src="${escapeAttr(pdfSrc)}" title="Pratonton PDF"></iframe>`;
+            html += `<iframe class="rev-pdf-embed" src="${escapeAttr(pdfSrc)}" title="${_d.pdf_iframe_title}"></iframe>`;
         }
     } else if (docxNode) {
         html += `<div class="rev-html-doc" id="${docxPlaceholderId}" contenteditable="true" spellcheck="false" oninput="onDocEdit(this.closest('.rev-annotated'))"></div>`;
@@ -3054,16 +3197,17 @@ async function downloadAnalysis(format) {
 // ─── PPT Slide-Selection Modal ─────────────────────────────────────────────
 
 const _PPT_SECTIONS = [
-    { id: 'penemuan', label: 'Penemuan Utama',     color: '#3B82F6', icon: '1', descFn: d => `${(d.penemuan||[]).length} penemuan` },
-    { id: 'tafsiran', label: 'Tafsiran & Analisis', color: '#06B6D4', icon: '2', descFn: d => d.tafsiran ? 'Huraian terperinci' : null },
-    { id: 'chart',    label: 'Visualisasi Data',    color: '#8B5CF6', icon: '◆', descFn: d => d.chart ? (d.chart.title || `Carta ${d.chart.type||''}`) : null },
-    { id: 'table',    label: 'Jadual Data',          color: '#10B981', icon: '▦', descFn: d => d.table?.rows ? `${d.table.rows.length} baris` : null },
-    { id: 'table2',   label: 'Jadual Perbandingan',  color: '#10B981', icon: '▧', descFn: d => d.table2?.rows ? `${d.table2.rows.length} baris` : null },
-    { id: 'cadangan', label: 'Cadangan & Tindakan', color: '#F59E0B', icon: '5', descFn: d => `${(d.cadangan||[]).length} cadangan` },
-    { id: 'amaran',   label: 'Amaran & Limitasi',   color: '#EF4444', icon: '!', descFn: d => `${(d.amaran||[]).length} amaran` },
+    { id: 'penemuan', labelKey: 'ppt_section_penemuan', color: '#3B82F6', icon: '1', descFn: (d,t) => `${(d.penemuan||[]).length} ${t.ppt_desc_penemuan}` },
+    { id: 'tafsiran', labelKey: 'ppt_section_tafsiran', color: '#06B6D4', icon: '2', descFn: (d,t) => d.tafsiran ? t.ppt_desc_tafsiran : null },
+    { id: 'chart',    labelKey: 'ppt_section_chart',    color: '#8B5CF6', icon: '◆', descFn: (d,t) => d.chart ? (d.chart.title || `Carta ${d.chart.type||''}`) : null },
+    { id: 'table',    labelKey: 'ppt_section_table',    color: '#10B981', icon: '▦', descFn: (d,t) => d.table?.rows ? `${d.table.rows.length} ${t.ppt_desc_rows}` : null },
+    { id: 'table2',   labelKey: 'ppt_section_table2',   color: '#10B981', icon: '▧', descFn: (d,t) => d.table2?.rows ? `${d.table2.rows.length} ${t.ppt_desc_rows}` : null },
+    { id: 'cadangan', labelKey: 'ppt_section_cadangan', color: '#F59E0B', icon: '5', descFn: (d,t) => `${(d.cadangan||[]).length} ${t.ppt_desc_cadangan}` },
+    { id: 'amaran',   labelKey: 'ppt_section_amaran',   color: '#EF4444', icon: '!', descFn: (d,t) => `${(d.amaran||[]).length} ${t.ppt_desc_amaran}` },
 ];
 
 function _showPptSelectionModal() {
+    const dict = I18N[currentLang];
     const relevant = analysisHistory.filter(e => e.data.response_type);
     if (!relevant.length) return;
 
@@ -3073,7 +3217,7 @@ function _showPptSelectionModal() {
     relevant.forEach((entry, turnIdx) => {
         const d = entry.data;
         const available = _PPT_SECTIONS.filter(s => {
-            const desc = s.descFn(d);
+            const desc = s.descFn(d, dict);
             if (s.id === 'penemuan')  return (d.penemuan||[]).length > 0;
             if (s.id === 'tafsiran')  return !!d.tafsiran;
             if (s.id === 'chart')     return !!d.chart;
@@ -3093,12 +3237,13 @@ function _showPptSelectionModal() {
             const lbl = document.createElement('div');
             lbl.className = 'ppt-turn-label';
             const preview = (d.message||'').substring(0, 48) + ((d.message||'').length > 48 ? '…' : '');
-            lbl.textContent = `Analisis ${turnIdx + 1}  —  ${preview}`;
+            lbl.textContent = `${dict.ppt_turn_prefix} ${turnIdx + 1}  —  ${preview}`;
             group.appendChild(lbl);
         }
 
         available.forEach(sec => {
-            const desc = sec.descFn(d) || '';
+            const desc = sec.descFn(d, dict) || '';
+            const secLabel = dict[sec.labelKey] || sec.labelKey;
             const row = document.createElement('label');
             row.className = 'ppt-section-row';
             row.dataset.turn = turnIdx;
@@ -3110,7 +3255,7 @@ function _showPptSelectionModal() {
                 </span>
                 <span class="ppt-section-icon" style="background:${sec.color}">${sec.icon}</span>
                 <span class="ppt-section-info">
-                    <span class="ppt-section-name">${sec.label}</span>
+                    <span class="ppt-section-name">${secLabel}</span>
                     <span class="ppt-section-desc">${desc}</span>
                 </span>`;
             row.querySelector('input').addEventListener('change', _updatePptSlideCount);
@@ -3120,11 +3265,17 @@ function _showPptSelectionModal() {
         body.appendChild(group);
     });
 
-    // Set agent icon in modal title
+    // Set agent icon and i18n text in modal title/buttons
     const titleEl = document.getElementById('pptModalTitle');
     if (titleEl) {
-        titleEl.innerHTML = `<span style="display:inline-flex;align-items:center;width:28px;height:28px;vertical-align:middle;margin-right:8px">${AGENT_ICONS.data_analysis}</span>Jana Slaid PowerPoint`;
+        titleEl.innerHTML = `<span style="display:inline-flex;align-items:center;width:28px;height:28px;vertical-align:middle;margin-right:8px">${AGENT_ICONS.data_analysis}</span>${dict.ppt_modal_title}`;
     }
+    const subEl = document.getElementById('pptModalSubtitle');
+    if (subEl) subEl.textContent = dict.ppt_modal_subtitle;
+    const cancelBtn = document.querySelector('#pptModal .ppt-btn-cancel');
+    if (cancelBtn) cancelBtn.textContent = dict.ppt_btn_cancel;
+    const genBtn = document.getElementById('pptGenerateBtn');
+    if (genBtn) genBtn.textContent = dict.ppt_btn_generate;
     _updatePptSlideCount();
     document.getElementById('pptModal').classList.add('open');
 }
@@ -3134,11 +3285,11 @@ function closePptModal() {
 }
 
 function _updatePptSlideCount() {
+    const dict = I18N[currentLang];
     const checked = document.querySelectorAll('#pptModalBody input[type=checkbox]:checked');
-    // title + closing are always present; checked = content slides
     const total = 2 + checked.length;
-    const el = document.getElementById('pptSlideCount');
-    if (el) el.textContent = total;
+    const countWrap = document.querySelector('#pptModal .ppt-slide-count');
+    if (countWrap) countWrap.innerHTML = `${dict.ppt_slide_count_label} <span id="pptSlideCount">${total}</span> ${dict.ppt_slide_count_suffix}`;
     const btn = document.getElementById('pptGenerateBtn');
     if (btn) btn.disabled = checked.length === 0;
 }
@@ -3156,10 +3307,11 @@ async function confirmPptDownload() {
     });
 
     // Compile merged data to send
+    const dict = I18N[currentLang];
     const merged = {
         message: relevant.length === 1
-            ? (relevant[0].data.message || 'Analisis Data')
-            : `Analisis Data — ${Object.keys(selected).length} analisis digabungkan`,
+            ? (relevant[0].data.message || dict.ppt_modal_title)
+            : `${dict.ppt_modal_title} — ${Object.keys(selected).length} ${dict.ppt_merge_label}`,
         penemuan: [], tafsiran: '', cadangan: [], amaran: [],
         charts: [], tables: [],
     };
@@ -3189,30 +3341,30 @@ async function confirmPptDownload() {
 
         // Tables
         if (secs.has('table')  && d.table?.headers)  merged.tables.push(d.table);
-        if (secs.has('table2') && d.table2?.headers) merged.tables.push({ ...d.table2, label: 'Jadual Perbandingan' });
+        if (secs.has('table2') && d.table2?.headers) merged.tables.push({ ...d.table2, label: dict.ppt_section_table2 });
     });
 
     closePptModal();
 
     const btn = document.getElementById('pptGenerateBtn');
-    if (btn) btn.textContent = '⏳ Menjana...';
+    if (btn) btn.textContent = dict.ppt_btn_generating;
 
     try {
         const res = await fetch('/api/analysis/export', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ session_id: sessionId, format: 'pptx', data: merged }),
         });
-        if (!res.ok) throw new Error('Gagal menjana fail.');
+        if (!res.ok) throw new Error(dict.ppt_err_generate);
         const blob = await res.blob();
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = 'analisis_data.pptx';
         a.click();
-        showToast(I18N[currentLang].toast_file_downloaded, 'ok');
+        showToast(dict.toast_file_downloaded, 'ok');
     } catch (err) {
         showToast(err.message, 'err');
     } finally {
-        if (btn) btn.textContent = '📊 Jana Slaid';
+        if (btn) btn.textContent = dict.ppt_btn_generate;
     }
 }
 
@@ -3419,7 +3571,7 @@ async function lgHandleLetterPdfUpload(file) {
         return;
     }
     setProcessing(true);
-    addMessage(`📎 Menganalisis PDF: ${file.name}...`, 'user');
+    addMessage(`📎 ${I18N[currentLang].letter_pdf_analysing}: ${file.name}...`, 'user');
     const formData = new FormData();
     formData.append('file', file);
     formData.append('session_id', sessionId);
@@ -3430,18 +3582,19 @@ async function lgHandleLetterPdfUpload(file) {
             uploadBtn.classList.add('has-file');
             fileIndicator.style.display = 'flex';
             const pagesNote = data.pages_note || '';
-            fileIndicatorText.textContent = `📄 ${data.filename} (${data.char_count} aksara diekstrak${pagesNote})`;
+            const _ld = I18N[currentLang];
+            fileIndicatorText.textContent = `📄 ${data.filename} (${data.char_count} ${_ld.letter_char_count_suffix}${pagesNote})`;
             canvasWelcome.style.display = 'none';
             // Papar ringkasan PDF dalam chat sebelum trigger AI form
             const fields = data.extracted_fields || {};
             const fieldLines = Object.entries(fields).map(([k, v]) => `• ${k}: ${v}`).join('\n');
-            const docTypeLabel = data.suggested_type === 'memo' ? 'Memo Dalaman' : 'Surat Rasmi';
-            const summaryMsg = `📄 PDF berjaya dianalisis.\n\n`
+            const docTypeLabel = data.suggested_type === 'memo' ? _ld.letter_pdf_type_memo : _ld.letter_pdf_type_surat;
+            const summaryMsg = `📄 ${_ld.letter_pdf_ok}\n\n`
                 + (data.analysis_summary ? `${data.analysis_summary}\n\n` : '')
-                + `Jenis dokumen dicadangkan: ${docTypeLabel}\n`
-                + (fieldLines ? `\nMaklumat yang diekstrak:\n${fieldLines}\n` : '\nTiada maklumat khusus dapat diekstrak. Sila isi borang secara manual.\n')
-                + `\nSila lengkapkan borang di bawah untuk jana surat.`;
-            addMessage(summaryMsg, 'assistant', '📄', 'Penjana Surat Rasmi/Memo');
+                + `${_ld.letter_pdf_type_label} ${docTypeLabel}\n`
+                + (fieldLines ? `\n${_ld.letter_pdf_info_label}\n${fieldLines}\n` : `\n${_ld.letter_pdf_no_info}\n`)
+                + `\n${_ld.letter_pdf_fill_form}`;
+            addMessage(summaryMsg, 'assistant', '📄', _ld.letter_agent_name);
             await lgSendPdfAnalysisRequest(file.name, data.analysis_summary, data.suggested_type, data.extracted_fields);
         } else {
             addMessage(data.error || I18N[currentLang].error_generic, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
@@ -3641,7 +3794,7 @@ let _hadCurrentFilter = '';
     const allItem = document.createElement('div');
     allItem.className = 'had-item had-item-active';
     allItem.dataset.value = '';
-    allItem.innerHTML = `<span class="had-item-icon had-all-icon">✦</span><span class="had-item-label">Semua Ejen</span>`;
+    allItem.innerHTML = `<span class="had-item-icon had-all-icon">✦</span><span class="had-item-label agent-filter-name">${I18N[currentLang].all_agents_label}</span>`;
     menu.appendChild(allItem);
 
     agentOrder.forEach(key => {
@@ -3727,7 +3880,7 @@ function _buildKpmAgentNav() {
     const nav = document.getElementById('kpmAgentNav');
     if (!nav) return;
     nav.innerHTML = '';
-    const sectionLabel = currentLang === 'en' ? 'Quick Access' : 'Akses Pantas';
+    const sectionLabel = I18N[currentLang].kpm_quick_access;
     const heading = document.createElement('div');
     heading.className = 'kpm-agent-nav-label';
     heading.textContent = sectionLabel;
@@ -3778,9 +3931,7 @@ function openKpmBubble() {
 
 function closeKpmBubbleWithFarewell() {
     if (!_kpmReady) { closeKpmBubble(); return; }
-    const farewell = currentLang === 'en'
-        ? `Thank you for using SMARTAssist Hub KPM Support. Have a great day! 😊`
-        : `Terima kasih kerana menggunakan khidmat SMARTAssist Hub Sokongan KPM. Semoga hari tuan/puan menyenangkan! 😊`;
+    const farewell = currentLang === 'en' ? I18N.en.kpm_farewell_en : I18N.bm.kpm_farewell_bm;
     _appendKpmMsg(farewell, 'bot');
     setTimeout(() => closeKpmBubble(), 2000);
 }
@@ -3980,7 +4131,7 @@ async function lhSelect(id, lhType) {
 }
 
 async function lhDelete(id) {
-    if (!confirm(currentLang === 'bm' ? 'Padam imej ini?' : 'Delete this image?')) return;
+    if (!confirm(I18N[currentLang].lh_confirm_delete)) return;
     await fetch(`/api/letterhead/${encodeURIComponent(id)}`, { method: 'DELETE' });
     loadLhList();
 }
@@ -4013,7 +4164,7 @@ async function uploadLhFiles(files, lhType) {
     const dict = I18N[currentLang];
     for (const file of files) {
         if (file.size > 5 * 1024 * 1024) {
-            showLhToast(`${file.name}: fail terlalu besar (maks 5 MB)`, false);
+            showLhToast(`${file.name}: ${I18N[currentLang].lh_upload_too_large}`, false);
             continue;
         }
         const fd = new FormData();
