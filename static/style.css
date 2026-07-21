@@ -69,6 +69,25 @@ html[data-theme="light"] .da-table-filter {
     color: var(--text-primary);
     border-color: var(--border);
 }
+html[data-theme="light"] .input-wrapper {
+    background: rgba(255,255,255,0.92);
+    border-color: rgba(0,0,0,0.12);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+html[data-theme="light"] .input-wrapper:focus-within {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.12), 0 4px 20px rgba(99,102,241,0.08);
+}
+html[data-theme="light"] .chat-input {
+    color: #1a1a2e;
+}
+html[data-theme="light"] .chat-input::placeholder { color: #94a3b8; }
+html[data-theme="light"] .kpm-bubble-input {
+    background: rgba(255,255,255,0.85);
+    color: #1a1a2e;
+    border-color: rgba(185,28,28,0.3);
+}
+html[data-theme="light"] .kpm-bubble-input::placeholder { color: #94a3b8; }
 html[data-theme="light"] .history-panel,
 html[data-theme="light"] .profile-panel {
     background: var(--bg-secondary);
@@ -520,6 +539,54 @@ html[data-theme="light"] .kpm-bubble-title { color: #1a0202; text-shadow: none; 
         0 -6px 30px var(--card-glow, rgba(99,102,241,0.25));
 }
 .agent-card:hover::after { opacity: 1; }
+
+/* ── Coming Soon overlay ── */
+.agent-card.agent-coming-soon {
+    cursor: not-allowed;
+    opacity: 0.5;
+    filter: grayscale(0.6);
+    pointer-events: auto;
+}
+.agent-card.agent-coming-soon:hover {
+    transform: none;
+    box-shadow: none;
+    border-top-color: var(--card-color, rgba(99,102,241,0.45));
+}
+.agent-card.agent-coming-soon:hover::after { opacity: 0; }
+.coming-soon-badge {
+    position: absolute; top: 10px; right: 10px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #1a1000;
+    font-size: 9.5px; font-weight: 800;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(245,158,11,0.45);
+    z-index: 10; user-select: none;
+    animation: cs-pulse 2.4s ease-in-out infinite;
+}
+@keyframes cs-pulse {
+    0%, 100% { box-shadow: 0 2px 8px rgba(245,158,11,0.45); }
+    50% { box-shadow: 0 2px 18px rgba(245,158,11,0.75); }
+}
+html[data-theme="light"] .agent-card.agent-coming-soon { opacity: 0.45; }
+
+/* ── Canvas nav bar — disabled agent ── */
+.agent-nav-btn.agent-nav-disabled {
+    opacity: 0.35; cursor: not-allowed; position: relative;
+}
+.agent-nav-btn.agent-nav-disabled:hover {
+    background: none; border-color: transparent;
+    transform: none; box-shadow: none;
+}
+.agent-nav-soon {
+    position: absolute; top: 2px; right: 2px;
+    background: #f59e0b; color: #1a1000;
+    font-size: 7px; font-weight: 800;
+    padding: 1px 4px; border-radius: 999px;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    line-height: 1.4;
+}
+
 .agent-card-icon { font-size: 36px; margin-bottom: 14px; position: relative; z-index: 1; display: flex; justify-content: center; align-items: center; }
 .agent-card-icon svg { width: 100px; height: 100px; display: block; filter: drop-shadow(0 0 8px var(--card-color, rgba(99,102,241,0.5))); transition: filter 0.35s; }
 .agent-card:hover .agent-card-icon svg { filter: drop-shadow(0 0 16px var(--card-color, rgba(99,102,241,0.8))); }
@@ -2584,8 +2651,12 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
     background-clip: text;
     text-shadow: none;
     filter: drop-shadow(0 0 8px rgba(167,139,250,0.6));
+    padding: 2px 10px; border-radius: 8px;
+    background-color: rgba(10,10,28,0.55);
 }
 .kpm-avatar-sublabel {
-    font-size: 11px; color: var(--text-secondary);
+    font-size: 11px; color: #e2e8f0;
     letter-spacing: 0.5px; margin-top: 3px;
+    background: rgba(10,10,28,0.5);
+    padding: 1px 8px; border-radius: 6px;
 }

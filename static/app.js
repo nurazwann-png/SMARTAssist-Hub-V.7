@@ -525,6 +525,11 @@ function applyLanguage(lang) {
         if (nameEl) nameEl.textContent = info.name;
     }
 
+    // Coming-soon badge text
+    document.querySelectorAll('[data-i18n-coming-soon]').forEach(el => {
+        el.textContent = lang === 'en' ? 'Coming Soon' : 'Akan Datang';
+    });
+
     // KPM agent nav labels — update text only (safe for early calls before nav is built)
     document.querySelectorAll('.kpm-nav-btn[data-agent]').forEach(btn => {
         const key = btn.dataset.agent;
@@ -552,6 +557,11 @@ const agentCanvas = document.getElementById('agentCanvas');
 const historyPanel = document.getElementById('historyPanel');
 const historyOverlay = document.getElementById('historyOverlay');
 const historyList = document.getElementById('historyList');
+
+// ─── DISABLED AGENTS ────────────────────────────────────────────────────────
+// To re-enable: remove the agent key from this Set (or clear it entirely).
+const DISABLED_AGENTS = new Set(['letter_generator', 'document_reviewer']);
+// ────────────────────────────────────────────────────────────────────────────
 
 const canvasMessages = document.getElementById('canvasMessages');
 const canvasWelcome = document.getElementById('canvasWelcome');
@@ -749,9 +759,14 @@ function updateAgentNavBar(activeKey) {
     navBar.innerHTML = agentKeys.map(key => {
         const info = getAgentInfo(key);
         const isActive = key === activeKey;
-        return `<button class="agent-nav-btn${isActive ? ' active' : ''}" onclick="switchAgent('${key}')" title="${info.name}">
+        const isDisabled = DISABLED_AGENTS.has(key);
+        const disabledAttr = isDisabled ? ' disabled' : '';
+        const disabledClass = isDisabled ? ' agent-nav-disabled' : '';
+        const disabledTitle = isDisabled ? (currentLang === 'en' ? 'Coming Soon' : 'Akan Datang') : info.name;
+        return `<button class="agent-nav-btn${isActive ? ' active' : ''}${disabledClass}"${disabledAttr} onclick="${isDisabled ? '' : `switchAgent('${key}')`}" title="${disabledTitle}">
             <span class="agent-nav-icon">${info.icon}</span>
             <span class="agent-nav-label">${info.name}</span>
+            ${isDisabled ? '<span class="agent-nav-soon">Soon</span>' : ''}
         </button>`;
     }).join('');
 }
@@ -3503,11 +3518,21 @@ applyLanguage(currentLang);
 // Resume last session if available
 setTimeout(_checkResumeBanner, 800);
 
-// Agent cards
+// Agent cards — apply coming-soon overlay and block disabled agents
 document.querySelectorAll('.agent-card').forEach(card => {
+    const key = card.dataset.agent;
+    if (DISABLED_AGENTS.has(key)) {
+        card.classList.add('agent-coming-soon');
+        const badge = document.createElement('div');
+        badge.className = 'coming-soon-badge';
+        badge.textContent = currentLang === 'en' ? 'Coming Soon' : 'Akan Datang';
+        badge.dataset.i18nComingSoon = '1';
+        card.appendChild(badge);
+    }
     card.addEventListener('click', () => {
-        if (card.dataset.agent === 'kpm_support') openKpmBubble();
-        else openAgent(card.dataset.agent);
+        if (DISABLED_AGENTS.has(key)) return;
+        if (key === 'kpm_support') openKpmBubble();
+        else openAgent(key);
     });
 });
 
@@ -3537,6 +3562,7 @@ function _buildKpmAgentNav() {
     const row = document.createElement('div');
     row.className = 'kpm-agent-nav-row';
     _KPM_NAV_AGENTS.forEach(key => {
+        if (DISABLED_AGENTS.has(key)) return;
         const info = AGENT_INFO[key];
         if (!info) return;
         const label = (_KPM_NAV_LABELS[key] || {})[currentLang] || key;
