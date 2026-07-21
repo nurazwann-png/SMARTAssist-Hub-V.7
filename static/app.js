@@ -3678,7 +3678,7 @@ async function sendMessage() {
     if (_awaitingFollowup) {
         _awaitingFollowup = false;
         if (!_suppressUserMsg) addMessage(message, 'user');
-        _suppressUserMsg = false;
+        _suppressUserMsg = true; // prevent duplicate at line below
 
         if (_FOLLOWUP_NO_RE.test(message.trim())) {
             await sendFarewell();
