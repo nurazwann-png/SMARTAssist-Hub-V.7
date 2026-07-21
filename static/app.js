@@ -1012,7 +1012,8 @@ async function loadSessionMessages(sid) {
                 } else {
                     let structured = null;
                     try { structured = JSON.parse(msg.content); } catch (_) {}
-                    addMessage(msg.content, 'assistant', msg.agent_icon, msg.agent_name, structured);
+                    const _hi = getAgentInfo(msg.agent || agentKey);
+                    addMessage(msg.content, 'assistant', _hi.icon, _hi.name, structured);
                 }
             });
             scrollToBottom();
@@ -3605,7 +3606,8 @@ async function lgHandleLetterPdfUpload(file) {
                 + `${_ld.letter_pdf_type_label} ${docTypeLabel}\n`
                 + (fieldLines ? `\n${_ld.letter_pdf_info_label}\n${fieldLines}\n` : `\n${_ld.letter_pdf_no_info}\n`)
                 + `\n${_ld.letter_pdf_fill_form}`;
-            addMessage(summaryMsg, 'assistant', '📄', _ld.letter_agent_name);
+            const _lgi = getAgentInfo('letter_generator');
+            addMessage(summaryMsg, 'assistant', _lgi.icon, _lgi.name);
             await lgSendPdfAnalysisRequest(file.name, data.analysis_summary, data.suggested_type, data.extracted_fields);
         } else {
             addMessage(data.error || I18N[currentLang].error_generic, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
@@ -3713,7 +3715,8 @@ async function sendMessage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         lastActiveAgent = data.agent || currentAgent || 'fallback';
-        addMessage(data.response, 'assistant', data.agent_icon, data.agent_name, data.structured);
+        const _info = getAgentInfo(lastActiveAgent);
+        addMessage(data.response, 'assistant', _info.icon, _info.name, data.structured);
         _saveDraft();
 
         // Tanya followup jika dokumen baru sahaja siap
