@@ -2660,3 +2660,137 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
     background: rgba(10,10,28,0.5);
     padding: 1px 8px; border-radius: 6px;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PPT Slide-Selection Modal
+   ═══════════════════════════════════════════════════════════════ */
+.ppt-modal-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(4px);
+    align-items: center; justify-content: center;
+}
+.ppt-modal-overlay.open { display: flex; }
+
+.ppt-modal-card {
+    background: #111827;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    width: 480px; max-width: 96vw;
+    max-height: 85vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    overflow: hidden;
+}
+
+.ppt-modal-header {
+    padding: 20px 24px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.ppt-modal-title {
+    font-size: 17px; font-weight: 700; color: #f1f5f9;
+    display: flex; align-items: center; gap: 8px;
+}
+.ppt-modal-subtitle {
+    font-size: 12px; color: #64748b; margin-top: 4px;
+}
+
+.ppt-modal-body {
+    flex: 1; overflow-y: auto; padding: 12px 16px;
+    scrollbar-width: thin; scrollbar-color: #334155 transparent;
+}
+
+/* Analysis group (one per turn) */
+.ppt-turn-group {
+    margin-bottom: 14px;
+}
+.ppt-turn-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+    color: #475569; text-transform: uppercase;
+    padding: 0 6px; margin-bottom: 6px;
+}
+
+/* Locked always-on sections (title / closing) */
+.ppt-section-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 10px;
+    cursor: pointer; user-select: none;
+    transition: background 0.15s;
+    margin-bottom: 3px;
+}
+.ppt-section-row:hover:not(.locked) { background: rgba(255,255,255,0.04); }
+.ppt-section-row.locked { opacity: 0.45; cursor: default; }
+
+/* Custom checkbox */
+.ppt-check-wrap { position: relative; flex-shrink: 0; }
+.ppt-check-wrap input[type=checkbox] {
+    position: absolute; opacity: 0; width: 0; height: 0;
+}
+.ppt-checkmark {
+    display: block; width: 18px; height: 18px;
+    border: 2px solid #334155; border-radius: 5px;
+    background: transparent;
+    transition: background 0.15s, border-color 0.15s;
+    position: relative;
+}
+.ppt-check-wrap input:checked + .ppt-checkmark {
+    background: #3b82f6; border-color: #3b82f6;
+}
+.ppt-checkmark::after {
+    content: '';
+    position: absolute; left: 4px; top: 1px;
+    width: 5px; height: 9px;
+    border: 2px solid #fff; border-top: none; border-left: none;
+    transform: rotate(45deg);
+    opacity: 0; transition: opacity 0.1s;
+}
+.ppt-check-wrap input:checked + .ppt-checkmark::after { opacity: 1; }
+
+.ppt-section-icon {
+    width: 30px; height: 30px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; color: #fff;
+    flex-shrink: 0;
+}
+.ppt-section-info { flex: 1; min-width: 0; }
+.ppt-section-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+.ppt-section-desc { font-size: 11px; color: #64748b; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.ppt-modal-footer {
+    padding: 14px 20px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.ppt-slide-count { font-size: 12px; color: #64748b; }
+.ppt-slide-count span { color: #94a3b8; font-weight: 600; }
+.ppt-modal-actions { display: flex; gap: 8px; }
+
+.ppt-btn-cancel {
+    background: transparent; border: 1px solid #334155;
+    color: #94a3b8; border-radius: 8px;
+    padding: 7px 16px; font-size: 13px; cursor: pointer;
+    transition: background 0.15s;
+}
+.ppt-btn-cancel:hover { background: rgba(255,255,255,0.04); }
+
+.ppt-btn-generate {
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    border: none; color: #fff; border-radius: 8px;
+    padding: 7px 18px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: opacity 0.15s;
+}
+.ppt-btn-generate:hover { opacity: 0.88; }
+.ppt-btn-generate:disabled { opacity: 0.4; cursor: not-allowed; }
+
+html[data-theme="light"] .ppt-modal-card {
+    background: #f8fafc; border-color: rgba(0,0,0,0.1);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.2);
+}
+html[data-theme="light"] .ppt-modal-title { color: #1e293b; }
+html[data-theme="light"] .ppt-turn-label { color: #94a3b8; }
+html[data-theme="light"] .ppt-section-row:hover:not(.locked) { background: rgba(0,0,0,0.04); }
+html[data-theme="light"] .ppt-checkmark { border-color: #cbd5e1; }
+html[data-theme="light"] .ppt-section-name { color: #1e293b; }
+html[data-theme="light"] .ppt-modal-footer,
+html[data-theme="light"] .ppt-modal-header { border-color: rgba(0,0,0,0.08); }

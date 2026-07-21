@@ -10,6 +10,7 @@ let chartCounter = 0;
 let hasUploadedData = false;
 let lastActiveAgent = 'fallback';
 let lastStructuredData = null;
+let analysisHistory = [];   // [{data, workItemRef, timestamp}] — one entry per analysis turn
 let _chartQaContext = null;  // set when user clicks "Ask about chart"
 let currentLang = localStorage.getItem('smartassist_lang') || 'bm';
 let _fontSize = parseInt(localStorage.getItem('smartassist_fontsize') || '2');
@@ -1042,6 +1043,7 @@ function addMessage(content, role, agentIcon, agentName, structured) {
 
         if (structured.response_type) {
             lastStructuredData = structured;
+            analysisHistory.push({ data: structured, workItemRef: null, timestamp: Date.now() });
             workHtml = buildStructuredHtml(structured);
         } else if (structured.issues !== undefined) {
             workHtml = buildReviewHtml(structured);
@@ -1081,6 +1083,8 @@ function addMessage(content, role, agentIcon, agentName, structured) {
         }
 
         if (structured.chart) renderChart(workItem, structured.chart);
+        // Link workItem to the history entry so the PPT modal can capture its canvas
+        if (analysisHistory.length) analysisHistory[analysisHistory.length - 1].workItemRef = workItem;
         if (document.getElementById('reportImgGrid')) _refreshReportImages();
         if (structured.document_html || structured.document_preview || structured.corrected_document) {
             _docOriginalHtml = null; _docOriginalText = null;
@@ -3026,6 +3030,10 @@ async function downloadAnalysis(format) {
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'data.csv'; a.click();
         return;
     }
+    if (format === 'pptx') {
+        _showPptSelectionModal();
+        return;
+    }
     let chartImage = null;
     const chartCanvas = document.querySelector('.da-chart-container canvas');
     if (chartCanvas) { try { chartImage = chartCanvas.toDataURL('image/png'); } catch (_) {} }
@@ -3041,6 +3049,166 @@ async function downloadAnalysis(format) {
         a.download = `analisis_data.${_ext}`; a.click();
         showToast(I18N[currentLang].toast_file_downloaded, 'ok');
     } catch (err) { showToast(err.message, 'err'); }
+}
+
+// ─── PPT Slide-Selection Modal ─────────────────────────────────────────────
+
+const _PPT_SECTIONS = [
+    { id: 'penemuan', label: 'Penemuan Utama',     color: '#3B82F6', icon: '1', descFn: d => `${(d.penemuan||[]).length} penemuan` },
+    { id: 'tafsiran', label: 'Tafsiran & Analisis', color: '#06B6D4', icon: '2', descFn: d => d.tafsiran ? 'Huraian terperinci' : null },
+    { id: 'chart',    label: 'Visualisasi Data',    color: '#8B5CF6', icon: '◆', descFn: d => d.chart ? (d.chart.title || `Carta ${d.chart.type||''}`) : null },
+    { id: 'table',    label: 'Jadual Data',          color: '#10B981', icon: '▦', descFn: d => d.table?.rows ? `${d.table.rows.length} baris` : null },
+    { id: 'table2',   label: 'Jadual Perbandingan',  color: '#10B981', icon: '▧', descFn: d => d.table2?.rows ? `${d.table2.rows.length} baris` : null },
+    { id: 'cadangan', label: 'Cadangan & Tindakan', color: '#F59E0B', icon: '5', descFn: d => `${(d.cadangan||[]).length} cadangan` },
+    { id: 'amaran',   label: 'Amaran & Limitasi',   color: '#EF4444', icon: '!', descFn: d => `${(d.amaran||[]).length} amaran` },
+];
+
+function _showPptSelectionModal() {
+    const relevant = analysisHistory.filter(e => e.data.response_type);
+    if (!relevant.length) return;
+
+    const body = document.getElementById('pptModalBody');
+    body.innerHTML = '';
+
+    relevant.forEach((entry, turnIdx) => {
+        const d = entry.data;
+        const available = _PPT_SECTIONS.filter(s => {
+            const desc = s.descFn(d);
+            if (s.id === 'penemuan')  return (d.penemuan||[]).length > 0;
+            if (s.id === 'tafsiran')  return !!d.tafsiran;
+            if (s.id === 'chart')     return !!d.chart;
+            if (s.id === 'table')     return !!(d.table?.headers);
+            if (s.id === 'table2')    return !!(d.table2?.headers);
+            if (s.id === 'cadangan')  return (d.cadangan||[]).length > 0;
+            if (s.id === 'amaran')    return (d.amaran||[]).length > 0;
+            return false;
+        });
+        if (!available.length) return;
+
+        const group = document.createElement('div');
+        group.className = 'ppt-turn-group';
+
+        // Label for multi-turn sessions
+        if (relevant.length > 1) {
+            const lbl = document.createElement('div');
+            lbl.className = 'ppt-turn-label';
+            const preview = (d.message||'').substring(0, 48) + ((d.message||'').length > 48 ? '…' : '');
+            lbl.textContent = `Analisis ${turnIdx + 1}  —  ${preview}`;
+            group.appendChild(lbl);
+        }
+
+        available.forEach(sec => {
+            const desc = sec.descFn(d) || '';
+            const row = document.createElement('label');
+            row.className = 'ppt-section-row';
+            row.dataset.turn = turnIdx;
+            row.dataset.section = sec.id;
+            row.innerHTML = `
+                <span class="ppt-check-wrap">
+                    <input type="checkbox" checked data-turn="${turnIdx}" data-section="${sec.id}">
+                    <span class="ppt-checkmark"></span>
+                </span>
+                <span class="ppt-section-icon" style="background:${sec.color}">${sec.icon}</span>
+                <span class="ppt-section-info">
+                    <span class="ppt-section-name">${sec.label}</span>
+                    <span class="ppt-section-desc">${desc}</span>
+                </span>`;
+            row.querySelector('input').addEventListener('change', _updatePptSlideCount);
+            group.appendChild(row);
+        });
+
+        body.appendChild(group);
+    });
+
+    _updatePptSlideCount();
+    document.getElementById('pptModal').classList.add('open');
+}
+
+function closePptModal() {
+    document.getElementById('pptModal').classList.remove('open');
+}
+
+function _updatePptSlideCount() {
+    const checked = document.querySelectorAll('#pptModalBody input[type=checkbox]:checked');
+    // title + closing are always present; checked = content slides
+    const total = 2 + checked.length;
+    const el = document.getElementById('pptSlideCount');
+    if (el) el.textContent = total;
+    const btn = document.getElementById('pptGenerateBtn');
+    if (btn) btn.disabled = checked.length === 0;
+}
+
+async function confirmPptDownload() {
+    const relevant = analysisHistory.filter(e => e.data.response_type);
+    const checks = document.querySelectorAll('#pptModalBody input[type=checkbox]:checked');
+
+    // Build sets of selected sections per turn
+    const selected = {};
+    checks.forEach(cb => {
+        const t = cb.dataset.turn;
+        if (!selected[t]) selected[t] = new Set();
+        selected[t].add(cb.dataset.section);
+    });
+
+    // Compile merged data to send
+    const merged = {
+        message: relevant.length === 1
+            ? (relevant[0].data.message || 'Analisis Data')
+            : `Analisis Data — ${Object.keys(selected).length} analisis digabungkan`,
+        penemuan: [], tafsiran: '', cadangan: [], amaran: [],
+        charts: [], tables: [],
+    };
+
+    Object.entries(selected).forEach(([tIdxStr, secs]) => {
+        const t = parseInt(tIdxStr);
+        const entry = relevant[t];
+        if (!entry) return;
+        const d = entry.data;
+
+        if (secs.has('penemuan') && d.penemuan?.length) merged.penemuan.push(...d.penemuan);
+        if (secs.has('tafsiran') && d.tafsiran) {
+            merged.tafsiran += (merged.tafsiran ? '\n\n' : '') + d.tafsiran;
+        }
+        if (secs.has('cadangan') && d.cadangan?.length) merged.cadangan.push(...d.cadangan);
+        if (secs.has('amaran')   && d.amaran?.length)   merged.amaran.push(...d.amaran);
+
+        // Chart: capture canvas from the stored workItem
+        if (secs.has('chart') && d.chart) {
+            let imgB64 = null;
+            if (entry.workItemRef) {
+                const canvas = entry.workItemRef.querySelector('.da-chart-container canvas');
+                if (canvas) { try { imgB64 = canvas.toDataURL('image/png'); } catch (_) {} }
+            }
+            merged.charts.push({ title: d.chart.title || '', image_b64: imgB64 });
+        }
+
+        // Tables
+        if (secs.has('table')  && d.table?.headers)  merged.tables.push(d.table);
+        if (secs.has('table2') && d.table2?.headers) merged.tables.push({ ...d.table2, label: 'Jadual Perbandingan' });
+    });
+
+    closePptModal();
+
+    const btn = document.getElementById('pptGenerateBtn');
+    if (btn) btn.textContent = '⏳ Menjana...';
+
+    try {
+        const res = await fetch('/api/analysis/export', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId, format: 'pptx', data: merged }),
+        });
+        if (!res.ok) throw new Error('Gagal menjana fail.');
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'analisis_data.pptx';
+        a.click();
+        showToast(I18N[currentLang].toast_file_downloaded, 'ok');
+    } catch (err) {
+        showToast(err.message, 'err');
+    } finally {
+        if (btn) btn.textContent = '📊 Jana Slaid';
+    }
 }
 
 // ═══ Table tools ═══

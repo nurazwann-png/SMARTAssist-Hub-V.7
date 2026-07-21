@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMARTAssist Hub</title>
-    <link rel="stylesheet" href="/static/style.css?v=58">
+    <link rel="stylesheet" href="/static/style.css?v=59">
     <script src="/static/chart.min.js"></script>
 </head>
 <body>
@@ -784,6 +784,24 @@
     </div>
 
 
-    <script src="/static/app.js?v=102"></script>
+    <!-- PPT Slide-Selection Modal -->
+    <div id="pptModal" class="ppt-modal-overlay" onclick="if(event.target===this)closePptModal()">
+      <div class="ppt-modal-card">
+        <div class="ppt-modal-header">
+          <div class="ppt-modal-title">📊 Jana Slaid PowerPoint</div>
+          <div class="ppt-modal-subtitle" id="pptModalSubtitle">Pilih bahagian yang ingin disertakan dalam pembentangan</div>
+        </div>
+        <div class="ppt-modal-body" id="pptModalBody"></div>
+        <div class="ppt-modal-footer">
+          <div class="ppt-slide-count">Anggaran: <span id="pptSlideCount">—</span> slaid</div>
+          <div class="ppt-modal-actions">
+            <button class="ppt-btn-cancel" onclick="closePptModal()">Batal</button>
+            <button class="ppt-btn-generate" id="pptGenerateBtn" onclick="confirmPptDownload()">📊 Jana Slaid</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/app.js?v=103"></script>
 </body>
 </html>
