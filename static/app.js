@@ -2668,7 +2668,7 @@ async function handleCompareUpload() {
         const res = await fetch('/api/data/compare', { method: 'POST', body: fd });
         const data = await res.json();
         if (data.ok) {
-            addMessage('', 'assistant', '\u{1F4CA}', 'Analisis Data', data.comparison);
+            addMessage('', 'assistant', AGENT_ICONS.data_analysis, AGENT_INFO.data_analysis.name[currentLang], data.comparison);
         } else {
             addMessage(data.error || I18N[currentLang].compare_fail, 'assistant', '\u{26A0}\u{FE0F}', I18N[currentLang].agent_kpm_name);
         }
@@ -3492,7 +3492,7 @@ async function handleDataUpload(file) {
                 penemuan: [`Lajur: ${data.column_names.join(', ')}`],
                 susulan: ['Tunjukkan ringkasan statistik', 'Paparkan 10 baris pertama', 'Buat carta berdasarkan data ini'],
             };
-            addMessage('', 'assistant', '\u{1F4CA}', 'Analisis Data', structured);
+            addMessage('', 'assistant', AGENT_ICONS.data_analysis, AGENT_INFO.data_analysis.name[currentLang], structured);
         } else {
             addMessage(data.error || I18N[currentLang].err_upload_fail, 'assistant', '⚠️', I18N[currentLang].agent_kpm_name);
         }
