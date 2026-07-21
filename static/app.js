@@ -326,6 +326,7 @@ const I18N = {
         sec_penemuan: '🔍 Penemuan', sec_tafsiran: '💡 Tafsiran',
         sec_cadangan: '✅ Cadangan', sec_amaran: '⚠️ Amaran',
         sec_susulan: '💬 Soalan Susulan',
+        upload_file: 'Memuat naik fail',
         // Typing indicator
         typing_label: 'Sedang memproses...',
         // Canvas history
@@ -526,6 +527,7 @@ const I18N = {
         sec_penemuan: '🔍 Findings', sec_tafsiran: '💡 Interpretation',
         sec_cadangan: '✅ Recommendations', sec_amaran: '⚠️ Warnings',
         sec_susulan: '💬 Follow-up Questions',
+        upload_file: 'Uploading file',
         // Typing indicator
         typing_label: 'Processing...',
         // Canvas history
@@ -3469,7 +3471,7 @@ fileInput.addEventListener('change', async () => {
 
 async function handleDataUpload(file) {
     setProcessing(true);
-    addMessage(`Memuat naik fail: ${file.name}...`, 'user');
+    addMessage(`${I18N[currentLang].upload_file}: ${file.name}...`, 'user');
     const formData = new FormData();
     formData.append('file', file);
     formData.append('session_id', sessionId);
