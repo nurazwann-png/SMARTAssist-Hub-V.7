@@ -3120,6 +3120,11 @@ function _showPptSelectionModal() {
         body.appendChild(group);
     });
 
+    // Set agent icon in modal title
+    const titleEl = document.getElementById('pptModalTitle');
+    if (titleEl) {
+        titleEl.innerHTML = `<span style="display:inline-flex;align-items:center;width:28px;height:28px;vertical-align:middle;margin-right:8px">${AGENT_ICONS.data_analysis}</span>Jana Slaid PowerPoint`;
+    }
     _updatePptSlideCount();
     document.getElementById('pptModal').classList.add('open');
 }
