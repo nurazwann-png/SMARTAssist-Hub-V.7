@@ -322,6 +322,10 @@ const I18N = {
         form_fill_one: 'Sila isi sekurang-kurangnya satu medan.',
         form_photo_min: 'Sila muat naik sekurang-kurangnya 2 gambar landscape sebelum menghantar.',
         kpm_greeting: 'Salam! Saya Sokongan KPM. Apa yang boleh saya bantu?',
+        // Analysis result section headers
+        sec_penemuan: '🔍 Penemuan', sec_tafsiran: '💡 Tafsiran',
+        sec_cadangan: '✅ Cadangan', sec_amaran: '⚠️ Amaran',
+        sec_susulan: '💬 Soalan Susulan',
         // Typing indicator
         typing_label: 'Sedang memproses...',
         // Canvas history
@@ -518,6 +522,10 @@ const I18N = {
         form_fill_one: 'Please fill in at least one field.',
         form_photo_min: 'Please upload at least 2 landscape photos before submitting.',
         kpm_greeting: 'Hello! I am KPM Support. How can I help you?',
+        // Analysis result section headers
+        sec_penemuan: '🔍 Findings', sec_tafsiran: '💡 Interpretation',
+        sec_cadangan: '✅ Recommendations', sec_amaran: '⚠️ Warnings',
+        sec_susulan: '💬 Follow-up Questions',
         // Typing indicator
         typing_label: 'Processing...',
         // Canvas history
@@ -1299,30 +1307,31 @@ function buildStructuredHtml(data) {
 
     html += `<div class="da-message">${escapeHtml(data.message || '')}</div>`;
 
+    const _sd = I18N[currentLang];
     if (data.penemuan && data.penemuan.length) {
-        html += '<div class="da-section"><div class="da-section-title">\u{1F50D} Penemuan</div><ul>';
+        html += `<div class="da-section"><div class="da-section-title">${_sd.sec_penemuan}</div><ul>`;
         data.penemuan.forEach(p => { html += `<li>${escapeHtml(p)}</li>`; });
         html += '</ul></div>';
     }
 
     if (data.tafsiran) {
-        html += `<div class="da-section"><div class="da-section-title">\u{1F4A1} Tafsiran</div><p style="font-size:13px;color:var(--text-secondary);line-height:1.6">${escapeHtml(data.tafsiran)}</p></div>`;
+        html += `<div class="da-section"><div class="da-section-title">${_sd.sec_tafsiran}</div><p style="font-size:13px;color:var(--text-secondary);line-height:1.6">${escapeHtml(data.tafsiran)}</p></div>`;
     }
 
     if (data.cadangan && data.cadangan.length) {
-        html += '<div class="da-section"><div class="da-section-title">\u{2705} Cadangan</div><ul>';
+        html += `<div class="da-section"><div class="da-section-title">${_sd.sec_cadangan}</div><ul>`;
         data.cadangan.forEach(c => { html += `<li>${escapeHtml(c)}</li>`; });
         html += '</ul></div>';
     }
 
     if (data.amaran && data.amaran.length) {
-        html += '<div class="da-section da-warning"><div class="da-section-title">\u{26A0}\u{FE0F} Amaran</div><ul>';
+        html += `<div class="da-section da-warning"><div class="da-section-title">${_sd.sec_amaran}</div><ul>`;
         data.amaran.forEach(a => { html += `<li>${escapeHtml(a)}</li>`; });
         html += '</ul></div>';
     }
 
     if (data.susulan && data.susulan.length) {
-        html += '<div class="da-section"><div class="da-section-title">\u{1F4AC} Soalan Susulan</div>';
+        html += `<div class="da-section"><div class="da-section-title">${_sd.sec_susulan}</div>`;
         html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
         data.susulan.forEach(s => {
             html += `<button class="canvas-quick-btn" onclick="useQuickAction('${escapeAttr(s)}')">${escapeHtml(s)}</button>`;
