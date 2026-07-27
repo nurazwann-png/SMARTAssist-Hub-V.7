@@ -102,6 +102,52 @@ def get_client() -> OpenAI:
     return _client
 
 
+def tool_completion(
+    messages: list[dict],
+    tools: list[dict],
+    tool_choice: str = "auto",
+    model: str = _MODEL,
+    temperature: float = 0.0,
+    max_tokens: int = 1500,
+):
+    """Like chat_completion but returns the full message object so callers can
+    inspect tool_calls. Used by the agentic tool-calling loop."""
+    if not _circuit_breaker.allow_request():
+        cb = _circuit_breaker.status
+        raise RuntimeError(
+            f"Perkhidmatan AI tidak tersedia. Cuba semula dalam {int(cb['seconds_until_retry'])} saat."
+        )
+    client = get_client()
+    last_error = None
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                tools=tools,
+                tool_choice=tool_choice,
+            )
+            _circuit_breaker.record_success()
+            return response.choices[0].message
+        except APITimeoutError as e:
+            last_error = e
+        except APIConnectionError as e:
+            last_error = e
+        except APIError as e:
+            last_error = e
+            if e.status_code and 400 <= e.status_code < 500:
+                _circuit_breaker.record_failure()
+                raise RuntimeError(f"Permintaan tidak sah (ralat {e.status_code}).")
+        if attempt < _MAX_RETRIES:
+            import random
+            delay = min(_BACKOFF_BASE ** attempt, _BACKOFF_MAX) + random.uniform(0, _JITTER)
+            time.sleep(delay)
+    _circuit_breaker.record_failure()
+    raise RuntimeError(f"Tidak dapat menghubungi DeepSeek API. Ralat terakhir: {last_error}")
+
+
 def get_circuit_breaker_status() -> dict:
     """Kembalikan status circuit breaker semasa — berguna untuk endpoint /api/health."""
     return _circuit_breaker.status

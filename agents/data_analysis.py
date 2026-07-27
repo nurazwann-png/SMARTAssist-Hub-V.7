@@ -5,8 +5,10 @@ import io
 import os
 import re
 import pathlib
+import threading
+import builtins as _builtins
 import pandas as pd
-from backend.deepseek_client import chat_completion
+from backend.deepseek_client import chat_completion, tool_completion
 
 _DATA_DIR = pathlib.Path("static/session_data")
 
@@ -799,30 +801,124 @@ def clear_session_data(session_id: str):
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  Plan → Execute → Narrate
-#  The LLM PLANS which pandas operations to run; the server EXECUTES
-#  them on the FULL dataset; the LLM then NARRATES the real results.
-#  This guarantees every number in the answer is computed, not guessed.
+#  Agentic Tool-Calling Loop
+#  The LLM drives multi-step pandas computation via tool calls.
+#  Tools: run_pandas, get_column_info, sample_rows, propose_chart.
+#  After the loop, real results are injected into the narration prompt
+#  so every number in the final answer is grounded in computed truth.
 # ═══════════════════════════════════════════════════════════════════
 
-_PLAN_PROMPT = """Anda ialah perancang analisis data. Berdasarkan soalan pengguna dan struktur dataset,
-pilih operasi pandas (1 hingga 4) yang perlu dijalankan untuk menjawab soalan dengan TEPAT.
+_DA_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "run_pandas",
+            "description": (
+                "Execute a pandas expression on the DataFrame 'df' and return the result. "
+                "Use for groupby, filtering, aggregation, correlation, value counts, sorting, etc. "
+                "Always use real column names. The expression must be a single evaluable line."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": (
+                            "A single pandas expression using 'df'. "
+                            "Examples: \"df.groupby('Sekolah')['Markah'].mean().sort_values(ascending=False).head(10)\", "
+                            "\"df['Gred'].value_counts()\", \"df.describe()\", "
+                            "\"df[df['Markah']>80][['Nama','Markah']].head(20)\""
+                        ),
+                    },
+                    "description": {"type": "string", "description": "Brief description of what this computes"},
+                },
+                "required": ["code", "description"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_column_info",
+            "description": "Get data type, null count, unique values count, sample values, and numeric statistics for columns.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "columns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Column names to inspect. Omit to see all columns.",
+                    }
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "sample_rows",
+            "description": "Get a sample of rows from the DataFrame, optionally filtered.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "n": {"type": "integer", "description": "Number of rows to return (max 20, default 5)"},
+                    "query_filter": {
+                        "type": "string",
+                        "description": "Optional pandas query string. E.g. \"Markah > 80\" or \"Sekolah == 'SMK Dalat'\"",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "propose_chart",
+            "description": (
+                "Register a chart to include in the response. "
+                "Call this when you have computed real labels and values for a chart. "
+                "The chart will be injected directly — do NOT also include chart data in your JSON response."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "chart_type": {
+                        "type": "string",
+                        "enum": ["bar", "line", "pie", "doughnut"],
+                        "description": "Type of chart",
+                    },
+                    "title": {"type": "string", "description": "Chart title"},
+                    "labels": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "X-axis or category labels (real values from computation)",
+                    },
+                    "values": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "Numeric values for each label (real computed values)",
+                    },
+                    "dataset_label": {"type": "string", "description": "Legend label (optional)"},
+                },
+                "required": ["chart_type", "title", "labels", "values"],
+            },
+        },
+    },
+]
 
-Operasi yang dibenarkan:
-- {"op":"describe","cols":["A","B"]} — statistik deskriptif (cols pilihan; lalai semua numerik)
-- {"op":"value_counts","col":"A","top":10} — kiraan nilai unik satu lajur
-- {"op":"groupby","by":["A"],"col":"B","agg":"mean","top":15,"sort":"desc"} — agregat mengikut kumpulan; agg: mean|sum|count|median|min|max|nunique; "col" pilihan (tanpa col = kiraan baris)
-- {"op":"filter","where":[{"col":"A","cmp":">","val":50}],"then":"rows","cols":["A","B"],"top":20} — tapis baris; cmp: ==|!=|>|>=|<|<=|contains|isnull|notnull; "then": "count" | "rows" | {"agg":"mean","col":"B"}
-- {"op":"correlation"} — korelasi antara semua lajur numerik
-- {"op":"top_rows","sort_col":"A","ascending":false,"n":10,"cols":["A","B"]} — baris teratas selepas isih
-- {"op":"crosstab","row":"A","col":"B"} — jadual silang dua lajur kategori
+# Stores chart specs proposed by the tool loop, keyed by session_id
+_pending_charts: dict[str, dict] = {}
 
-Peraturan:
-- Gunakan HANYA nama lajur yang wujud dalam senarai lajur diberikan (padankan ejaan tepat).
-- Untuk soalan umum ("analisis penuh", "ringkasan"), gunakan describe + value_counts lajur kategori utama + correlation.
-- Balas HANYA JSON sah: {"ops":[...]}"""
-
-_ALLOWED_AGGS = {"mean", "sum", "count", "median", "min", "max", "nunique"}
+_SAFE_BUILTINS = {
+    name: getattr(_builtins, name)
+    for name in ("abs", "round", "len", "min", "max", "sum", "sorted",
+                 "list", "dict", "str", "int", "float", "bool", "range",
+                 "enumerate", "zip", "map", "filter", "isinstance", "type",
+                 "True", "False", "None")
+    if hasattr(_builtins, name)
+}
 
 
 def _fmt_result(obj, max_rows: int = 25) -> str:
@@ -837,128 +933,96 @@ def _fmt_result(obj, max_rows: int = 25) -> str:
     return str(obj)
 
 
-def _apply_filter(df: pd.DataFrame, where: list[dict]) -> pd.Series:
-    mask = pd.Series(True, index=df.index)
-    for cond in where or []:
-        col, cmp, val = cond.get("col"), cond.get("cmp"), cond.get("val")
-        if col not in df.columns:
-            raise ValueError(f"Lajur '{col}' tiada dalam dataset")
-        s = df[col]
-        if cmp in (">", ">=", "<", "<=") or (cmp in ("==", "!=") and pd.api.types.is_numeric_dtype(s)):
-            try:
-                val = float(val)
-            except (TypeError, ValueError):
-                pass
-        if cmp == "==":
-            mask &= (s == val)
-        elif cmp == "!=":
-            mask &= (s != val)
-        elif cmp == ">":
-            mask &= (s > val)
-        elif cmp == ">=":
-            mask &= (s >= val)
-        elif cmp == "<":
-            mask &= (s < val)
-        elif cmp == "<=":
-            mask &= (s <= val)
-        elif cmp == "contains":
-            mask &= s.astype(str).str.contains(str(val), case=False, na=False)
-        elif cmp == "isnull":
-            mask &= s.isnull()
-        elif cmp == "notnull":
-            mask &= s.notnull()
-        else:
-            raise ValueError(f"Operator '{cmp}' tidak disokong")
-    return mask
+def _safe_eval_pandas(code: str, df: pd.DataFrame) -> str:
+    """Evaluate a pandas expression in a restricted namespace with timeout."""
+    g = {"pd": pd, "__builtins__": _SAFE_BUILTINS}
+    l = {"df": df}  # noqa: E741
+    result_holder: list = [None]
+    error_holder: list = [None]
 
-
-def _execute_ops(df: pd.DataFrame, ops: list[dict]) -> list[str]:
-    """Run a validated list of pandas operations; return formatted result blocks."""
-    blocks: list[str] = []
-    for op_spec in (ops or [])[:4]:
+    def _run():
         try:
-            op = op_spec.get("op")
-            if op == "describe":
-                cols = [c for c in (op_spec.get("cols") or []) if c in df.columns]
-                target = df[cols] if cols else df.select_dtypes(include=["number"])
-                if target.shape[1] == 0:
-                    continue
-                blocks.append("### Statistik deskriptif\n" + _fmt_result(target.describe().round(3)))
-            elif op == "value_counts":
-                col = op_spec.get("col")
-                if col not in df.columns:
-                    continue
-                top = int(op_spec.get("top", 10))
-                vc = df[col].value_counts().head(max(1, min(top, 30)))
-                blocks.append(f"### Kiraan nilai: {col}\n" + _fmt_result(vc))
-            elif op == "groupby":
-                by = [c for c in (op_spec.get("by") or []) if c in df.columns]
-                if not by:
-                    continue
-                col = op_spec.get("col")
-                agg = op_spec.get("agg", "count")
-                if agg not in _ALLOWED_AGGS:
-                    agg = "count"
-                if col and col in df.columns:
-                    res = df.groupby(by)[col].agg(agg)
-                    title = f"{agg}({col}) mengikut {', '.join(by)}"
-                else:
-                    res = df.groupby(by).size()
-                    title = f"kiraan baris mengikut {', '.join(by)}"
-                asc = str(op_spec.get("sort", "desc")).lower() == "asc"
-                res = res.sort_values(ascending=asc)
-                top = max(1, min(int(op_spec.get("top", 15)), 40))
-                if pd.api.types.is_float_dtype(res):
-                    res = res.round(3)
-                blocks.append(f"### Groupby: {title}\n" + _fmt_result(res.head(top)))
-            elif op == "filter":
-                mask = _apply_filter(df, op_spec.get("where") or [])
-                sub = df[mask]
-                then = op_spec.get("then", "count")
-                desc = json.dumps(op_spec.get("where", []), ensure_ascii=False)
-                if then == "count":
-                    blocks.append(f"### Tapisan {desc}\nBilangan baris sepadan: {len(sub)} daripada {len(df)}")
-                elif then == "rows":
-                    cols = [c for c in (op_spec.get("cols") or []) if c in df.columns] or list(df.columns)
-                    top = max(1, min(int(op_spec.get("top", 20)), 40))
-                    blocks.append(f"### Baris sepadan {desc} ({len(sub)} baris)\n" + _fmt_result(sub[cols], top))
-                elif isinstance(then, dict):
-                    agg = then.get("agg", "mean")
-                    col = then.get("col")
-                    if agg in _ALLOWED_AGGS and col in df.columns:
-                        val = getattr(sub[col], agg)()
-                        blocks.append(f"### {agg}({col}) untuk tapisan {desc}\n{round(float(val), 4) if pd.notna(val) else 'tiada data'} ({len(sub)} baris sepadan)")
-            elif op == "correlation":
-                num = df.select_dtypes(include=["number"])
-                if num.shape[1] < 2:
-                    continue
-                corr = num.corr()
-                pairs = []
-                cols = list(num.columns)
-                for i, a in enumerate(cols):
-                    for b in cols[i + 1:]:
-                        r = corr.loc[a, b]
-                        if pd.notna(r):
-                            pairs.append((abs(float(r)), f"{a} ↔ {b}: r={float(r):.3f}"))
-                pairs.sort(reverse=True)
-                blocks.append("### Korelasi (pasangan terkuat)\n" + "\n".join(p[1] for p in pairs[:10]))
-            elif op == "top_rows":
-                sc = op_spec.get("sort_col")
-                if sc not in df.columns:
-                    continue
-                n = max(1, min(int(op_spec.get("n", 10)), 40))
-                cols = [c for c in (op_spec.get("cols") or []) if c in df.columns] or list(df.columns)
-                res = df.sort_values(sc, ascending=bool(op_spec.get("ascending", False))).head(n)[cols]
-                blocks.append(f"### Top {n} mengikut {sc}\n" + _fmt_result(res, n))
-            elif op == "crosstab":
-                r, c = op_spec.get("row"), op_spec.get("col")
-                if r not in df.columns or c not in df.columns:
-                    continue
-                ct = pd.crosstab(df[r], df[c])
-                blocks.append(f"### Jadual silang: {r} x {c}\n" + _fmt_result(ct.iloc[:15, :10]))
+            result_holder[0] = eval(compile(code, "<tool>", "eval"), g, l)
+        except SyntaxError:
+            try:
+                exec(compile(code, "<tool>", "exec"), g, l)
+                result_holder[0] = l.get("result", "Code executed (assign to 'result' to return a value)")
+            except Exception as e:
+                error_holder[0] = e
         except Exception as e:
-            blocks.append(f"### Operasi {op_spec.get('op')} gagal: {e}")
-    return blocks
+            error_holder[0] = e
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(8)
+    if t.is_alive():
+        return "Error: execution timed out (>8s) — simplify the expression"
+    if error_holder[0]:
+        return f"Error: {error_holder[0]}"
+    return _fmt_result(result_holder[0])
+
+
+def _execute_da_tool(name: str, args: dict, df: pd.DataFrame, pending_chart: list) -> str:
+    """Dispatch a tool call and return a result string."""
+    try:
+        if name == "run_pandas":
+            code = (args.get("code") or "").strip()
+            if not code:
+                return "Error: no code provided"
+            return _safe_eval_pandas(code, df)
+
+        elif name == "get_column_info":
+            cols = args.get("columns") or list(df.columns[:25])
+            cols = [c for c in cols if c in df.columns]
+            if not cols:
+                return f"No matching columns. Available: {', '.join(df.columns.tolist())}"
+            lines = []
+            for col in cols:
+                s = df[col]
+                nulls = int(s.isnull().sum())
+                uniq = int(s.nunique(dropna=True))
+                samples = ", ".join(str(v)[:20] for v in s.dropna().unique()[:5])
+                if pd.api.types.is_numeric_dtype(s) and s.notna().any():
+                    stats = f"min={s.min():.4g}, mean={s.mean():.4g}, max={s.max():.4g}"
+                    lines.append(f"{col} | {s.dtype} | nulls:{nulls} | unique:{uniq} | {stats} | samples: {samples}")
+                else:
+                    lines.append(f"{col} | {s.dtype} | nulls:{nulls} | unique:{uniq} | samples: {samples}")
+            return "\n".join(lines)
+
+        elif name == "sample_rows":
+            n = min(int(args.get("n", 5)), 20)
+            qf = (args.get("query_filter") or "").strip()
+            if qf:
+                try:
+                    sub = df.query(qf).head(n)
+                except Exception as e:
+                    return f"Error in query filter: {e}"
+            else:
+                sub = df.head(n)
+            return _fmt_result(sub, n)
+
+        elif name == "propose_chart":
+            labels = args.get("labels", [])
+            values = args.get("values", [])
+            if not labels or not values:
+                return "Error: labels and values are required"
+            if len(labels) != len(values):
+                return f"Error: labels ({len(labels)}) and values ({len(values)}) length mismatch"
+            pending_chart[0] = {
+                "type": args.get("chart_type", "bar"),
+                "title": args.get("title", ""),
+                "labels": [str(l) for l in labels],
+                "datasets": [{
+                    "label": args.get("dataset_label") or args.get("title", ""),
+                    "data": [float(v) if v is not None else 0 for v in values],
+                    "backgroundColor": _PALETTE[:len(labels)],
+                }],
+            }
+            return f"Chart '{args.get('title')}' ({args.get('chart_type', 'bar')}) registered with {len(labels)} points."
+
+        return f"Unknown tool: {name}"
+    except Exception as e:
+        return f"Tool error ({name}): {e}"
 
 
 def _recent_user_turns(history: list[dict] | None, n: int = 3) -> list[str]:
@@ -967,63 +1031,115 @@ def _recent_user_turns(history: list[dict] | None, n: int = 3) -> list[str]:
     return [m["content"] for m in history if m.get("role") == "user"][-n:]
 
 
-def _plan_and_compute(query: str, df: pd.DataFrame,
-                      history: list[dict] | None = None,
-                      session_id: str = "default") -> str | None:
-    """Ask the LLM to plan pandas operations, execute them on the full dataset,
-    and return a computed-results context block. None on failure.
+def _agentic_tool_loop(
+    query: str,
+    df: pd.DataFrame,
+    history: list[dict] | None = None,
+    session_id: str = "default",
+) -> str | None:
+    """Drive the LLM through multi-step tool calls to compute real data,
+    then return a context block of verified results for the narration call.
 
-    Idea C: recent user turns are given to the planner so follow-ups like
-    "what about class 5B only?" resolve against the previous question.
-    Idea D: identical (query + recent-context) pairs reuse the cached result
-    instead of re-planning and re-computing.
+    Uses the same cache key scheme as the old _plan_and_compute so cached
+    results are transparently reused across the session.
     """
     prior = _recent_user_turns(history)
     prior_prev = prior[:-1] if prior and prior[-1] == query else prior
     cache_key = "‖".join(prior_prev[-2:] + [query.strip().lower()])
     cache = _compute_cache.setdefault(session_id, {})
     if cache_key in cache:
+        # Restore any cached chart spec too
+        cached_chart = cache.get(f"{cache_key}__chart")
+        if cached_chart:
+            _pending_charts[session_id] = cached_chart
         return cache[cache_key]
 
+    # Build compact column manifest for the tool-loop system prompt
     col_lines = []
-    for col in df.columns[:40]:
+    for col in df.columns[:50]:
         s = df[col]
-        samples = ", ".join(str(v)[:30] for v in s.dropna().unique()[:3])
-        col_lines.append(f"- {col} ({s.dtype}): cth. {samples}")
-    context_block = ""
+        samples = ", ".join(str(v)[:20] for v in s.dropna().unique()[:3])
+        col_lines.append(f"- {col} ({s.dtype}): e.g. {samples}")
+
+    prior_ctx = ""
     if prior_prev:
-        context_block = ("\n\nSoalan sebelum ini dalam perbualan (untuk merungkai rujukan seperti "
-                         "'kelas itu' atau 'bagaimana pula dengan…'):\n- " + "\n- ".join(prior_prev[-2:]))
-    plan_user = (
-        f"Dataset: {df.shape[0]} baris x {df.shape[1]} lajur\n"
-        f"Lajur:\n" + "\n".join(col_lines) +
-        context_block +
-        f"\n\nSoalan pengguna semasa: {query}"
+        prior_ctx = (
+            "\n\nPrevious questions in this conversation (for resolving references like "
+            "'that class' or 'compared to before'):\n- " + "\n- ".join(prior_prev[-2:])
+        )
+
+    system = (
+        f"You are a data computation engine. Use the provided tools to compute EXACT results "
+        f"from the pandas DataFrame 'df' ({df.shape[0]} rows × {df.shape[1]} columns).\n\n"
+        f"COLUMNS:\n" + "\n".join(col_lines) + prior_ctx +
+        "\n\nRules:\n"
+        "- Call tools to get REAL numbers. Never guess or hallucinate values.\n"
+        "- Use run_pandas for any computation: groupby, filter, sort, correlation, describe, etc.\n"
+        "- If a chart is appropriate, call propose_chart with the computed labels and values.\n"
+        "- Call get_column_info first if you are unsure about column names or types.\n"
+        "- You may call multiple tools in sequence to refine results.\n"
+        "- When you have computed everything needed, stop calling tools and output 'DONE'."
     )
-    try:
-        raw = chat_completion(
-            messages=[{"role": "system", "content": _PLAN_PROMPT},
-                      {"role": "user", "content": plan_user}],
-            temperature=0.0, max_tokens=600,
-        )
-        plan = _try_parse_json(raw)
-        ops = plan.get("ops") if isinstance(plan, dict) else None
-        if not ops:
-            return None
-        blocks = _execute_ops(df, ops)
-        if not blocks:
-            return None
-        result = (
-            f"\n\nHASIL PENGIRAAN SEBENAR (dikira oleh pandas ke atas KESEMUA {df.shape[0]} baris):\n\n"
-            + "\n\n".join(blocks)
-            + "\n\nPENTING: Setiap nombor dalam respons anda MESTI diambil terus daripada "
-              "HASIL PENGIRAAN di atas atau RINGKASAN DATA. JANGAN kira sendiri, "
-              "JANGAN anggar, dan JANGAN reka sebarang nilai."
-        )
-        cache[cache_key] = result
-        return result
-    except Exception:
+
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": f"Compute the data needed to answer: {query}"},
+    ]
+
+    pending_chart: list = [None]
+    computed_blocks: list[str] = []
+
+    for _ in range(6):  # max 6 tool-call rounds
+        try:
+            msg = tool_completion(messages, _DA_TOOLS, temperature=0.0, max_tokens=1000)
+        except Exception:
+            break
+
+        if not msg.tool_calls:
+            break  # Model finished computing
+
+        # Append assistant message (with tool calls) to conversation
+        messages.append({
+            "role": "assistant",
+            "content": msg.content,
+            "tool_calls": [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                }
+                for tc in msg.tool_calls
+            ],
+        })
+
+        # Execute each tool call and append results
+        for tc in msg.tool_calls:
+            try:
+                args = json.loads(tc.function.arguments)
+            except Exception:
+                args = {}
+            result = _execute_da_tool(tc.function.name, args, df, pending_chart)
+            if tc.function.name != "propose_chart":
+                computed_blocks.append(f"### [{tc.function.name}: {args.get('description', '')}]\n{result}")
+            messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+
+    if not computed_blocks and pending_chart[0] is None:
         return None
+
+    context = (
+        f"\n\nHASIL PENGIRAAN SEBENAR (dikira oleh pandas ke atas KESEMUA {df.shape[0]} baris):\n\n"
+        + "\n\n".join(computed_blocks)
+        + "\n\nPENTING: Setiap nombor dalam respons anda MESTI diambil terus daripada "
+          "HASIL PENGIRAAN di atas. JANGAN kira sendiri, JANGAN anggar, JANGAN reka nilai."
+    )
+
+    # Cache result and chart spec
+    cache[cache_key] = context
+    if pending_chart[0]:
+        _pending_charts[session_id] = pending_chart[0]
+        cache[f"{cache_key}__chart"] = pending_chart[0]
+
+    return context
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1424,10 +1540,10 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
             _add_explored(session_id, topic_hint)
             return json.dumps(template, ensure_ascii=False)
 
-    # Plan→Execute→Narrate: LLM plans pandas ops, server computes them on the
-    # FULL dataset, and the narration below may only use those real numbers.
+    # Agentic Tool-Calling Loop: LLM drives multi-step pandas computation via
+    # tools, then the narration call may only use those verified real numbers.
     if df is not None and data_context:
-        computed = _plan_and_compute(query, df, history=history, session_id=session_id)
+        computed = _agentic_tool_loop(query, df, history=history, session_id=session_id)
         if computed:
             data = get_session_data(session_id) or {}
             raw_block = ""
@@ -1480,6 +1596,9 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
         _add_explored(session_id, topic_hint)
 
     if parsed:
+        # Inject chart proposed by the tool-calling loop (if any, and not already present)
+        if not parsed.get("chart") and session_id in _pending_charts:
+            parsed["chart"] = _pending_charts.pop(session_id)
         return json.dumps(parsed, ensure_ascii=False)
     return json.dumps({
         "response_type": "pandangan",
