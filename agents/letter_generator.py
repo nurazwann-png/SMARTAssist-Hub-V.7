@@ -549,7 +549,7 @@ def _parse_form_submission(query: str, doc_type: str) -> dict:
     return result
 
 
-def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm", user_name: str = "") -> str:
+def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm", user_name: str = "", user_context: str = "") -> str:
     sapaan = f", {user_name.split()[0]}" if user_name else ""
     if query == '__INTRO__':
         if lang == "en":
@@ -647,8 +647,9 @@ Status sesi semasa:
     system_prompt = _SYSTEM_PROMPT_TEMPLATE.replace("{current_date}", date_str).replace("{current_year}", str(now.year))
     lang_note = "\n\nIMPORTANT: The user has selected English. You MUST respond entirely in English. All 'message' and text fields in your JSON response must be in English. The generated document content should remain in Malay as it is an official KPM document." if lang == "en" else ""
 
+    mem_note = user_context or ""
     messages = [
-        {"role": "system", "content": system_prompt + context_info + lang_note},
+        {"role": "system", "content": system_prompt + context_info + lang_note + mem_note},
     ]
     if history:
         for msg in history[-10:]:
@@ -1673,6 +1674,27 @@ def _build_memo_docx(doc, fields: dict):
 def get_session_info(session_id: str) -> dict | None:
     s = _get_session(session_id)
     return s if s.get("doc_type") else None
+
+
+def prefill_from_memory(session_id: str, org_name: str = "", user_name: str = "") -> None:
+    """Proactively seed session fields from user memory so the agent doesn't
+    need to re-ask for information it already knows about the user.
+
+    Only fills fields that are not already set in the session.
+    """
+    if not org_name and not user_name:
+        return
+    session = _get_session(session_id)
+    fields = session.setdefault("fields", {})
+    changed = False
+    if org_name and not fields.get("nama_organisasi"):
+        fields["nama_organisasi"] = org_name
+        changed = True
+    if user_name and not fields.get("penandatangan_nama"):
+        fields["penandatangan_nama"] = user_name
+        changed = True
+    if changed:
+        _save_session(session_id, session)
 
 
 def send_email(session_id: str, to_email: str, subject: str) -> dict:

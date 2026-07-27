@@ -64,6 +64,13 @@ from auth import router as auth_router, get_current_user
 from backend.profile_store import get_profile, save_profile
 from backend.orchestrator import run_query
 from backend.session_store import get_store as _get_store
+from backend.user_memory import (
+    load_memory as _load_memory,
+    update_memory as _update_memory,
+    add_topic as _add_topic,
+    extract_org_name as _extract_org_name,
+    get_context_string as _get_memory_context,
+)
 from agents.data_analysis import upload_file as da_upload, get_session_data as da_get_data
 from agents.letter_generator import (
     get_document as lg_get_document,
@@ -1475,6 +1482,34 @@ async def list_agents():
     return JSONResponse(AGENT_LABELS)
 
 
+@app.get("/api/memory")
+async def get_user_memory(request: Request):
+    """Return the current user's memory (for display in the UI)."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"ok": False, "error": "Not authenticated"}, status_code=401)
+    try:
+        mem = _load_memory(user["sub"])
+        return JSONResponse({"ok": True, "memory": mem})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@app.delete("/api/memory")
+async def clear_user_memory(request: Request):
+    """Clear the current user's memory."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"ok": False, "error": "Not authenticated"}, status_code=401)
+    try:
+        from backend.db import get_conn, dict_cur
+        with get_conn() as conn, dict_cur(conn) as cur:
+            cur.execute("DELETE FROM user_memory WHERE email = %s", (user["sub"],))
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
 @app.get("/api/health")
 async def health_check():
     """Semak kesihatan sistem dan status circuit breaker DeepSeek."""
@@ -1597,6 +1632,7 @@ async def get_session_messages(session_id: str):
 async def agent_chat(req: AgentChatRequest, request: Request):
     """Direct chat with a specific agent, bypassing intent classification."""
     user = get_current_user(request)
+    user_email = user.get("sub", "") if user else ""
     user_name = ""
     if user:
         profile = get_profile(user["sub"])
@@ -1607,6 +1643,14 @@ async def agent_chat(req: AgentChatRequest, request: Request):
     if not is_intro:
         store.append_message(req.session_id, {"role": "user", "content": req.message})
         history.append({"role": "user", "content": req.message})
+
+    # ── Memory: load per-user context for injection into agents ──────────────
+    user_context = ""
+    try:
+        if user_email and not is_intro:
+            user_context = _get_memory_context(user_email, req.lang)
+    except Exception:
+        pass
 
     agent = req.agent
     agent_info = AGENT_LABELS.get(agent, {"icon": "\U0001f4ac", "name": agent})
@@ -1631,6 +1675,16 @@ async def agent_chat(req: AgentChatRequest, request: Request):
                 kwargs["lang"] = req.lang
             if "user_name" in sig.parameters:
                 kwargs["user_name"] = user_name
+            if "user_context" in sig.parameters:
+                kwargs["user_context"] = user_context
+            # Proactive: pre-fill letter fields from memory before first turn
+            if agent == "letter_generator" and not is_intro and user_email:
+                try:
+                    from agents.letter_generator import prefill_from_memory as _lg_prefill
+                    mem = _load_memory(user_email)
+                    _lg_prefill(req.session_id, org_name=mem.get("org_name", ""), user_name=user_name)
+                except Exception:
+                    pass
             output = module.handle(**kwargs)
 
             # JSON retry: if agent expects JSON but output fails to parse, try once more
@@ -1658,6 +1712,16 @@ async def agent_chat(req: AgentChatRequest, request: Request):
             agent=agent,
             title=existing_meta.get("title") or req.message[:60],
         )
+        # ── Memory: persist what we learned from this interaction ─────────────
+        try:
+            if user_email:
+                _update_memory(user_email, preferred_lang=req.lang, preferred_agent=agent)
+                _add_topic(user_email, req.message)
+                org = _extract_org_name(req.message)
+                if org:
+                    _update_memory(user_email, org_name=org)
+        except Exception:
+            pass
 
     structured = None
     if agent in ("data_analysis", "letter_generator", "report_generator", "document_reviewer"):

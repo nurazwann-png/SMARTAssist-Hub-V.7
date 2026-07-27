@@ -110,7 +110,7 @@ def _format_doc_context(docs: list[dict]) -> str:
     return "\n\nDokumen rujukan:\n" + "\n\n".join(sections)
 
 
-def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm", user_name: str = "") -> str:
+def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm", user_name: str = "", user_context: str = "") -> str:
     sapaan = f", {user_name.split()[0]}" if user_name else ""
     if query == '__INTRO__':
         if lang == "en":
@@ -129,8 +129,9 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
     session_context = "\n\nSesi sedang berjalan. JANGAN ulang sapaan perkenalan. Terus jawab soalan pengguna secara langsung dan profesional."
     lang_note = "\n\nIMPORTANT: The user has selected English. You MUST respond entirely in English. Do not use Malay." if lang == "en" else ""
 
+    mem_note = user_context or ""
     messages = [
-        {"role": "system", "content": _SYSTEM_PROMPT + session_context + lang_note + doc_context},
+        {"role": "system", "content": _SYSTEM_PROMPT + session_context + lang_note + doc_context + mem_note},
     ]
     if history:
         for msg in history[-8:]:

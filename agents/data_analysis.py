@@ -572,20 +572,55 @@ def _compute_eda(df: pd.DataFrame, filename: str, lang: str = "bm") -> dict:
         if EN else
         f"Fail '{filename}' berjaya dimuat naik dan diprofilkan secara automatik. Skor kualiti data: {score}/100 ({grade})."
     )
+    # ── Proactive warnings ────────────────────────────────────────────────────
     amaran = []
-    if missing_pct > 5 or dup_rows:
+    if missing_pct > 30:
+        worst_col = df.isnull().sum().idxmax()
+        amaran.append(
+            f"⚠️ HIGH missing data: {missing_pct}% of cells are empty. Column '{worst_col}' has the most gaps. Consider cleaning before analysis." if EN
+            else f"⚠️ DATA KOSONG TINGGI: {missing_pct}% sel adalah kosong. Lajur '{worst_col}' paling terjejas. Pertimbangkan pembersihan data sebelum analisis."
+        )
+    elif missing_pct > 5:
         amaran.append(
             "Data quality issues detected — review missing/duplicate values before drawing conclusions." if EN
             else "Isu kualiti data dikesan — semak nilai kosong/pendua sebelum membuat kesimpulan."
         )
+    if dup_rows > 0 and dup_pct > 5:
+        amaran.append(
+            f"⚠️ {dup_rows} duplicate rows ({dup_pct}%) — these may skew your results. Ask me to investigate or remove them." if EN
+            else f"⚠️ {dup_rows} baris pendua ({dup_pct}%) — ini boleh memesongkan keputusan analisis. Minta saya menyiasat atau membuangnya."
+        )
+    if outlier_info:
+        worst_out_col, worst_out_n = outlier_info[0]
+        if worst_out_n > 3:
+            amaran.append(
+                f"⚠️ Outliers detected in '{worst_out_col}' ({worst_out_n} values). These extreme values may affect averages and trends." if EN
+                else f"⚠️ Outlier dikesan dalam '{worst_out_col}' ({worst_out_n} nilai). Nilai ekstrem ini boleh mempengaruhi purata dan trend."
+            )
 
-    susulan = (
-        ["Give me a full analysis of this dataset", "Check data quality in detail",
-         "Detect anomalies and outliers", "Show correlations between numeric columns"]
+    # ── Anomaly-aware proactive follow-up suggestions ─────────────────────────
+    susulan_base = (
+        ["Give me a full analysis of this dataset", "Show correlations between numeric columns"]
         if EN else
-        ["Buat analisis penuh dataset ini", "Semak kualiti data dengan terperinci",
-         "Kesan anomali dan outlier", "Tunjukkan korelasi antara lajur numerik"]
+        ["Buat analisis penuh dataset ini", "Tunjukkan korelasi antara lajur numerik"]
     )
+    susulan_proactive: list[str] = []
+    if missing_pct > 5:
+        worst_miss_col = df.isnull().sum().idxmax()
+        susulan_proactive.append(
+            f"Which rows have missing values in '{worst_miss_col}'?" if EN
+            else f"Baris mana yang tiada nilai dalam lajur '{worst_miss_col}'?"
+        )
+    if dup_rows > 0:
+        susulan_proactive.append(
+            "Show me the duplicate rows" if EN else "Tunjukkan baris-baris yang pendua"
+        )
+    if outlier_info:
+        susulan_proactive.append(
+            f"Show me the outliers in '{outlier_info[0][0]}'" if EN
+            else f"Tunjukkan outlier dalam lajur '{outlier_info[0][0]}'"
+        )
+    susulan = (susulan_proactive + susulan_base)[:5]
 
     # Auto-chart suggestions (deterministic, based on column types)
     suggested = []
@@ -1517,7 +1552,7 @@ def _maybe_run_education_template(query: str, df: pd.DataFrame, lang: str) -> di
     return None
 
 
-def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm", user_name: str = "") -> str:
+def handle(query: str, history: list[dict] | None = None, session_id: str = "default", lang: str = "bm", user_name: str = "", user_context: str = "") -> str:
     sapaan = f", {user_name.split()[0]}" if user_name else ""
     if query == '__INTRO__':
         if lang == "en":
@@ -1529,6 +1564,7 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
     context_note = _build_context_note(session_id)
     data_context = _build_data_context(session_id)
     lang_note = "\n\nIMPORTANT: The user has selected English. You MUST respond entirely in English. All text fields in your JSON response must be in English." if lang == "en" else ""
+    mem_note = user_context or ""
 
     df = _get_df(session_id)
 
@@ -1573,7 +1609,7 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
         }, ensure_ascii=False)
 
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT + data_context + context_note + lang_note},
+        {"role": "system", "content": SYSTEM_PROMPT + data_context + context_note + lang_note + mem_note},
     ]
     if history:
         for msg in history[-8:]:
