@@ -709,7 +709,7 @@ const historyList = document.getElementById('historyList');
 
 // ─── DISABLED AGENTS ────────────────────────────────────────────────────────
 // To re-enable: remove the agent key from this Set (or clear it entirely).
-const DISABLED_AGENTS = new Set(['letter_generator', 'document_reviewer']);
+const DISABLED_AGENTS = new Set([]);
 // ────────────────────────────────────────────────────────────────────────────
 
 const canvasMessages = document.getElementById('canvasMessages');
