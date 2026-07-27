@@ -2814,3 +2814,22 @@ html[data-theme="light"] .ppt-modal-header { border-color: rgba(0,0,0,0.08); }
 .version-date { font-size: 11px; opacity: 0.55; white-space: nowrap; }
 .version-restore-btn { padding: 4px 12px; border-radius: 6px; background: #c9a96e; color: #1a1a2e; border: none; cursor: pointer; font-size: 12px; font-weight: 600; }
 .version-restore-btn:hover { background: #e8d5b7; }
+
+/* ── Reasoning Trace Panel (#20) ───────────────────────────────────── */
+.reasoning-trace-section .da-section-title { user-select: none; }
+.trace-toggle { font-size: 11px; font-weight: 400; opacity: 0.6; margin-left: 8px; }
+.trace-body { display: none; flex-direction: column; gap: 6px; margin-top: 8px; }
+.trace-body.open { display: flex; }
+.trace-step { display: flex; align-items: flex-start; gap: 8px; padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.04); font-size: 12px; line-height: 1.5; }
+.trace-icon { font-size: 14px; min-width: 20px; }
+.trace-round { font-size: 10px; font-weight: 700; color: #c9a96e; background: rgba(201,169,110,0.15); border-radius: 4px; padding: 1px 5px; margin-right: 4px; white-space: nowrap; align-self: center; }
+.trace-detail { flex: 1; }
+.trace-issues { opacity: 0.7; font-size: 11px; }
+.trace-code { background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+.trace-result { margin: 4px 0 0; padding: 4px 8px; background: rgba(0,0,0,0.25); border-radius: 4px; font-size: 11px; white-space: pre-wrap; max-height: 120px; overflow-y: auto; }
+
+/* ── Background Task Toast (#16) ───────────────────────────────────── */
+.task-notification { position: fixed; bottom: 80px; right: 24px; background: #1e293b; border: 1px solid rgba(201,169,110,0.4); border-radius: 10px; padding: 12px 18px; font-size: 13px; z-index: 5000; max-width: 320px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+.task-notification .task-notif-title { font-weight: 700; margin-bottom: 4px; color: #c9a96e; }
+.task-notification .task-notif-body { opacity: 0.85; }
+.task-notif-progress { display: flex; gap: 6px; align-items: center; margin-top: 6px; font-size: 11px; opacity: 0.65; }

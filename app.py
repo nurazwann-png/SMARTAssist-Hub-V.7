@@ -73,6 +73,12 @@ from backend.user_memory import (
 )
 from backend.summariser import compress_history as _compress_history
 from backend.doc_versions import list_versions as _list_versions, get_version as _get_version
+from backend.task_queue import (
+    enqueue as _tq_enqueue,
+    get_task as _tq_get,
+    list_tasks as _tq_list,
+    start_worker as _tq_start_worker,
+)
 from agents.data_analysis import upload_file as da_upload, get_session_data as da_get_data
 from agents.letter_generator import (
     get_document as lg_get_document,
@@ -92,6 +98,11 @@ from agents.report_generator import (
 )
 
 app = FastAPI(title="SMARTAssist Hub", version="7.0")
+
+
+@app.on_event("startup")
+async def _on_startup():
+    _tq_start_worker()
 
 # Session middleware must be added before including routers
 app.add_middleware(
@@ -1747,65 +1758,43 @@ async def agent_chat(req: AgentChatRequest, request: Request):
             except Exception:
                 pass
 
-    # Auto-review + auto-improve: when a document agent produces a ready document
+    # Self-correcting loop (#19) + auto-review: when a document agent produces a ready document
     _DOC_AGENTS = {
         "letter_generator": lambda s: "Memo Dalaman" if s.get("doc_type") == "memo" else "Surat Rasmi",
         "report_generator": lambda s: "Laporan Satu Muka Surat",
     }
     if agent in _DOC_AGENTS and structured and structured.get("ready_to_save") and structured.get("document_preview"):
         try:
-            from agents.document_reviewer import auto_review, auto_improve
-            doc_text = structured["document_preview"]
+            from agents.document_reviewer import self_correcting_loop, auto_review
             doc_type = _DOC_AGENTS[agent](structured)
 
-            # Step 1: Review
-            review = auto_review(doc_text, doc_type, req.session_id, req.lang)
+            # Run up to 3 critique→improve rounds; get final doc + reasoning trace
+            final_doc, reasoning_trace = self_correcting_loop(
+                session_id=req.session_id,
+                agent=agent,
+                doc_type=doc_type,
+                lang=req.lang,
+                max_rounds=3,
+            )
+
+            if final_doc and final_doc != structured["document_preview"]:
+                structured["document_preview"] = final_doc
+                if agent == "letter_generator" and structured.get("doc_type") == "memo":
+                    from agents.letter_generator import _build_memo_html
+                    agent_mod_lg = __import__("agents.letter_generator", fromlist=["letter_generator"])
+                    new_fields = agent_mod_lg.get_fields(req.session_id)
+                    structured["document_html"] = _build_memo_html(new_fields)
+
+            # Attach reasoning trace for #20 and a summary auto_review entry
+            structured["reasoning_trace"] = reasoning_trace
+
+            # Also include the final review so the existing auto_review UI still works
+            final_text = structured["document_preview"]
+            review = auto_review(final_text, doc_type, req.session_id, req.lang)
             if review:
                 structured["auto_review"] = review
 
-                # Step 2: Auto-improve using review findings
-                agent_mod = __import__(f"agents.{agent}", fromlist=[agent])
-                all_fields = agent_mod.get_fields(req.session_id)
-                gen_keys = agent_mod.GENERATED_FIELD_KEYS
-
-                # Strip template-hardcoded opening from surat isi before sending to LLM
-                _SURAT_ISI_PREFIX = "dengan hormatnya perkara di atas adalah dirujuk"
-                clean_fields = dict(all_fields)
-                if agent == "letter_generator" and "isi" in clean_fields:
-                    isi_lines = clean_fields["isi"].strip().splitlines()
-                    if isi_lines and isi_lines[0].strip().lower().rstrip(".") == _SURAT_ISI_PREFIX:
-                        clean_fields["isi"] = "\n".join(isi_lines[1:]).strip()
-
-                improvement = auto_improve(
-                    doc_type=doc_type,
-                    user_fields=clean_fields,
-                    generated_field_keys=gen_keys,
-                    review=review,
-                    lang=req.lang,
-                )
-                if improvement and improvement.get("improved_fields"):
-                    # Strip template prefix from improved isi if LLM included it
-                    imp_fields = improvement["improved_fields"]
-                    if agent == "letter_generator" and "isi" in imp_fields:
-                        isi_lines = imp_fields["isi"].strip().splitlines()
-                        if isi_lines and isi_lines[0].strip().lower().rstrip(".") == _SURAT_ISI_PREFIX:
-                            imp_fields["isi"] = "\n".join(isi_lines[1:]).strip()
-                    # apply_improvement updates fields + rebuilds doc via original template
-                    new_doc = agent_mod.apply_improvement(req.session_id, imp_fields)
-                    if new_doc:
-                        structured["document_preview"] = new_doc
-                        # Rebuild memo HTML from updated fields
-                        if agent == "letter_generator" and structured.get("doc_type") == "memo":
-                            from agents.letter_generator import _build_memo_html
-                            new_fields = agent_mod.get_fields(req.session_id)
-                            structured["document_html"] = _build_memo_html(new_fields)
-                    structured["auto_review"]["improvement"] = {
-                        "changes_applied": improvement.get("changes_applied", []),
-                        "changes_skipped": improvement.get("changes_skipped", []),
-                        "needs_info": improvement.get("needs_info"),
-                    }
-
-                output = json.dumps(structured, ensure_ascii=False)
+            output = json.dumps(structured, ensure_ascii=False)
         except Exception:
             pass
 
@@ -1909,6 +1898,90 @@ async def get_version_detail(version_id: int, request: Request = None):
         return JSONResponse(ver)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ── Background Task Queue endpoints (#16) ─────────────────────────────────────
+
+class TaskEnqueueRequest(BaseModel):
+    agent: str
+    query: str
+    session_id: str = "default"
+    lang: str = "bm"
+    history: list = []
+
+
+@app.post("/api/tasks")
+async def enqueue_task(req: TaskEnqueueRequest, request: Request):
+    """Enqueue an agent call as a background task. Returns {task_id}."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "Tidak dibenarkan."}, status_code=401)
+    profile = get_profile(user["sub"])
+    user_name = profile.get("nama") or user.get("name", "")
+    user_email = user.get("sub", "")
+    user_context = ""
+    try:
+        user_context = _get_memory_context(user_email, req.lang)
+    except Exception:
+        pass
+    payload = {
+        "agent": req.agent,
+        "query": req.query,
+        "session_id": req.session_id,
+        "lang": req.lang,
+        "user_name": user_name,
+        "user_context": user_context,
+        "history": req.history,
+    }
+    task_id = _tq_enqueue("agent_call", payload, session_id=req.session_id, user_email=user_email)
+    return JSONResponse({"task_id": task_id, "status": "PENDING"})
+
+
+@app.get("/api/tasks/{task_id}")
+async def get_task_status(task_id: str, request: Request):
+    """Poll the status and result of a background task."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "Tidak dibenarkan."}, status_code=401)
+    task = _tq_get(task_id)
+    if not task:
+        return JSONResponse({"error": "Tugas tidak ditemui."}, status_code=404)
+    return JSONResponse(task)
+
+
+@app.get("/api/sessions/{session_id}/tasks")
+async def list_session_tasks(session_id: str, request: Request):
+    """List all background tasks for a session."""
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "Tidak dibenarkan."}, status_code=401)
+    return JSONResponse({"tasks": _tq_list(session_id)})
+
+
+@app.get("/api/tasks/{task_id}/stream")
+async def stream_task(task_id: str, request: Request):
+    """SSE endpoint: push task status updates until DONE or FAILED."""
+    from fastapi.responses import StreamingResponse as _SR
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "Tidak dibenarkan."}, status_code=401)
+
+    def event_gen():
+        import time as _t
+        for _ in range(300):  # max 10 min (300 × 2s)
+            task = _tq_get(task_id)
+            if not task:
+                yield f"data: {json.dumps({'error': 'not_found'})}\n\n"
+                return
+            yield f"data: {json.dumps({'status': task['status'], 'progress': task['progress']}, default=str)}\n\n"
+            if task["status"] in ("DONE", "FAILED"):
+                # Send full result on terminal state
+                yield f"data: {json.dumps({'status': task['status'], 'result': task.get('result'), 'error': task.get('error')}, default=str)}\n\n"
+                return
+            _t.sleep(2)
+        yield f"data: {json.dumps({'status': 'TIMEOUT'})}\n\n"
+
+    return _SR(event_gen(), media_type="text/event-stream")
 
 
 @app.get("/api/avatar")

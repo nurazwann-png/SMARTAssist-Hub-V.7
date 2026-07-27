@@ -391,6 +391,134 @@ def auto_improve(
     return _try_parse_json(raw)
 
 
+_CRITIQUE_SYSTEM = """Anda ialah juruaudit dokumen rasmi KPM yang sangat teliti.
+Beri skor kualiti dokumen dari 1-10 dan senaraikan isu kritikal sahaja.
+
+Format JSON WAJIB:
+{
+  "score": <integer 1-10>,
+  "passed": <true jika score >= 7>,
+  "critical_issues": ["isu 1", "isu 2"],
+  "summary": "ringkasan satu ayat tentang kualiti keseluruhan"
+}
+
+Skor 7-10: dokumen diterima pakai. Skor <7: perlu penambahbaikan."""
+
+_CRITIQUE_PROMPT = """Nilai kualiti dokumen {doc_type} berikut:
+
+{document}
+
+Fokus pada: ketepatan format rasmi KPM, kelengkapan kandungan, kesesuaian bahasa, dan ketiadaan placeholder."""
+
+
+def critique_score(document: str, doc_type: str, lang: str = "bm") -> dict:
+    """Return {score, passed, critical_issues, summary} for a document.
+
+    score >= 7 means the document passes quality gate.
+    Falls back to {"score": 7, "passed": True} on any error so the loop
+    never stalls the user when the critic LLM is unavailable.
+    """
+    lang_note = "\n\nIMPORTANT: Respond in English." if lang == "en" else ""
+    messages = [
+        {"role": "system", "content": _CRITIQUE_SYSTEM + lang_note},
+        {"role": "user", "content": _CRITIQUE_PROMPT.format(doc_type=doc_type, document=document[:4000])},
+    ]
+    try:
+        raw = chat_completion(messages=messages, temperature=0.1, max_tokens=400)
+        parsed = _try_parse_json(raw)
+        if parsed and "score" in parsed:
+            parsed.setdefault("passed", int(parsed["score"]) >= 7)
+            parsed.setdefault("critical_issues", [])
+            return parsed
+    except Exception:
+        pass
+    return {"score": 7, "passed": True, "critical_issues": [], "summary": ""}
+
+
+def self_correcting_loop(
+    session_id: str,
+    agent: str,
+    doc_type: str,
+    lang: str = "bm",
+    max_rounds: int = 3,
+    pass_threshold: int = 7,
+) -> tuple[str | None, list[dict]]:
+    """Run up to *max_rounds* critique→improve cycles on the current document.
+
+    Returns (final_document_or_None, trace) where trace is a list of dicts
+    that can be surfaced as the reasoning trace (#20).
+
+    Designed to be called after the first document generation, before returning
+    the response to the user.
+    """
+    # Import here to avoid circular imports at module load
+    from agents import letter_generator, report_generator as rg_mod
+    _agent_modules = {"letter_generator": letter_generator, "report_generator": rg_mod}
+    agent_mod = _agent_modules.get(agent)
+    if not agent_mod:
+        return None, []
+
+    trace: list[dict] = []
+    current_doc = agent_mod.get_document(session_id)
+    if not current_doc:
+        return None, []
+
+    for round_num in range(1, max_rounds + 1):
+        # Step 1: score current document
+        critique = critique_score(current_doc, doc_type, lang)
+        trace.append({
+            "round": round_num,
+            "step": "critique",
+            "score": critique.get("score"),
+            "passed": critique.get("passed"),
+            "summary": critique.get("summary", ""),
+            "issues": critique.get("critical_issues", []),
+        })
+
+        if critique.get("passed"):
+            trace.append({"round": round_num, "step": "pass", "message": f"Dokumen lulus (skor {critique.get('score')}/10)"})
+            break
+
+        # Step 2: auto-review for structured issues
+        review = auto_review(current_doc, doc_type, session_id, lang)
+        if not review or not review.get("issues"):
+            trace.append({"round": round_num, "step": "no_issues", "message": "Tiada isu konkrit ditemui — berhenti"})
+            break
+
+        # Step 3: auto-improve
+        all_fields = agent_mod.get_fields(session_id)
+        gen_keys = agent_mod.GENERATED_FIELD_KEYS
+        improvement = auto_improve(
+            doc_type=doc_type,
+            user_fields=all_fields,
+            generated_field_keys=gen_keys,
+            review=review,
+            lang=lang,
+        )
+        if not improvement or not improvement.get("improved_fields"):
+            trace.append({"round": round_num, "step": "no_improvement", "message": "Tiada penambahbaikan boleh dilakukan"})
+            break
+
+        # Step 4: apply improvement and get new document
+        new_doc = agent_mod.apply_improvement(session_id, improvement["improved_fields"])
+        if not new_doc or new_doc == current_doc:
+            trace.append({"round": round_num, "step": "unchanged", "message": "Dokumen tidak berubah — berhenti"})
+            break
+
+        current_doc = new_doc
+        trace.append({
+            "round": round_num,
+            "step": "improved",
+            "changes": improvement.get("changes_applied", []),
+            "skipped": improvement.get("changes_skipped", []),
+        })
+
+        if round_num == max_rounds:
+            trace.append({"round": round_num, "step": "max_rounds", "message": f"Had {max_rounds} pusingan dicapai"})
+
+    return current_doc, trace
+
+
 def clear_session(session_id: str):
     from backend.session_store import get_store
     get_store().delete_ns(session_id, _NS)

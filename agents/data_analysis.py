@@ -945,6 +945,7 @@ _DA_TOOLS = [
 
 # Stores chart specs proposed by the tool loop, keyed by session_id
 _pending_charts: dict[str, dict] = {}
+_pending_traces: dict[str, list] = {}  # reasoning trace steps keyed by session_id
 
 _SAFE_BUILTINS = {
     name: getattr(_builtins, name)
@@ -1123,8 +1124,9 @@ def _agentic_tool_loop(
 
     pending_chart: list = [None]
     computed_blocks: list[str] = []
+    trace_steps: list[dict] = []  # reasoning trace for #20
 
-    for _ in range(6):  # max 6 tool-call rounds
+    for round_idx in range(6):  # max 6 tool-call rounds
         try:
             msg = tool_completion(messages, _DA_TOOLS, temperature=0.0, max_tokens=1000)
         except Exception:
@@ -1157,6 +1159,14 @@ def _agentic_tool_loop(
             if tc.function.name != "propose_chart":
                 computed_blocks.append(f"### [{tc.function.name}: {args.get('description', '')}]\n{result}")
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+            # Record step for reasoning trace
+            trace_steps.append({
+                "round": round_idx + 1,
+                "tool": tc.function.name,
+                "args": {k: v for k, v in args.items() if k != "description"},
+                "description": args.get("description", ""),
+                "result_preview": str(result)[:300],
+            })
 
     if not computed_blocks and pending_chart[0] is None:
         return None
@@ -1173,6 +1183,9 @@ def _agentic_tool_loop(
     if pending_chart[0]:
         _pending_charts[session_id] = pending_chart[0]
         cache[f"{cache_key}__chart"] = pending_chart[0]
+
+    # Store trace for the handle() call to pick up
+    _pending_traces[session_id] = trace_steps
 
     return context
 
@@ -1635,6 +1648,9 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
         # Inject chart proposed by the tool-calling loop (if any, and not already present)
         if not parsed.get("chart") and session_id in _pending_charts:
             parsed["chart"] = _pending_charts.pop(session_id)
+        # Inject reasoning trace from the tool-calling loop
+        if session_id in _pending_traces:
+            parsed["reasoning_trace"] = _pending_traces.pop(session_id)
         return json.dumps(parsed, ensure_ascii=False)
     return json.dumps({
         "response_type": "pandangan",

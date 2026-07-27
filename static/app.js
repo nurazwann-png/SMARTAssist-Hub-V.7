@@ -2423,6 +2423,10 @@ function buildLetterHtml(data) {
         html += '</ul></div>';
     }
 
+    if (data.reasoning_trace && data.reasoning_trace.length > 0) {
+        html += renderReasoningTrace(data.reasoning_trace);
+    }
+
     if (data.auto_review) {
         html += renderAutoReviewPanel(data.auto_review);
     }
@@ -2459,6 +2463,60 @@ function buildLetterHtml(data) {
 
     html += '</div>';
     return html;
+}
+
+function renderReasoningTrace(trace) {
+    if (!trace || !trace.length) return '';
+    const id = 'reasoningTrace_' + Math.random().toString(36).slice(2);
+    const isBm = currentLang !== 'en';
+    const title = isBm ? '🧠 Jejak Pemikiran Agen' : '🧠 Agent Reasoning Trace';
+    const toggleLabel = isBm ? 'Lihat / Sembunyikan' : 'Show / Hide';
+
+    let rows = '';
+    trace.forEach(step => {
+        const icon = {
+            critique:   '🔍',
+            improved:   '✏️',
+            pass:       '✅',
+            no_issues:  '✅',
+            no_improvement: '⚠️',
+            unchanged:  '⚠️',
+            max_rounds: '⏹',
+            // data analysis tool names
+            run_pandas:       '⚙️',
+            get_column_info:  '📋',
+            sample_rows:      '📄',
+            propose_chart:    '📊',
+        }[step.step || step.tool] || '•';
+
+        let detail = '';
+        if (step.step === 'critique') {
+            const passed = step.passed ? '✅' : '❌';
+            detail = `Skor: <b>${step.score}/10</b> ${passed}`;
+            if (step.summary) detail += ` — ${escapeHtml(step.summary)}`;
+            if (step.issues && step.issues.length) detail += `<br><span class="trace-issues">${step.issues.map(escapeHtml).join('; ')}</span>`;
+        } else if (step.step === 'improved') {
+            detail = (step.changes || []).map(c => `+ ${escapeHtml(c)}`).join('<br>');
+        } else if (step.message) {
+            detail = escapeHtml(step.message);
+        } else if (step.tool) {
+            // data analysis tool step
+            detail = `<code class="trace-code">${escapeHtml(step.description || step.tool)}</code>`;
+            if (step.result_preview) detail += `<pre class="trace-result">${escapeHtml(step.result_preview)}</pre>`;
+        }
+
+        const roundBadge = step.round ? `<span class="trace-round">R${step.round}</span>` : '';
+        rows += `<div class="trace-step"><span class="trace-icon">${icon}</span>${roundBadge}<div class="trace-detail">${detail}</div></div>`;
+    });
+
+    return `<div class="da-section reasoning-trace-section">
+        <div class="da-section-title" onclick="document.getElementById('${id}').classList.toggle('open')" style="cursor:pointer">
+            ${title} <span class="trace-toggle">${toggleLabel}</span>
+        </div>
+        <div id="${id}" class="trace-body">
+            ${rows}
+        </div>
+    </div>`;
 }
 
 function renderAutoReviewPanel(review) {
@@ -4823,6 +4881,91 @@ document.getElementById('fontDecBtn')?.addEventListener('click', fontDecrease);
 
 // Init KPM agent nav (called here because _buildKpmAgentNav is defined after applyLanguage runs at load)
 _buildKpmAgentNav();
+
+// ═══════════════════════════════════════
+//  BACKGROUND TASK QUEUE (#16)
+// ═══════════════════════════════════════
+
+const _activeTasks = new Map(); // task_id → {notifEl, intervalId}
+
+/**
+ * Enqueue an agent call as a background task and show a live notification.
+ * @param {string} agent  - agent key e.g. "report_generator"
+ * @param {string} query  - the user query / instruction
+ * @param {string} sessionId - session to attach the result to
+ */
+async function enqueueBackgroundTask(agent, query, sessionId) {
+    sessionId = sessionId || _currentSessionId || 'default';
+    try {
+        const res = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agent, query, session_id: sessionId, lang: currentLang }),
+        });
+        const data = await res.json();
+        if (!data.task_id) { alert('Gagal menambah tugas latar.'); return; }
+        _watchTask(data.task_id, agent, query);
+    } catch (e) {
+        alert('Ralat: ' + e);
+    }
+}
+
+function _watchTask(taskId, agent, query) {
+    const notif = _createTaskNotif(taskId, agent, query);
+    const intervalId = setInterval(async () => {
+        try {
+            const res = await fetch(`/api/tasks/${taskId}`);
+            const task = await res.json();
+            _updateTaskNotif(notif, task);
+            if (task.status === 'DONE' || task.status === 'FAILED') {
+                clearInterval(intervalId);
+                _activeTasks.delete(taskId);
+                if (task.status === 'DONE') {
+                    // Reload session messages so new result appears
+                    if (typeof loadSessionMessages === 'function') loadSessionMessages(_currentSessionId);
+                }
+            }
+        } catch (_) {}
+    }, 3000);
+    _activeTasks.set(taskId, { notif, intervalId });
+}
+
+function _createTaskNotif(taskId, agent, query) {
+    const el = document.createElement('div');
+    el.className = 'task-notification';
+    el.dataset.taskId = taskId;
+    const agentLabel = (AGENT_LABELS && AGENT_LABELS[agent]) ? AGENT_LABELS[agent].name : agent;
+    el.innerHTML = `
+        <div class="task-notif-title">⏳ Tugas Latar: ${escapeHtml(agentLabel)}</div>
+        <div class="task-notif-body">${escapeHtml(query.slice(0, 80))}</div>
+        <div class="task-notif-progress" id="tnp_${taskId}">Menunggu pekerja…</div>`;
+    document.body.appendChild(el);
+    return el;
+}
+
+function _updateTaskNotif(el, task) {
+    const prog = el.querySelector(`#tnp_${el.dataset.taskId}`);
+    if (!prog) return;
+    const icons = { PENDING: '⏳', RUNNING: '⚙️', DONE: '✅', FAILED: '❌' };
+    prog.textContent = `${icons[task.status] || '•'} ${task.progress || task.status}`;
+    if (task.status === 'DONE') {
+        el.style.borderColor = 'rgba(52,211,153,0.5)';
+        setTimeout(() => el.remove(), 5000);
+    } else if (task.status === 'FAILED') {
+        el.style.borderColor = 'rgba(248,113,113,0.5)';
+        el.innerHTML += `<div style="font-size:11px;color:#f87171;margin-top:4px">${escapeHtml(task.error || '')}</div>`;
+        setTimeout(() => el.remove(), 8000);
+    }
+}
+
+// Expose AGENT_LABELS to JS for task notifications
+const AGENT_LABELS = {
+    data_analysis: { name: 'Analisis Data' },
+    letter_generator: { name: 'Penjana Surat/Memo' },
+    report_generator: { name: 'Penjana Laporan' },
+    document_reviewer: { name: 'Semakan Dokumen' },
+    kpm_support: { name: 'Sokongan KPM' },
+};
 
 // ═══════════════════════════════════════
 //  VERSION HISTORY
