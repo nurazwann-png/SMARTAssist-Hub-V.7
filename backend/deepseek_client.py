@@ -148,6 +148,44 @@ def tool_completion(
     raise RuntimeError(f"Tidak dapat menghubungi DeepSeek API. Ralat terakhir: {last_error}")
 
 
+def stream_chat_completion(
+    messages: list[dict],
+    model: str = _MODEL,
+    temperature: float = 0.3,
+    max_tokens: int = 2048,
+):
+    """Stream a chat completion, yielding text delta strings as they arrive.
+
+    Uses the same circuit breaker check as chat_completion.  Does NOT retry
+    on failure mid-stream (the OpenAI SDK handles reconnection internally).
+
+    Raises RuntimeError if the circuit breaker is open or the initial
+    connection fails.
+    """
+    if not _circuit_breaker.allow_request():
+        cb = _circuit_breaker.status
+        raise RuntimeError(
+            f"Perkhidmatan AI tidak tersedia. Cuba semula dalam {int(cb['seconds_until_retry'])} saat."
+        )
+    client = get_client()
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=True,
+        )
+        for chunk in response:
+            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if delta:
+                yield delta
+        _circuit_breaker.record_success()
+    except (APITimeoutError, APIConnectionError, APIError) as e:
+        _circuit_breaker.record_failure()
+        raise RuntimeError(f"Ralat penstriman API: {e}") from e
+
+
 def get_circuit_breaker_status() -> dict:
     """Kembalikan status circuit breaker semasa — berguna untuk endpoint /api/health."""
     return _circuit_breaker.status

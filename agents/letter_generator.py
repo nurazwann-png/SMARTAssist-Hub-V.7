@@ -598,6 +598,11 @@ Kembalikan HANYA dokumen yang telah dikemaskini dalam format JSON:
                 session["document"] = doc_text
                 parsed["ready_to_save"] = not _has_placeholders(doc_text)
                 parsed["fields_status"] = {"collected": session["fields"], "missing": []}
+                try:
+                    from backend.doc_versions import save_version
+                    parsed["version"] = save_version(session_id, "letter_generator", doc_text, session.get("doc_type", ""), session.get("fields", {}))
+                except Exception:
+                    pass
                 return json.dumps(parsed, ensure_ascii=False)
         except Exception:
             pass
@@ -786,6 +791,11 @@ Status sesi semasa:
         else:
             parsed["ready_to_save"] = True
             session["document"] = doc_text
+            try:
+                from backend.doc_versions import save_version
+                parsed["version"] = save_version(session_id, "letter_generator", doc_text, session.get("doc_type", ""), session.get("fields", {}))
+            except Exception:
+                pass
 
     # form_extras: optional fields that should appear in the form but don't block generation
     form_extras: list[str] = []
@@ -844,6 +854,11 @@ def apply_improvement(session_id: str, improved_fields: dict) -> str | None:
     new_doc = _build_document(session["doc_type"], session["fields"])
     session["document"] = new_doc
     _save_session(session_id, session)
+    try:
+        from backend.doc_versions import save_version
+        save_version(session_id, "letter_generator", new_doc, session.get("doc_type", ""), session.get("fields", {}))
+    except Exception:
+        pass
     return new_doc
 
 

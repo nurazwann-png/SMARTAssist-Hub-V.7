@@ -2406,6 +2406,7 @@ function buildLetterHtml(data) {
             + `<button class="doc-edit-btn doc-edit-reset" onclick="docResetToOriginal()" data-i18n-title="doc_reset_tip" title="${_d.doc_reset_tip}">⟳ <span data-i18n="doc_reset">${_d.doc_reset}</span></button>`
             + `<button class="doc-preview-expand-btn" onclick="openWordPreview()" data-i18n-title="doc_view_word" title="${_d.doc_view_word}">&#9974; <span data-i18n="doc_view_word">${_d.doc_view_word}</span></button>`
             + `<button class="doc-preview-save-btn" id="docPreviewSaveBtn" onclick="savePreviewEdits(this)">💾 <span data-i18n="doc_save">${_d.doc_save}</span></button>`
+            + `<button class="doc-edit-btn" onclick="openVersionHistory()" title="Sejarah versi">🕐 Versi</button>`
             + `</div></div>`;
         if (data.document_html) {
             html += `<pre class="doc-preview" contenteditable="true" id="docPreview" style="display:none" oninput="onPreviewEdit()">${escapeHtml(data.document_preview)}</pre>`;
@@ -3972,15 +3973,50 @@ function closeKpmBubble() {
     }, 420);
 }
 
-function _appendKpmMsg(text, role) {
+function _appendKpmMsg(textOrStructured, role) {
     const msgs = document.getElementById('kpmBubbleMessages');
     if (!msgs) return;
     const div = document.createElement('div');
     div.className = 'kpm-bubble-msg ' + role;
-    // Convert newlines to <br> and escape HTML
-    div.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+
+    let structured = null;
+    if (typeof textOrStructured === 'string') {
+        // Try to parse as structured JSON from kpm_support
+        try { structured = JSON.parse(textOrStructured); } catch (_) {}
+    } else if (textOrStructured && typeof textOrStructured === 'object') {
+        structured = textOrStructured;
+    }
+
+    if (structured && structured.message !== undefined) {
+        // Render message text
+        const msgText = document.createElement('div');
+        msgText.innerHTML = escapeHtml(structured.message).replace(/\n/g, '<br>');
+        div.appendChild(msgText);
+
+        // Render source citations if present
+        if (structured.sources && structured.sources.length > 0) {
+            const srcDiv = document.createElement('div');
+            srcDiv.className = 'kpm-citations';
+            const conf = structured.confidence || 'medium';
+            const confLabel = conf === 'high' ? '🟢' : conf === 'medium' ? '🟡' : '🔴';
+            srcDiv.innerHTML = `<div class="kpm-conf">${confLabel} ${conf === 'high' ? 'Keyakinan tinggi' : conf === 'medium' ? 'Keyakinan sederhana' : 'Keyakinan rendah'}</div>`;
+            structured.sources.forEach(s => {
+                const chip = document.createElement('div');
+                chip.className = 'kpm-source-chip';
+                chip.innerHTML = `<span class="kpm-src-num">[${s.num}]</span> <span class="kpm-src-title">${escapeHtml(s.title)}</span>`;
+                if (s.category) chip.innerHTML += ` <span class="kpm-src-cat">${escapeHtml(s.category)}</span>`;
+                srcDiv.appendChild(chip);
+            });
+            div.appendChild(srcDiv);
+        }
+    } else {
+        const text = typeof textOrStructured === 'string' ? textOrStructured : JSON.stringify(textOrStructured);
+        div.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+    }
+
     msgs.appendChild(div);
     msgs.scrollTop = msgs.scrollHeight;
+    return div;
 }
 
 async function _sendKpmIntro() {
@@ -4025,18 +4061,71 @@ async function sendKpmBubbleMsg() {
     const typing = document.getElementById('kpmBubbleTyping');
     typing.style.display = 'flex';
     document.getElementById('kpmBubbleMessages').scrollTop = 99999;
+
+    // Create a streaming bot message div that fills in as chunks arrive
+    const msgs = document.getElementById('kpmBubbleMessages');
+    const streamDiv = document.createElement('div');
+    streamDiv.className = 'kpm-bubble-msg bot';
+    msgs.appendChild(streamDiv);
+
     try {
-        const res = await fetch('/api/agent-chat', {
+        const res = await fetch('/api/agent-chat/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: text, agent: 'kpm_support', session_id: _kpmSessionId, lang: currentLang }),
         });
-        const data = await res.json();
+        if (!res.ok) throw new Error('stream failed');
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let collectedText = '';
+        let done = false;
+        while (!done) {
+            const { value, done: readerDone } = await reader.read();
+            done = readerDone;
+            if (value) buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                try {
+                    const evt = JSON.parse(line.slice(6));
+                    if (evt.chunk) {
+                        collectedText += evt.chunk;
+                        streamDiv.innerHTML = escapeHtml(collectedText).replace(/\n/g, '<br>');
+                        msgs.scrollTop = msgs.scrollHeight;
+                    } else if (evt.done && evt.structured) {
+                        // Replace stream div with proper structured render
+                        streamDiv.innerHTML = '';
+                        const msgText = document.createElement('div');
+                        msgText.innerHTML = escapeHtml(evt.structured.message || collectedText).replace(/\n/g, '<br>');
+                        streamDiv.appendChild(msgText);
+                        if (evt.structured.sources && evt.structured.sources.length > 0) {
+                            const srcDiv = document.createElement('div');
+                            srcDiv.className = 'kpm-citations';
+                            const conf = evt.structured.confidence || 'medium';
+                            const confLabel = conf === 'high' ? '🟢' : conf === 'medium' ? '🟡' : '🔴';
+                            srcDiv.innerHTML = `<div class="kpm-conf">${confLabel} ${conf === 'high' ? 'Keyakinan tinggi' : conf === 'medium' ? 'Keyakinan sederhana' : 'Keyakinan rendah'}</div>`;
+                            evt.structured.sources.forEach(s => {
+                                const chip = document.createElement('div');
+                                chip.className = 'kpm-source-chip';
+                                chip.innerHTML = `<span class="kpm-src-num">[${s.num}]</span> <span class="kpm-src-title">${escapeHtml(s.title)}</span>`;
+                                if (s.category) chip.innerHTML += ` <span class="kpm-src-cat">${escapeHtml(s.category)}</span>`;
+                                srcDiv.appendChild(chip);
+                            });
+                            streamDiv.appendChild(srcDiv);
+                        }
+                        msgs.scrollTop = msgs.scrollHeight;
+                    } else if (evt.error) {
+                        streamDiv.innerHTML = escapeHtml(evt.error);
+                    }
+                } catch (_) {}
+            }
+        }
         typing.style.display = 'none';
-        _appendKpmMsg(data.response || '', 'bot');
     } catch {
         typing.style.display = 'none';
-        _appendKpmMsg(I18N[currentLang].error_generic, 'bot');
+        streamDiv.innerHTML = escapeHtml(I18N[currentLang].error_generic);
     }
 }
 
@@ -4734,3 +4823,85 @@ document.getElementById('fontDecBtn')?.addEventListener('click', fontDecrease);
 
 // Init KPM agent nav (called here because _buildKpmAgentNav is defined after applyLanguage runs at load)
 _buildKpmAgentNav();
+
+// ═══════════════════════════════════════
+//  VERSION HISTORY
+// ═══════════════════════════════════════
+
+async function openVersionHistory() {
+    const sessionId = _currentSessionId;
+    const agent = _currentAgent;
+    if (!sessionId || !agent) return;
+
+    let modal = document.getElementById('versionHistoryModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'versionHistoryModal';
+        modal.className = 'modal-overlay version-modal';
+        modal.innerHTML = `
+            <div class="modal-box version-modal-box">
+                <div class="modal-header">
+                    <span>🕐 Sejarah Versi Dokumen</span>
+                    <button class="modal-close" onclick="document.getElementById('versionHistoryModal').style.display='none'">✕</button>
+                </div>
+                <div id="versionHistoryList" class="version-list"></div>
+            </div>`;
+        document.body.appendChild(modal);
+    }
+    modal.style.display = 'flex';
+
+    const listDiv = document.getElementById('versionHistoryList');
+    listDiv.innerHTML = '<div class="version-loading">Memuatkan...</div>';
+
+    try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/versions?agent=${encodeURIComponent(agent)}`);
+        const data = await res.json();
+        const versions = data.versions || [];
+        if (!versions.length) {
+            listDiv.innerHTML = '<div class="version-empty">Tiada versi disimpan untuk sesi ini.</div>';
+            return;
+        }
+        listDiv.innerHTML = '';
+        versions.forEach(v => {
+            const row = document.createElement('div');
+            row.className = 'version-row';
+            const dt = new Date(v.created_at).toLocaleString('ms-MY');
+            row.innerHTML = `<span class="version-num">v${v.version}</span><span class="version-type">${escapeHtml(v.doc_type || '')}</span><span class="version-date">${dt}</span><button class="version-restore-btn" onclick="restoreVersion(${v.id})">Pulihkan</button>`;
+            listDiv.appendChild(row);
+        });
+    } catch (e) {
+        listDiv.innerHTML = `<div class="version-empty">Ralat: ${escapeHtml(String(e))}</div>`;
+    }
+}
+
+async function restoreVersion(versionId) {
+    try {
+        const res = await fetch(`/api/versions/${versionId}`);
+        const ver = await res.json();
+        if (!ver || !ver.document_text) { alert('Gagal memuatkan versi.'); return; }
+
+        // Inject into current document preview
+        const previewEl = document.getElementById('docPreview');
+        const previewHtmlEl = document.getElementById('docPreviewHtml');
+        if (previewEl) previewEl.textContent = ver.document_text;
+        if (previewHtmlEl) previewHtmlEl.innerHTML = escapeHtml(ver.document_text).replace(/\n/g, '<br>');
+
+        document.getElementById('versionHistoryModal').style.display = 'none';
+        showToast(`Versi v${ver.version} telah dipulihkan.`);
+    } catch (e) {
+        alert('Gagal memulihkan versi: ' + e);
+    }
+}
+
+function showToast(msg) {
+    let t = document.getElementById('_toast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = '_toast';
+        t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 20px;border-radius:8px;z-index:9999;font-size:13px;transition:opacity .4s';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    setTimeout(() => { t.style.opacity = '0'; }, 2800);
+}

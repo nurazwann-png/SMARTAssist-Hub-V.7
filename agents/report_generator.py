@@ -315,6 +315,11 @@ Kembalikan HANYA laporan yang telah dikemaskini dalam format JSON:
                 doc_text = parsed["document_preview"]
                 session["document"] = doc_text
                 parsed["ready_to_save"] = not bool(_has_placeholders(doc_text))
+                try:
+                    from backend.doc_versions import save_version
+                    parsed["version"] = save_version(session_id, "report_generator", doc_text, "laporan", session.get("fields", {}))
+                except Exception:
+                    pass
                 image_count = len(get_report_images(session_id))
                 parsed["awaiting_images"] = True
                 parsed["image_count"] = image_count
@@ -427,6 +432,11 @@ Status sesi semasa:
         else:
             parsed["ready_to_save"] = True
             session["document"] = doc_text
+            try:
+                from backend.doc_versions import save_version
+                parsed["version"] = save_version(session_id, "report_generator", doc_text, "laporan", session.get("fields", {}))
+            except Exception:
+                pass
             # Prompt for images
             image_count = len(get_report_images(session_id))
             parsed["awaiting_images"] = True
@@ -666,6 +676,11 @@ def apply_improvement(session_id: str, improved_fields: dict) -> str | None:
     new_doc = _build_report(session["fields"])
     session["document"] = new_doc
     _save_session(session_id, session)
+    try:
+        from backend.doc_versions import save_version
+        save_version(session_id, "report_generator", new_doc, "laporan", session.get("fields", {}))
+    except Exception:
+        pass
     return new_doc
 
 

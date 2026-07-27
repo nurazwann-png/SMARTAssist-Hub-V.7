@@ -71,6 +71,8 @@ from backend.user_memory import (
     extract_org_name as _extract_org_name,
     get_context_string as _get_memory_context,
 )
+from backend.summariser import compress_history as _compress_history
+from backend.doc_versions import list_versions as _list_versions, get_version as _get_version
 from agents.data_analysis import upload_file as da_upload, get_session_data as da_get_data
 from agents.letter_generator import (
     get_document as lg_get_document,
@@ -1655,6 +1657,13 @@ async def agent_chat(req: AgentChatRequest, request: Request):
     agent = req.agent
     agent_info = AGENT_LABELS.get(agent, {"icon": "\U0001f4ac", "name": agent})
 
+    # ── Conversation summarisation: compress long history before sending ──────
+    try:
+        if not is_intro and len(history) > 20:
+            history = _compress_history(req.session_id, history, req.lang)
+    except Exception:
+        pass
+
     try:
         from agents import data_analysis, letter_generator, kpm_support, report_generator, document_reviewer
         import inspect
@@ -1688,7 +1697,7 @@ async def agent_chat(req: AgentChatRequest, request: Request):
             output = module.handle(**kwargs)
 
             # JSON retry: if agent expects JSON but output fails to parse, try once more
-            JSON_AGENTS = {"data_analysis", "letter_generator", "report_generator", "document_reviewer"}
+            JSON_AGENTS = {"data_analysis", "letter_generator", "report_generator", "document_reviewer", "kpm_support"}
             if agent in JSON_AGENTS and not is_intro:
                 try:
                     json.loads(output)
@@ -1724,7 +1733,7 @@ async def agent_chat(req: AgentChatRequest, request: Request):
             pass
 
     structured = None
-    if agent in ("data_analysis", "letter_generator", "report_generator", "document_reviewer"):
+    if agent in ("data_analysis", "letter_generator", "report_generator", "document_reviewer", "kpm_support"):
         structured = _parse_agent_json(output)
 
     # For an uploaded PDF under review, locate each issue's text and attach a
@@ -1809,6 +1818,97 @@ async def agent_chat(req: AgentChatRequest, request: Request):
         "agent_name": agent_info["name"],
         "structured": structured,
     })
+
+
+@app.post("/api/agent-chat/stream")
+async def agent_chat_stream(req: AgentChatRequest, request: Request):
+    """SSE streaming endpoint for kpm_support — returns text chunks then a final JSON sentinel."""
+    from fastapi.responses import StreamingResponse as _StreamingResponse
+    from backend.deepseek_client import stream_chat_completion
+    from agents.kpm_support import prepare_stream, _build_structured_response
+
+    user = get_current_user(request)
+    user_email = user.get("sub", "") if user else ""
+    user_name = ""
+    if user:
+        profile = get_profile(user["sub"])
+        user_name = profile.get("nama") or user.get("name", "")
+
+    store = _get_store()
+    is_intro = req.message == "__INTRO__"
+    history = store.get_messages(req.session_id)
+    if not is_intro:
+        store.append_message(req.session_id, {"role": "user", "content": req.message})
+        history.append({"role": "user", "content": req.message})
+
+    user_context = ""
+    try:
+        if user_email and not is_intro:
+            user_context = _get_memory_context(user_email, req.lang)
+    except Exception:
+        pass
+
+    try:
+        if not is_intro and len(history) > 20:
+            history = _compress_history(req.session_id, history, req.lang)
+    except Exception:
+        pass
+
+    messages, docs = prepare_stream(req.message, history, req.session_id, req.lang, user_context)
+
+    def event_gen():
+        collected = []
+        try:
+            for chunk in stream_chat_completion(messages, temperature=0.5, max_tokens=2000):
+                collected.append(chunk)
+                yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+            return
+        raw = "".join(collected)
+        structured = _build_structured_response(raw, docs, req.lang)
+        output = json.dumps(structured, ensure_ascii=False)
+        if not is_intro:
+            store.append_message(req.session_id, {"role": "assistant", "content": output, "agent": "kpm_support"})
+            existing_meta = store.get_meta(req.session_id) or {}
+            store.upsert_meta(req.session_id, agent="kpm_support", title=existing_meta.get("title") or req.message[:60])
+            try:
+                if user_email:
+                    _update_memory(user_email, preferred_lang=req.lang, preferred_agent="kpm_support")
+                    _add_topic(user_email, req.message)
+            except Exception:
+                pass
+        yield f"data: {json.dumps({'done': True, 'structured': structured}, ensure_ascii=False)}\n\n"
+
+    return _StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
+@app.get("/api/sessions/{session_id}/versions")
+async def get_session_versions(session_id: str, agent: str = "", request: Request = None):
+    """List document versions for a session, optionally filtered by agent."""
+    user = get_current_user(request) if request else None
+    if not user:
+        return JSONResponse({"error": "Tidak dibenarkan."}, status_code=401)
+    try:
+        versions = _list_versions(session_id, agent or None)
+        return JSONResponse({"versions": versions})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/versions/{version_id}")
+async def get_version_detail(version_id: int, request: Request = None):
+    """Get a specific document version by its integer id."""
+    user = get_current_user(request) if request else None
+    if not user:
+        return JSONResponse({"error": "Tidak dibenarkan."}, status_code=401)
+    try:
+        ver = _get_version(version_id)
+        if not ver:
+            return JSONResponse({"error": "Versi tidak ditemui."}, status_code=404)
+        return JSONResponse(ver)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.get("/api/avatar")

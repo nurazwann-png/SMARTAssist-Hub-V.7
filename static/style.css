@@ -2573,6 +2573,12 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
     border-radius: 14px 4px 14px 14px;
     padding: 9px 13px; color: #fff;
 }
+.kpm-citations { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.kpm-conf { font-size: 11px; opacity: 0.75; margin-bottom: 2px; }
+.kpm-source-chip { display: flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 7px; border-radius: 6px; background: rgba(255,255,255,0.08); border: 1px solid rgba(248,113,113,0.2); }
+.kpm-src-num { font-weight: 700; color: #f87171; min-width: 22px; }
+.kpm-src-title { flex: 1; opacity: 0.9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpm-src-cat { font-size: 10px; opacity: 0.6; white-space: nowrap; }
 .kpm-bubble-typing {
     padding: 6px 14px 2px; display: flex; gap: 5px; align-items: center;
 }
@@ -2794,3 +2800,17 @@ html[data-theme="light"] .ppt-checkmark { border-color: #cbd5e1; }
 html[data-theme="light"] .ppt-section-name { color: #1e293b; }
 html[data-theme="light"] .ppt-modal-footer,
 html[data-theme="light"] .ppt-modal-header { border-color: rgba(0,0,0,0.08); }
+
+/* ── Version History Modal ─────────────────────────────────────────── */
+.version-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 4000; display: flex; align-items: center; justify-content: center; }
+.version-modal-box { background: var(--bg-secondary, #1e293b); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; width: 480px; max-width: 96vw; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
+.version-modal-box .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.08); font-weight: 600; font-size: 14px; }
+.version-modal-box .modal-close { background: none; border: none; color: inherit; font-size: 18px; cursor: pointer; opacity: 0.7; }
+.version-list { overflow-y: auto; padding: 12px 18px; display: flex; flex-direction: column; gap: 8px; }
+.version-loading, .version-empty { text-align: center; opacity: 0.6; padding: 20px; font-size: 13px; }
+.version-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.05); font-size: 13px; }
+.version-num { font-weight: 700; color: #c9a96e; min-width: 30px; }
+.version-type { flex: 1; opacity: 0.8; }
+.version-date { font-size: 11px; opacity: 0.55; white-space: nowrap; }
+.version-restore-btn { padding: 4px 12px; border-radius: 6px; background: #c9a96e; color: #1a1a2e; border: none; cursor: pointer; font-size: 12px; font-weight: 600; }
+.version-restore-btn:hover { background: #e8d5b7; }

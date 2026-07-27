@@ -184,5 +184,109 @@ def _tokenize(text: str) -> list[str]:
     text = text.lower()
     tokens = re.findall(r"[a-z0-9]+", text)
     stopwords = {"dan", "atau", "yang", "di", "ke", "dari", "untuk", "dengan", "ini", "itu",
-                 "the", "and", "or", "is", "in", "of", "to", "for", "a", "an"}
+                 "the", "and", "or", "is", "in", "of", "to", "for", "a", "an", "ia",
+                 "pada", "oleh", "jika", "bagi", "telah", "akan", "tidak", "ada"}
     return [t for t in tokens if t not in stopwords and len(t) > 1]
+
+
+# ── KPM term expansions (abbreviation → full terms added to query) ────────────
+_KPM_EXPANSIONS: dict[str, list[str]] = {
+    "emis":   ["sistem maklumat", "sekolah", "pendaftaran"],
+    "delima": ["digital", "pembelajaran", "google", "microsoft"],
+    "apdm":   ["kehadiran", "murid", "pelajar"],
+    "dtpcare":["guru", "kakitangan", "perkhidmatan"],
+    "skas":   ["sekolah", "akaun", "kewangan"],
+    "sso":    ["single sign on", "log masuk"],
+    "kpm":    ["kementerian pendidikan malaysia"],
+    "ppd":    ["pejabat pendidikan daerah"],
+    "jpn":    ["jabatan pendidikan negeri"],
+    "bpsh":   ["bahagian pengurusan sekolah harian"],
+    "spm":    ["sijil pelajaran malaysia", "peperiksaan"],
+    "upsr":   ["ujian pencapaian sekolah rendah"],
+    "pt3":    ["pentaksiran tingkatan tiga"],
+}
+
+
+def _expand_query(query: str) -> str:
+    """Add KPM domain abbreviations to the query to improve recall."""
+    low = query.lower()
+    extras: list[str] = []
+    for abbr, expansions in _KPM_EXPANSIONS.items():
+        if abbr in low.split() or f" {abbr}" in low:
+            extras.extend(expansions)
+    if extras:
+        return query + " " + " ".join(extras)
+    return query
+
+
+def _best_passage(content: str, query_tokens: list[str], window: int = 600) -> str:
+    """Return the most relevant ~600-char passage from *content*.
+
+    Splits content by paragraph, scores each paragraph by token overlap
+    with the query, and returns the best one (truncated to *window* chars).
+    Falls back to the first *window* chars if nothing scores.
+    """
+    paragraphs = [p.strip() for p in re.split(r"\n{2,}|\. {2,}", content) if p.strip()]
+    if not paragraphs:
+        return content[:window]
+
+    best_para, best_score = "", 0
+    for para in paragraphs:
+        para_tokens = set(_tokenize(para))
+        score = sum(1 for t in query_tokens if t in para_tokens)
+        if score > best_score:
+            best_score, best_para = score, para
+
+    passage = (best_para or paragraphs[0])[:window]
+    if len(best_para) > window:
+        passage += "..."
+    return passage
+
+
+def search_documents_hybrid(query: str, top_k: int = 5) -> list[dict]:
+    """Hybrid retrieval: FTS5 + TF-IDF, deduped and title-boosted.
+
+    Steps:
+    1. Expand the query with KPM domain abbreviations
+    2. FTS5 BM25 search (primary)
+    3. TF-IDF search (complementary — fills gaps FTS5 misses)
+    4. Deduplicate by doc id, boost score if query tokens appear in title
+    5. Extract the most relevant passage per doc instead of raw prefix
+    6. Return top_k docs with relevance_score for confidence estimation
+    """
+    expanded = _expand_query(query)
+    query_tokens = _tokenize(expanded)
+
+    # Gather candidates from both sources
+    fts_docs  = search_documents(expanded, top_k=top_k + 3)
+    tfidf_docs = search_documents_tfidf(expanded, top_k=top_k + 3)
+
+    # Merge, deduplicate, and score
+    seen: dict[int, dict] = {}
+    for rank, doc in enumerate(fts_docs):
+        doc_id = doc["id"]
+        seen[doc_id] = {**doc, "_score": top_k + 3 - rank}
+
+    for rank, doc in enumerate(tfidf_docs):
+        doc_id = doc["id"]
+        if doc_id not in seen:
+            seen[doc_id] = {**doc, "_score": (top_k + 3 - rank) * 0.7}
+        else:
+            seen[doc_id]["_score"] += (top_k + 3 - rank) * 0.5  # bonus for appearing in both
+
+    # Title boost: +3 for each query token found in the title
+    for doc in seen.values():
+        title_tokens = set(_tokenize(doc.get("title", "")))
+        boost = sum(1 for t in query_tokens if t in title_tokens)
+        doc["_score"] += boost * 3
+
+    ranked = sorted(seen.values(), key=lambda d: d["_score"], reverse=True)[:top_k]
+
+    # Replace raw content with best passage + attach relevance label
+    max_score = ranked[0]["_score"] if ranked else 1
+    for doc in ranked:
+        doc["passage"] = _best_passage(doc["content"], query_tokens)
+        score_ratio = doc["_score"] / max(max_score, 1)
+        doc["relevance"] = "high" if score_ratio >= 0.7 else ("medium" if score_ratio >= 0.4 else "low")
+
+    return ranked
