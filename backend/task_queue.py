@@ -32,34 +32,34 @@ _POLL_INTERVAL = 2  # seconds
 
 # ── DB helpers ──────────────────────────────────────────────────────────────────
 
-def _get_conn():
+def _db():
+    """Return the get_conn context manager from backend.db."""
     from backend.db import get_conn
-    return get_conn()
+    return get_conn
 
 
 def _ensure_table():
-    conn = _get_conn()
-    with conn.cursor() as cur:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS bg_tasks (
-                id           TEXT PRIMARY KEY,
-                session_id   TEXT NOT NULL,
-                user_email   TEXT NOT NULL DEFAULT '',
-                task_type    TEXT NOT NULL,
-                payload      JSONB NOT NULL DEFAULT '{}',
-                status       TEXT NOT NULL DEFAULT 'PENDING',
-                progress     TEXT NOT NULL DEFAULT '',
-                result       JSONB,
-                error        TEXT,
-                created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_bg_tasks_session
-            ON bg_tasks (session_id, status)
-        """)
-    conn.commit()
+    with _db()() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS bg_tasks (
+                    id           TEXT PRIMARY KEY,
+                    session_id   TEXT NOT NULL,
+                    user_email   TEXT NOT NULL DEFAULT '',
+                    task_type    TEXT NOT NULL,
+                    payload      JSONB NOT NULL DEFAULT '{}',
+                    status       TEXT NOT NULL DEFAULT 'PENDING',
+                    progress     TEXT NOT NULL DEFAULT '',
+                    result       JSONB,
+                    error        TEXT,
+                    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_bg_tasks_session
+                ON bg_tasks (session_id, status)
+            """)
 
 
 # ── Public API ──────────────────────────────────────────────────────────────────
@@ -73,14 +73,13 @@ def enqueue(
     """Insert a new task and return its id."""
     _ensure_table()
     task_id = str(uuid.uuid4())
-    conn = _get_conn()
-    with conn.cursor() as cur:
-        cur.execute(
-            """INSERT INTO bg_tasks (id, session_id, user_email, task_type, payload)
-               VALUES (%s, %s, %s, %s, %s)""",
-            (task_id, session_id, user_email, task_type, json.dumps(payload)),
-        )
-    conn.commit()
+    with _db()() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO bg_tasks (id, session_id, user_email, task_type, payload)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (task_id, session_id, user_email, task_type, json.dumps(payload)),
+            )
     logger.info("[TaskQueue] Enqueued %s task %s for session %s", task_type, task_id, session_id)
     return task_id
 
@@ -88,14 +87,14 @@ def enqueue(
 def get_task(task_id: str) -> dict | None:
     """Return the full task row as a dict, or None."""
     _ensure_table()
-    conn = _get_conn()
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT id, session_id, task_type, status, progress, result, error, created_at, updated_at "
-            "FROM bg_tasks WHERE id = %s",
-            (task_id,),
-        )
-        row = cur.fetchone()
+    with _db()() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, session_id, task_type, status, progress, result, error, created_at, updated_at "
+                "FROM bg_tasks WHERE id = %s",
+                (task_id,),
+            )
+            row = cur.fetchone()
     if not row:
         return None
     cols = ["id", "session_id", "task_type", "status", "progress", "result", "error", "created_at", "updated_at"]
@@ -105,14 +104,14 @@ def get_task(task_id: str) -> dict | None:
 def list_tasks(session_id: str) -> list[dict]:
     """Return all tasks for a session, newest first."""
     _ensure_table()
-    conn = _get_conn()
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT id, task_type, status, progress, created_at FROM bg_tasks "
-            "WHERE session_id = %s ORDER BY created_at DESC LIMIT 50",
-            (session_id,),
-        )
-        rows = cur.fetchall()
+    with _db()() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, task_type, status, progress, created_at FROM bg_tasks "
+                "WHERE session_id = %s ORDER BY created_at DESC LIMIT 50",
+                (session_id,),
+            )
+            rows = cur.fetchall()
     cols = ["id", "task_type", "status", "progress", "created_at"]
     return [dict(zip(cols, r)) for r in rows]
 
@@ -123,15 +122,14 @@ def _update_task(task_id: str, **kwargs):
     sets = {k: v for k, v in kwargs.items() if k in allowed}
     if not sets:
         return
-    conn = _get_conn()
     parts = ", ".join(f"{k} = %s" for k in sets)
     vals = list(sets.values()) + [task_id]
-    with conn.cursor() as cur:
-        cur.execute(
-            f"UPDATE bg_tasks SET {parts}, updated_at = NOW() WHERE id = %s",
-            vals,
-        )
-    conn.commit()
+    with _db()() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE bg_tasks SET {parts}, updated_at = NOW() WHERE id = %s",
+                vals,
+            )
 
 
 # ── Task executor ───────────────────────────────────────────────────────────────
@@ -154,10 +152,10 @@ def _execute_agent_call(task_id: str, payload: dict):
         report_generator, document_reviewer,
     )
     agent_map = {
-        "data_analysis":    data_analysis,
-        "letter_generator": letter_generator,
-        "kpm_support":      kpm_support,
-        "report_generator": report_generator,
+        "data_analysis":     data_analysis,
+        "letter_generator":  letter_generator,
+        "kpm_support":       kpm_support,
+        "report_generator":  report_generator,
         "document_reviewer": document_reviewer,
     }
     agent = payload.get("agent", "")
@@ -222,14 +220,14 @@ def _worker_loop():
     _ensure_table()
     while True:
         try:
-            conn = _get_conn()
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT id, task_type, payload FROM bg_tasks WHERE status = %s "
-                    "ORDER BY created_at LIMIT 1",
-                    (PENDING,),
-                )
-                row = cur.fetchone()
+            with _db()() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT id, task_type, payload FROM bg_tasks WHERE status = %s "
+                        "ORDER BY created_at LIMIT 1",
+                        (PENDING,),
+                    )
+                    row = cur.fetchone()
             if row:
                 task = {"id": row[0], "task_type": row[1], "payload": row[2]}
                 _process_one(task)
