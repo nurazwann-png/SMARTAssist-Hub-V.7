@@ -79,9 +79,75 @@ _session_data: dict[str, dict] = {}
 _session_df: dict[str, "pd.DataFrame"] = {}
 _compute_cache: dict[str, dict] = {}  # session_id → {cache_key: computed_block}
 
+# Multi-file support: list of uploaded file entries per session + active file index
+_session_files: dict[str, list[dict]] = {}   # session_id → [{file_id, filename, rows, columns, ...}]
+_session_active: dict[str, str] = {}          # session_id → file_id (currently selected file)
+
 
 def _df_path(session_id: str) -> pathlib.Path:
     return _DATA_DIR / f"{session_id}.data.csv"
+
+
+def _file_df_path(session_id: str, file_id: str) -> pathlib.Path:
+    return _DATA_DIR / f"{session_id}.{file_id}.csv"
+
+
+def _file_entry_path(session_id: str) -> pathlib.Path:
+    return _DATA_DIR / f"{session_id}.files.json"
+
+
+def list_session_files(session_id: str) -> list[dict]:
+    """Return metadata for all files uploaded in this session."""
+    if session_id in _session_files:
+        return _session_files[session_id]
+    p = _file_entry_path(session_id)
+    if p.exists():
+        try:
+            files = json.loads(p.read_text(encoding="utf-8"))
+            _session_files[session_id] = files
+            return files
+        except Exception:
+            pass
+    return []
+
+
+def get_active_file_id(session_id: str) -> str | None:
+    """Return the currently active file_id for this session."""
+    if session_id in _session_active:
+        return _session_active[session_id]
+    files = list_session_files(session_id)
+    if files:
+        fid = files[-1]["file_id"]
+        _session_active[session_id] = fid
+        return fid
+    return None
+
+
+def switch_active_file(session_id: str, file_id: str) -> dict | None:
+    """Switch the active file; returns the file metadata entry or None if not found."""
+    files = list_session_files(session_id)
+    entry = next((f for f in files if f["file_id"] == file_id), None)
+    if not entry:
+        return None
+    _session_active[session_id] = file_id
+    # Load this file's DataFrame into the active slot
+    csv_path = _file_df_path(session_id, file_id)
+    if csv_path.exists():
+        try:
+            df = pd.read_csv(csv_path)
+            _session_df[session_id] = df
+        except Exception:
+            pass
+    # Update the active session_data entry
+    _session_data[session_id] = {
+        "filename": entry["filename"],
+        "summary":  entry.get("summary", ""),
+        "full_data": entry.get("full_data", ""),
+        "shape":    entry["shape"],
+        "columns":  entry["columns"],
+    }
+    _compute_cache.pop(session_id, None)
+    return entry
 
 
 def _get_df(session_id: str) -> "pd.DataFrame | None":
@@ -321,6 +387,9 @@ def upload_file(file_bytes: bytes, filename: str, session_id: str = "default", l
         if len(full_data) > 60000:
             full_data = df.head(500).to_csv(index=False)
 
+        import uuid as _uuid
+        file_id = _uuid.uuid4().hex[:12]
+
         entry = {
             "filename": filename,
             "summary": summary,
@@ -328,9 +397,27 @@ def upload_file(file_bytes: bytes, filename: str, session_id: str = "default", l
             "shape": list(df.shape),
             "columns": list(df.columns),
         }
+        # Set as active session data
         _session_data[session_id] = entry
         _session_df[session_id] = df
+        _session_active[session_id] = file_id
         _compute_cache.pop(session_id, None)  # new data invalidates cached computations
+
+        # Append to multi-file list
+        file_meta = {
+            "file_id":  file_id,
+            "filename": filename,
+            "rows":     df.shape[0],
+            "columns":  df.shape[1],
+            "column_names": list(df.columns),
+            "shape":    list(df.shape),
+            "summary":  summary,
+            "full_data": full_data,
+        }
+        existing = list_session_files(session_id)
+        existing.append(file_meta)
+        _session_files[session_id] = existing
+
         try:
             _DATA_DIR.mkdir(parents=True, exist_ok=True)
             (_DATA_DIR / f"{session_id}.json").write_text(
@@ -338,6 +425,11 @@ def upload_file(file_bytes: bytes, filename: str, session_id: str = "default", l
             )
             # Persist the FULL dataset so pandas computations use every row
             df.to_csv(_df_path(session_id), index=False)
+            # Also save per-file CSV and file list
+            df.to_csv(_file_df_path(session_id, file_id), index=False)
+            _file_entry_path(session_id).write_text(
+                json.dumps(existing, ensure_ascii=False), encoding="utf-8"
+            )
         except Exception:
             pass
 
@@ -367,11 +459,13 @@ def upload_file(file_bytes: bytes, filename: str, session_id: str = "default", l
 
         return {
             "ok": True,
+            "file_id": file_id,
             "filename": filename,
             "rows": df.shape[0],
             "columns": df.shape[1],
             "column_names": list(df.columns),
             "eda": eda,
+            "all_files": [{"file_id": f["file_id"], "filename": f["filename"], "rows": f["rows"], "columns": f["columns"]} for f in existing],
         }
     except Exception as e:
         return {"ok": False, "error": f"Gagal membaca fail: {e}"}
@@ -1574,10 +1668,33 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
         return (f"Assalamualaikum dan selamat datang{sapaan}! 👋 Saya Analisis Data Agent. Muat naik fail CSV atau Excel anda menggunakan butang 📎, kemudian tanya apa sahaja tentang data tersebut. Saya boleh menjana carta, statistik ringkasan, mengesan data kosong dan banyak lagi. Fail apa yang ingin anda analisis hari ini?\n\n"
                 "⚠️ Peringatan: Semua analisis, carta dan interpretasi adalah hasil AI. Sila sahkan dapatan dengan data asal anda sebelum digunakan dalam sebarang laporan rasmi atau membuat keputusan.")
 
+    # ── COMPARE prefix: "[COMPARE:file_id1:file_id2] user query" ──────────
+    import re as _re
+    _cmp_match = _re.match(r'^\[COMPARE:([a-f0-9]+):([a-f0-9]+)\]\s*(.*)', query, _re.DOTALL)
+    _compare_fids: list[str] | None = None
+    if _cmp_match:
+        _compare_fids = [_cmp_match.group(1), _cmp_match.group(2)]
+        query = _cmp_match.group(3).strip()
+        # Switch active file to first selected for context
+        switch_active_file(session_id, _compare_fids[0])
+
     context_note = _build_context_note(session_id)
-    data_context = _build_data_context(session_id)
     lang_note = "\n\nIMPORTANT: The user has selected English. You MUST respond entirely in English. All text fields in your JSON response must be in English." if lang == "en" else ""
     mem_note = user_context or ""
+
+    # Build combined data context for comparison mode
+    if _compare_fids:
+        parts = []
+        for fid in _compare_fids:
+            entry = switch_active_file(session_id, fid)
+            if entry:
+                data_ctx = _build_data_context(session_id)
+                parts.append(f"=== Fail: {entry['filename']} ===\n{data_ctx}")
+        data_context = "\n\n".join(parts) if parts else _build_data_context(session_id)
+        # Restore active to first file
+        switch_active_file(session_id, _compare_fids[0])
+    else:
+        data_context = _build_data_context(session_id)
 
     df = _get_df(session_id)
 

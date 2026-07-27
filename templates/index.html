@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMARTAssist Hub</title>
-    <link rel="stylesheet" href="/static/style.css?v=59">
+    <link rel="stylesheet" href="/static/style.css?v=62">
     <script src="/static/chart.min.js"></script>
 </head>
 <body>
@@ -711,6 +711,9 @@
 
             <!-- RIGHT: Work Panel -->
             <div class="work-panel" id="workPanel">
+                <!-- File Manager Panel — shown only for data_analysis when ≥1 file uploaded -->
+                <div id="fileManagerPanel" class="file-manager-panel" style="display:none"></div>
+
                 <div class="work-panel-header">
                     <span class="work-panel-icon" id="workPanelIcon">&#128196;</span>
                     <span class="work-panel-title" id="workPanelTitle" data-i18n="work_panel_title">Ruang Kerja</span>
@@ -802,6 +805,6 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=111"></script>
+    <script src="/static/app.js?v=115"></script>
 </body>
 </html>

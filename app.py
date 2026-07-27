@@ -79,7 +79,13 @@ from backend.task_queue import (
     list_tasks as _tq_list,
     start_worker as _tq_start_worker,
 )
-from agents.data_analysis import upload_file as da_upload, get_session_data as da_get_data
+from agents.data_analysis import (
+    upload_file as da_upload,
+    get_session_data as da_get_data,
+    list_session_files as da_list_files,
+    switch_active_file as da_switch_file,
+    get_active_file_id as da_active_file_id,
+)
 from agents.letter_generator import (
     get_document as lg_get_document,
     build_docx as lg_build_docx,
@@ -225,6 +231,25 @@ async def upload(file: UploadFile = File(...), session_id: str = Form("default")
         })
 
     return JSONResponse(result)
+
+
+@app.get("/api/files/{session_id}")
+async def list_files(session_id: str):
+    """List all files uploaded in a session."""
+    files = da_list_files(session_id)
+    active = da_active_file_id(session_id)
+    return JSONResponse({"files": files, "active_file_id": active})
+
+
+@app.post("/api/files/switch")
+async def switch_file(session_id: str = Form(...), file_id: str = Form(...)):
+    """Switch the active file for analysis."""
+    entry = da_switch_file(session_id, file_id)
+    if not entry:
+        return JSONResponse({"ok": False, "error": "Fail tidak ditemui."}, status_code=404)
+    return JSONResponse({"ok": True, "file_id": file_id, "filename": entry["filename"],
+                         "rows": entry["rows"], "columns": entry["columns"],
+                         "column_names": entry["column_names"]})
 
 
 def _text_to_review_html(text: str) -> str:

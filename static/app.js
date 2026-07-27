@@ -313,6 +313,22 @@ const I18N = {
         compare_comparing: '⇄ Membandingkan dengan',
         compare_fail: 'Perbandingan gagal.',
         compare_no_file: 'Sila muat naik fail pertama dahulu.',
+        files_panel_title: '📂 Fail Dimuat Naik',
+        files_active_badge: 'Aktif',
+        files_click_activate: 'Klik untuk gunakan fail ini',
+        files_btn_compare: '⇄ Bandingkan',
+        files_need_two: 'Muat naik sekurang-kurangnya 2 fail untuk membandingkan.',
+        compare_query_title: '⇄ Perbandingan Fail',
+        compare_query_ph: 'Contoh: Bandingkan kehadiran antara kedua-dua fail...',
+        compare_query_btn: 'Buat Perbandingan',
+        compare_select_two: 'Pilih 2 fail untuk dibandingkan.',
+        fm_uploaded_files: 'Fail Dimuat Naik',
+        fm_add: '+ Tambah',
+        fm_compare_files: '⇄ Bandingkan Fail',
+        fm_click_to_use: 'Klik<br>untuk guna',
+        fm_select_subtitle: 'pilih 2 fail',
+        fm_max_two: 'Pilih maksimum 2 fail sahaja.',
+        fm_enter_query: 'Sila masukkan soalan perbandingan.',
         err_system: 'Sistem',
         admin_sessions_label: 'Sesi',
         attach_photos_label: '📷 Lampirkan Gambar',
@@ -514,6 +530,22 @@ const I18N = {
         compare_comparing: '⇄ Comparing with',
         compare_fail: 'Comparison failed.',
         compare_no_file: 'Please upload the first file first.',
+        files_panel_title: '📂 Uploaded Files',
+        files_active_badge: 'Active',
+        files_click_activate: 'Click to use this file',
+        files_btn_compare: '⇄ Compare',
+        files_need_two: 'Upload at least 2 files to compare.',
+        compare_query_title: '⇄ File Comparison',
+        compare_query_ph: 'e.g. Compare attendance between both files...',
+        compare_query_btn: 'Run Comparison',
+        compare_select_two: 'Select 2 files to compare.',
+        fm_uploaded_files: 'Uploaded Files',
+        fm_add: '+ Add',
+        fm_compare_files: '⇄ Compare Files',
+        fm_click_to_use: 'Click<br>to use',
+        fm_select_subtitle: 'select 2 files',
+        fm_max_two: 'Select maximum 2 files only.',
+        fm_enter_query: 'Please enter a comparison question.',
         err_system: 'System',
         admin_sessions_label: 'Sessions',
         attach_photos_label: '📷 Attach Photos',
@@ -694,6 +726,11 @@ function applyLanguage(lang) {
     // LH back button
     const lhBack = document.getElementById('lhBackBtn');
     if (lhBack) lhBack.innerHTML = `&#8592; ${dict.back_btn.replace('← ', '').replace('← ', '')}`;
+
+    // Re-render file manager panel if visible (strings are lang-dependent)
+    if (currentAgent === 'data_analysis' && _daFiles.length > 0) {
+        renderFileManagerPanel(_daFiles, _daActiveFileId);
+    }
 }
 
 function toggleLanguage() {
@@ -893,11 +930,22 @@ function openAgent(agentKey, existingSessionId) {
         sidebarTools.style.display = (agentKey === 'letter_generator' || agentKey === 'report_generator') ? 'flex' : 'none';
     }
 
+    // Show/hide file manager panel based on agent
+    const fmPanel = document.getElementById('fileManagerPanel');
+    if (fmPanel) fmPanel.style.display = 'none';
+    _daFiles = [];
+    _daActiveFileId = null;
+
     if (existingSessionId) {
         loadSessionMessages(existingSessionId);
     } else {
         loadCanvasHistory(agentKey);
         sendAgentIntro(agentKey);
+    }
+
+    // Reload file manager if switching to data_analysis with an existing session
+    if (agentKey === 'data_analysis' && existingSessionId) {
+        loadFileManagerForSession();
     }
 }
 
@@ -1376,7 +1424,7 @@ function buildStructuredHtml(data) {
     // Export buttons
     html += '<div class="da-export-actions">';
     html += `<button class="da-export-btn" style="background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.4);color:#a5b4fc" onclick="showExecutiveSummary()">${I18N[currentLang].exec_summary_btn}</button>`;
-    html += `<button class="da-export-btn compare-btn" onclick="triggerCompareUpload()">${I18N[currentLang].compare_file_btn}</button>`;
+    html += `<button class="da-export-btn compare-btn" onclick="openComparePanel()">${I18N[currentLang].files_btn_compare}</button>`;
     html += `<button class="da-export-btn pptx-btn" onclick="downloadAnalysis('pptx')">\u{1F4CA} PowerPoint</button>`;
     html += `<button class="da-export-btn pdf-btn" onclick="downloadAnalysis('pdf')">\u{1F4C4} PDF</button>`;
     html += `<button class="da-export-btn xlsx-btn" onclick="downloadAnalysis('xlsx')">\u{1F4C8} Excel</button>`;
@@ -3545,6 +3593,8 @@ async function handleDataUpload(file) {
             uploadBtn.classList.add('has-file');
             fileIndicator.style.display = 'flex';
             fileIndicatorText.textContent = `\u{1F4C4} ${data.filename} (${data.rows} baris, ${data.columns} lajur)`;
+            // Refresh the file manager panel
+            renderFileManagerPanel(data.all_files || [], data.file_id);
             // Auto-EDA profile computed server-side with pandas (falls back to the basic notice)
             const structured = data.eda || {
                 response_type: 'papar',
@@ -4966,6 +5016,251 @@ const AGENT_LABELS = {
     document_reviewer: { name: 'Semakan Dokumen' },
     kpm_support: { name: 'Sokongan KPM' },
 };
+
+// ═══════════════════════════════════════
+//  MULTI-FILE MANAGER (#DA)
+// ═══════════════════════════════════════
+
+let _daFiles = [];       // [{file_id, filename, rows, columns}]
+let _daActiveFileId = null;
+let _compareSelected = [];  // up to 2 file_ids selected for comparison
+
+function renderFileManagerPanel(files, activeFileId) {
+    _daFiles = files || [];
+    _daActiveFileId = activeFileId || (_daFiles[0] && _daFiles[0].file_id) || null;
+
+    const panel = document.getElementById('fileManagerPanel');
+    if (!panel) return;
+    if (!_daFiles.length) { panel.style.display = 'none'; return; }
+
+    panel.style.display = 'block';
+    const d = I18N[currentLang];
+
+    // Preserve collapsed state across re-renders
+    const wasCollapsed = document.getElementById('fileManagerPanel')?.classList.contains('fm-collapsed');
+
+    // Header — clicking title area toggles collapse
+    let html = `<div class="fm-header" onclick="toggleFileManager(event)">
+        <div class="fm-title">
+            <div class="fm-title-icon">📂</div>
+            ${d.fm_uploaded_files}
+            <span class="fm-file-count">${_daFiles.length}</span>
+        </div>
+        <div class="fm-header-actions">
+            <button class="fm-upload-more" onclick="event.stopPropagation();document.getElementById('fileInput')?.click()">
+                ${d.fm_add}
+            </button>
+            <span class="fm-chevron" id="fmChevron">▾</span>
+        </div>
+    </div>
+    <div class="fm-body" id="fmBody">
+    <div class="fm-files">`;
+
+    // File cards
+    _daFiles.forEach(f => {
+        const isActive = f.file_id === _daActiveFileId;
+        const ext = (f.filename.split('.').pop() || '').toUpperCase();
+        const icon = (ext === 'XLSX' || ext === 'XLS') ? '📊' : '📄';
+        html += `<div class="fm-file-card${isActive ? ' active' : ''}" data-fid="${f.file_id}" onclick="switchActiveFile('${f.file_id}')">
+            <div class="fm-card-top">
+                <div class="fm-file-icon-wrap">${icon}</div>
+                ${isActive
+                    ? `<span class="fm-active-badge">${d.files_active_badge}</span>`
+                    : `<span class="fm-use-hint">${d.fm_click_to_use}</span>`}
+            </div>
+            <div class="fm-file-info">
+                <div class="fm-file-name" title="${escapeHtml(f.filename)}">${escapeHtml(f.filename)}</div>
+                <div class="fm-file-meta">
+                    <span class="fm-meta-chip">${f.rows} baris</span>
+                    <span class="fm-meta-chip">${f.columns} lajur</span>
+                </div>
+            </div>
+        </div>`;
+    });
+
+    html += `</div>`;
+
+    // Compare button row — only when ≥2 files
+    if (_daFiles.length >= 2) {
+        html += `<div class="fm-compare-row">
+            <button class="fm-compare-btn" onclick="openComparePanel()">
+                ${d.fm_compare_files}
+            </button>
+        </div>`;
+    }
+
+    // Compare query panel (hidden by default)
+    html += `<div id="compareQueryPanel" class="compare-query-panel" style="display:none">
+        <div class="cqp-title">
+            <span class="cqp-title-icon">⇄</span>
+            ${d.compare_query_title}
+            <span class="cqp-subtitle">— ${d.fm_select_subtitle}</span>
+        </div>
+        <div class="cqp-file-picker" id="cqpFilePicker"></div>
+        <textarea id="compareQueryInput" class="cqp-textarea" placeholder="${d.compare_query_ph}" rows="3"></textarea>
+        <div class="cqp-actions">
+            <button class="cqp-btn" onclick="runCompareQuery()">▶ ${d.compare_query_btn}</button>
+            <button class="cqp-cancel" onclick="document.getElementById('compareQueryPanel').style.display='none'">✕</button>
+        </div>
+    </div>
+    </div>`; // close fm-body
+
+    panel.innerHTML = html;
+
+    // Restore collapsed state after re-render
+    if (wasCollapsed) {
+        panel.classList.add('fm-collapsed');
+        const body = panel.querySelector('#fmBody');
+        const chevron = panel.querySelector('#fmChevron');
+        if (body) body.style.display = 'none';
+        if (chevron) chevron.textContent = '▸';
+    }
+}
+
+function toggleFileManager(e) {
+    if (e.target.closest('button')) return;
+    const panel = document.getElementById('fileManagerPanel');
+    const body = document.getElementById('fmBody');
+    const chevron = document.getElementById('fmChevron');
+    if (!panel || !body) return;
+
+    const isOpen = !panel.classList.contains('fm-collapsed');
+    if (isOpen) {
+        // Collapse: lock current height → animate to 0
+        body.style.maxHeight = body.scrollHeight + 'px';
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => { body.style.maxHeight = '0'; });
+        });
+        panel.classList.add('fm-collapsed');
+        if (chevron) chevron.textContent = '▸';
+    } else {
+        // Expand: go from 0 → scrollHeight, then remove cap so content can grow
+        panel.classList.remove('fm-collapsed');
+        body.style.maxHeight = '0';
+        requestAnimationFrame(() => {
+            body.style.maxHeight = body.scrollHeight + 'px';
+            body.addEventListener('transitionend', () => {
+                if (!panel.classList.contains('fm-collapsed')) body.style.maxHeight = '';
+            }, { once: true });
+        });
+        if (chevron) chevron.textContent = '▾';
+    }
+}
+
+async function switchActiveFile(fileId) {
+    if (fileId === _daActiveFileId) return;
+    const fd = new FormData();
+    fd.append('session_id', sessionId);
+    fd.append('file_id', fileId);
+    try {
+        const res = await fetch('/api/files/switch', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.ok) { showToast(data.error || 'Gagal tukar fail', 'err'); return; }
+        _daActiveFileId = fileId;
+        renderFileManagerPanel(_daFiles, fileId);
+        // Update file indicator
+        const fi = document.getElementById('fileIndicatorText');
+        if (fi) fi.textContent = `📄 ${data.filename} (${data.rows} baris, ${data.columns} lajur)`;
+        showToast(`✅ ${data.filename} dipilih sebagai fail aktif`);
+    } catch (e) {
+        showToast('Ralat: ' + e, 'err');
+    }
+}
+
+function openComparePanel() {
+    if (_daFiles.length < 2) {
+        showToast(I18N[currentLang].files_need_two, 'err');
+        return;
+    }
+    const panel = document.getElementById('compareQueryPanel');
+    if (!panel) return;
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    if (panel.style.display === 'none') return;
+
+    // Render file checkboxes for selection
+    const picker = document.getElementById('cqpFilePicker');
+    if (!picker) return;
+    _compareSelected = _daFiles.length === 2 ? _daFiles.map(f => f.file_id) : [_daActiveFileId];
+    picker.innerHTML = _daFiles.map(f => {
+        const checked = _compareSelected.includes(f.file_id);
+        const ext = (f.filename.split('.').pop() || '').toUpperCase();
+        const icon = (ext === 'XLSX' || ext === 'XLS') ? '📊' : '📄';
+        return `<label class="cqp-file-label${checked ? ' checked' : ''}">
+            <input type="checkbox" value="${f.file_id}" ${checked ? 'checked' : ''}
+                onchange="toggleCompareFile('${f.file_id}', this.checked, this)">
+            <div class="cqp-check-icon">${checked ? '✓' : ''}</div>
+            <span>${icon} ${escapeHtml(f.filename)}</span>
+            <span class="cqp-meta">${f.rows}r · ${f.columns}k</span>
+        </label>`;
+    }).join('');
+    document.getElementById('compareQueryInput')?.focus();
+}
+
+function toggleCompareFile(fileId, checked, el) {
+    if (checked) {
+        if (_compareSelected.length >= 2) {
+            el.checked = false;
+            showToast(I18N[currentLang].fm_max_two, 'err');
+            return;
+        }
+        _compareSelected.push(fileId);
+    } else {
+        _compareSelected = _compareSelected.filter(id => id !== fileId);
+    }
+    const lbl = el.closest('.cqp-file-label');
+    lbl.classList.toggle('checked', el.checked);
+    const icon = lbl.querySelector('.cqp-check-icon');
+    if (icon) icon.textContent = el.checked ? '✓' : '';
+}
+
+async function runCompareQuery() {
+    const query = document.getElementById('compareQueryInput')?.value.trim();
+    if (!query) { showToast(I18N[currentLang].fm_enter_query, 'err'); return; }
+    if (_compareSelected.length < 2) {
+        showToast(I18N[currentLang].compare_select_two, 'err');
+        return;
+    }
+    document.getElementById('compareQueryPanel').style.display = 'none';
+    const f1 = _daFiles.find(f => f.file_id === _compareSelected[0]);
+    const f2 = _daFiles.find(f => f.file_id === _compareSelected[1]);
+    const label = `⇄ Bandingkan: "${f1?.filename}" vs "${f2?.filename}" — ${query}`;
+    addMessage(label, 'user');
+    setProcessing(true);
+    try {
+        const res = await fetchWithTimeout('/api/agent-chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: `[COMPARE:${_compareSelected[0]}:${_compareSelected[1]}] ${query}`,
+                session_id: sessionId,
+                agent: 'data_analysis',
+                lang: currentLang,
+            }),
+        });
+        const data = await res.json();
+        if (data.structured) {
+            addMessage('', 'assistant', AGENT_ICONS.data_analysis, AGENT_INFO.data_analysis.name[currentLang], data.structured);
+        } else {
+            addMessage(data.response || '', 'assistant', AGENT_ICONS.data_analysis, AGENT_INFO.data_analysis.name[currentLang]);
+        }
+    } catch (e) {
+        addMessage('Ralat perbandingan: ' + e, 'assistant', '⚠️');
+    } finally { setProcessing(false); }
+}
+
+// Load file panel when switching to data_analysis agent
+async function loadFileManagerForSession() {
+    if (currentAgent !== 'data_analysis') return;
+    try {
+        const res = await fetch(`/api/files/${encodeURIComponent(sessionId)}`);
+        const data = await res.json();
+        if (data.files && data.files.length) {
+            renderFileManagerPanel(data.files, data.active_file_id);
+            hasUploadedData = true;
+        }
+    } catch (_) {}
+}
+
 
 // ═══════════════════════════════════════
 //  VERSION HISTORY
