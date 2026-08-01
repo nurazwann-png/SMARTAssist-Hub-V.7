@@ -63,6 +63,7 @@ from fastapi.responses import PlainTextResponse, Response
 from auth import router as auth_router, get_current_user
 from backend.profile_store import get_profile, save_profile
 from backend.prefs_store import get_prefs, save_prefs
+from backend.login_logger import log_audit
 from backend.orchestrator import run_query
 from backend.session_store import get_store as _get_store
 from backend.user_memory import (
@@ -217,7 +218,7 @@ async def chat(req: ChatRequest):
 
 
 @app.post("/api/upload")
-async def upload(file: UploadFile = File(...), session_id: str = Form("default"), lang: str = Form("bm")):
+async def upload(request: Request, file: UploadFile = File(...), session_id: str = Form("default"), lang: str = Form("bm")):
     contents = await file.read()
     result = da_upload(contents, file.filename, session_id, lang=lang)
 
@@ -230,6 +231,8 @@ async def upload(file: UploadFile = File(...), session_id: str = Form("default")
                        f"{'...' if len(result['column_names']) > 15 else ''}",
             "agent": "data_analysis",
         })
+        log_audit(request=request, action="upload", resource_type="dataset",
+                  detail={"filename": result["filename"], "rows": result["rows"], "columns": result["columns"]})
 
     return JSONResponse(result)
 
@@ -390,7 +393,7 @@ def _pdf_to_review_html(pdf) -> str:
 
 
 @app.post("/api/review/upload")
-async def review_upload(file: UploadFile = File(...), session_id: str = Form("default")):
+async def review_upload(request: Request, file: UploadFile = File(...), session_id: str = Form("default")):
     """Extract text from PDF or DOCX and store in document reviewer session."""
     import io as _io
     fname = file.filename or ""
@@ -476,6 +479,8 @@ async def review_upload(file: UploadFile = File(...), session_id: str = Form("de
     # Add to session history so context is preserved
     _get_store().append_message(session_id, {"role": "user", "content": f"[Fail dimuat naik: {fname}]"})
 
+    log_audit(request=request, action="upload", resource_type="review_document",
+              detail={"filename": fname, "doc_type": doc_type, "char_count": len(text)})
     return JSONResponse({
         "ok": True,
         "filename": fname,
@@ -1036,6 +1041,8 @@ async def export_pdf(request: Request):
 
         pdf_bytes = _render_html_to_pdf(html_content, top_margin_mm=top_m, bottom_margin_mm=bottom_m)
         _docs_generated[agent] = _docs_generated.get(agent, 0) + 1
+        log_audit(request=request, action="export", resource_type="pdf",
+                  detail={"filename": filename, "agent": agent})
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
@@ -1267,7 +1274,7 @@ async def data_status(session_id: str = "default"):
 
 
 @app.get("/api/document/download")
-async def download_document(session_id: str = "default"):
+async def download_document(request: Request, session_id: str = "default"):
     docx_bytes = lg_build_docx(session_id)
     if not docx_bytes:
         return JSONResponse({"error": "Tiada dokumen sedia untuk dimuat turun."}, status_code=404)
@@ -1275,6 +1282,8 @@ async def download_document(session_id: str = "default"):
     doc_type = info.get("doc_type", "dokumen") if info else "dokumen"
     filename = f"{doc_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
     _docs_generated["letter_generator"] = _docs_generated.get("letter_generator", 0) + 1
+    log_audit(request=request, action="download", resource_type="document",
+              detail={"filename": filename, "doc_type": doc_type, "session_id": session_id})
     return Response(
         content=docx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -1283,12 +1292,14 @@ async def download_document(session_id: str = "default"):
 
 
 @app.get("/api/report/download")
-async def download_report(session_id: str = "default"):
+async def download_report(request: Request, session_id: str = "default"):
     docx_bytes = rg_build_docx(session_id)
     if not docx_bytes:
         return JSONResponse({"error": "Tiada laporan sedia untuk dimuat turun."}, status_code=404)
     filename = f"laporan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
     _docs_generated["report_generator"] = _docs_generated.get("report_generator", 0) + 1
+    log_audit(request=request, action="download", resource_type="report",
+              detail={"filename": filename, "session_id": session_id})
     return Response(
         content=docx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -1306,8 +1317,11 @@ async def save_report(req: "SaveDocRequest"):
 
 
 @app.post("/api/report/send-email")
-async def send_report_email(req: "EmailRequest"):
+async def send_report_email(req: "EmailRequest", request: Request):
     result = rg_send_email(req.session_id, req.to_email, req.subject)
+    if result.get("ok"):
+        log_audit(request=request, action="send_email", resource_type="report",
+                  detail={"to": req.to_email, "subject": req.subject, "session_id": req.session_id})
     return JSONResponse(result)
 
 
@@ -1377,8 +1391,11 @@ class EmailRequest(BaseModel):
 
 
 @app.post("/api/document/send-email")
-async def send_document_email(req: EmailRequest):
+async def send_document_email(req: EmailRequest, request: Request):
     result = lg_send_email(req.session_id, req.to_email, req.subject)
+    if result.get("ok"):
+        log_audit(request=request, action="send_email", resource_type="document",
+                  detail={"to": req.to_email, "subject": req.subject, "session_id": req.session_id})
     return JSONResponse(result)
 
 
@@ -1390,11 +1407,13 @@ class ExportRequest(BaseModel):
 
 
 @app.post("/api/analysis/export")
-async def export_analysis(req: ExportRequest):
+async def export_analysis(req: ExportRequest, request: Request):
     from agents.data_analysis_export import build_pptx, build_pdf, build_xlsx
     try:
         if req.format == "pptx":
             content = build_pptx(req.data, chart_image_b64=req.chart_image)
+            log_audit(request=request, action="export", resource_type="analysis",
+                      detail={"format": "pptx", "session_id": req.session_id})
             return Response(
                 content=content,
                 media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -1402,6 +1421,8 @@ async def export_analysis(req: ExportRequest):
             )
         elif req.format == "pdf":
             content = build_pdf(req.data, chart_image_b64=req.chart_image)
+            log_audit(request=request, action="export", resource_type="analysis",
+                      detail={"format": "pdf", "session_id": req.session_id})
             return Response(
                 content=content,
                 media_type="application/pdf",
@@ -1410,6 +1431,8 @@ async def export_analysis(req: ExportRequest):
         elif req.format == "xlsx":
             from agents.data_analysis import _get_df
             content = build_xlsx(req.data, df=_get_df(req.session_id))
+            log_audit(request=request, action="export", resource_type="analysis",
+                      detail={"format": "xlsx", "session_id": req.session_id})
             return Response(
                 content=content,
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
