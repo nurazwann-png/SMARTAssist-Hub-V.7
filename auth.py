@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from starlette.requests import Request
 from authlib.integrations.starlette_client import OAuth
 from backend.profile_store import get_profile, save_profile
+from backend.login_logger import log_login, _get_client_ip, _get_user_agent
 
 router = APIRouter()
 
@@ -31,13 +32,20 @@ async def login_via_google(request: Request):
 
 @router.get("/auth/callback", name="auth_callback")
 async def auth_callback(request: Request):
+    ip = _get_client_ip(request)
+    ua = _get_user_agent(request)
+
     try:
         token = await oauth.google.authorize_access_token(request)
     except Exception:
+        log_login(google_sub=None, email=None, success=False,
+                  failure_reason="oauth_failed", ip_address=ip, user_agent=ua)
         return RedirectResponse("/login?error=auth_failed")
 
     user = token.get("userinfo")
     if not user:
+        log_login(google_sub=None, email=None, success=False,
+                  failure_reason="no_userinfo", ip_address=ip, user_agent=ua)
         return RedirectResponse("/login?error=no_userinfo")
 
     email = user.get("email", "")
@@ -46,6 +54,9 @@ async def auth_callback(request: Request):
     if ALLOWED_DOMAINS:
         domain = email.split("@")[-1] if "@" in email else ""
         if domain not in ALLOWED_DOMAINS:
+            log_login(google_sub=None, email=email, success=False,
+                      failure_reason=f"unauthorized_domain:{domain}",
+                      ip_address=ip, user_agent=ua)
             return RedirectResponse(f"/login?error=unauthorized_domain&email={email}")
 
     google_sub = user.get("sub", "")
@@ -70,6 +81,9 @@ async def auth_callback(request: Request):
     existing = get_profile(google_sub)
     if not existing.get("nama") or existing.get("nama") == google_name:
         save_profile(google_sub, email, {"nama": display_name})
+
+    log_login(google_sub=google_sub, email=email, success=True,
+              ip_address=ip, user_agent=ua)
 
     return RedirectResponse("/")
 
