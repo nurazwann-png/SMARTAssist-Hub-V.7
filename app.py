@@ -112,6 +112,11 @@ app = FastAPI(title="SMARTAssist Hub", version="7.0")
 async def _on_startup():
     _tq_start_worker()
 
+# Trust Cloud Run / reverse-proxy forwarded headers so request.url_for()
+# generates https:// URLs instead of http://
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
 # Session middleware must be added before including routers
 app.add_middleware(
     SessionMiddleware,
