@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMARTAssist Hub</title>
-    <link rel="stylesheet" href="/static/style.css?v=62">
+    <link rel="stylesheet" href="/static/style.css?v=66">
     <script src="/static/chart.min.js"></script>
 </head>
 <body>
@@ -84,18 +84,18 @@
                 <button type="submit" class="btn-profile-save" id="profileSaveBtn" data-i18n="profile_save">Simpan Profil</button>
                 <p class="profile-save-msg" id="profileSaveMsg"></p>
             </div>
-        </form>
 
-        <div class="profile-bottom-actions">
-            <button class="btn-profile-dashboard" id="adminBtn">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                <span data-i18n="profile_dashboard">Papan Pemuka Penggunaan</span>
-            </button>
-            <a href="/auth/logout" class="btn-profile-logout">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                <span data-i18n="profile_logout">Log Keluar</span>
-            </a>
-        </div>
+            <div class="profile-bottom-actions">
+                <button class="btn-profile-dashboard" id="adminBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    <span data-i18n="profile_dashboard">Papan Pemuka Penggunaan</span>
+                </button>
+                <a href="/auth/logout" class="btn-profile-logout">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    <span data-i18n="profile_logout">Log Keluar</span>
+                </a>
+            </div>
+        </form>
     </aside>
 
     <!-- ═══ Admin Dashboard Page ═══ -->
@@ -389,6 +389,10 @@
     <!-- ═══ KPM Support Chat Bubble (homepage overlay) ═══ -->
     <div id="kpmChatBubble" class="kpm-bubble-overlay" style="display:none;">
 
+        <!-- KPM Chat Window comes first (top) -->
+        <!-- KPM Avatar strip will follow below -->
+        <!-- Avatar moved below window — see kpm-avatar-wrap after kpm-bubble-window -->
+
         <!-- KPM Avatar -->
         <div class="kpm-avatar-wrap" id="kpmAvatar">
             <svg class="kpm-avatar-svg" viewBox="0 0 160 220" xmlns="http://www.w3.org/2000/svg">
@@ -672,7 +676,17 @@
                 </div>
             </div>
 
-        <div class="canvas-body">
+        <!-- Mobile tab switcher — hidden on desktop -->
+        <div class="mobile-panel-tabs" id="mobilePanelTabs">
+            <button class="mobile-panel-tab active" id="tabChat" onclick="switchMobilePanel('chat')">
+                💬 <span data-i18n="tab_chat">Chat</span>
+            </button>
+            <button class="mobile-panel-tab" id="tabWork" onclick="switchMobilePanel('work')">
+                📄 <span data-i18n="tab_workspace">Ruang Kerja</span>
+            </button>
+        </div>
+
+        <div class="canvas-body" id="canvasBody">
 
             <!-- LEFT: Chat Panel -->
             <div class="chat-panel" id="chatPanel">
@@ -805,6 +819,6 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=116"></script>
+    <script src="/static/app.js?v=118"></script>
 </body>
 </html>
