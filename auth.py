@@ -25,9 +25,12 @@ ALLOWED_DOMAINS = [d.strip() for d in ALLOWED_DOMAINS if d.strip()]
 
 
 @router.get("/auth/google")
-async def login_via_google(request: Request):
+async def login_via_google(request: Request, hint: str = ""):
     redirect_uri = request.url_for("auth_callback")
-    return await oauth.google.authorize_redirect(request, str(redirect_uri))
+    kwargs = {}
+    if hint:
+        kwargs["login_hint"] = hint
+    return await oauth.google.authorize_redirect(request, str(redirect_uri), **kwargs)
 
 
 @router.get("/auth/callback", name="auth_callback")

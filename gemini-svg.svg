@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient (Corporate Dark Navy) -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A192F" />
+      <stop offset="100%" stop-color="#1E293B" />
+    </linearGradient>
+
+    <!-- Metallic Blue Gradient (Primary Structure) -->
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+
+    <!-- Gold Accent Gradient (Official Emblem Touch) -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCD34D" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+
+    <!-- Subtle Drop Shadow for Depth -->
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Base App Tile (Squircle Shape) -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- Outer Official Frame / Border Ring -->
+  <rect x="32" y="32" width="448" height="448" rx="88" 
+        fill="none" stroke="url(#blueGrad)" stroke-width="4" opacity="0.3" />
+
+  <!-- Main Symbol Group with Shadow -->
+  <g filter="url(#dropShadow)">
+    
+    <!-- Outer Shield Crest (Official Emblem Base) -->
+    <path d="M 256 96 
+             L 360 136 
+             C 360 260, 310 350, 256 396 
+             C 202 350, 152 260, 152 136 
+             Z" 
+          fill="none" 
+          stroke="url(#blueGrad)" 
+          stroke-width="16" 
+          stroke-linejoin="round" />
+
+    <!-- Inner SMART Interlocking 'S' Ribbon -->
+    <!-- Top Arc of 'S' -->
+    <path d="M 310 180 
+             C 310 180, 210 160, 200 220 
+             C 190 270, 310 260, 300 310 
+             C 290 350, 200 340, 200 340" 
+          fill="none" 
+          stroke="#FFFFFF" 
+          stroke-width="24" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" />
+
+    <!-- Official Gold Star / AI Diamond in Center -->
+    <path d="M 256 226 L 264 246 L 284 254 L 264 262 L 256 282 L 248 262 L 228 254 L 248 246 Z" 
+          fill="url(#goldGrad)" />
+
+    <!-- Top Right Official Dot Accent -->
+    <circle cx="360" cy="136" r="10" fill="url(#goldGrad)" />
+  </g>
+</svg>

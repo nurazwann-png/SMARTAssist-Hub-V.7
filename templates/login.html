@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log Masuk — SMARTAssist Hub</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#C9A96E">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SMARTAssist">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
     <style>
         :root {
             --bg: #0a0e1a;
@@ -87,6 +95,39 @@
             background: var(--border);
         }
 
+        /* Email input */
+        .email-field {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+        .email-field label {
+            display: block;
+            font-size: 12.5px;
+            color: var(--muted);
+            margin-bottom: 6px;
+            letter-spacing: 0.03em;
+        }
+        .email-input {
+            width: 100%;
+            padding: 11px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.05);
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+        .email-input:focus { border-color: var(--gold); }
+        .email-input::placeholder { color: var(--muted); opacity: 0.7; }
+        .email-error {
+            font-size: 12px;
+            color: #fca5a5;
+            margin-top: 5px;
+            display: none;
+        }
+
         /* Google button */
         .btn-google {
             display: flex; align-items: center; justify-content: center;
@@ -105,6 +146,7 @@
             box-shadow: 0 6px 20px rgba(0,0,0,0.4);
         }
         .btn-google:active { transform: translateY(0); }
+        .btn-google:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
         .btn-google svg { width: 20px; height: 20px; flex-shrink: 0; }
 
@@ -156,7 +198,17 @@
 
         <div class="divider">Log masuk untuk teruskan</div>
 
-        <a href="/auth/google" class="btn-google">
+        <div class="email-field">
+            <label for="emailInput">Emel rasmi anda</label>
+            <input type="email" id="emailInput" class="email-input"
+                   placeholder="nama@moe.gov.my"
+                   autocomplete="email" autocapitalize="off" spellcheck="false">
+            <div class="email-error" id="emailError">
+                ⚠️ Sila gunakan emel domain <strong>@moe.gov.my</strong> atau <strong>@moe-dl.edu.my</strong>
+            </div>
+        </div>
+
+        <button type="button" id="googleBtn" class="btn-google" onclick="doLogin()">
             <!-- Google SVG logo -->
             <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                 <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -166,7 +218,7 @@
                 <path fill="none" d="M0 0h48v48H0z"/>
             </svg>
             Teruskan dengan Google
-        </a>
+        </button>
 
         <div class="login-info">
             Sistem ini menggunakan akaun Google anda untuk pengesahan.<br>
@@ -213,6 +265,48 @@
             requestAnimationFrame(draw);
         }
         draw();
+    </script>
+    <script>
+        const ALLOWED = ['moe.gov.my', 'moe-dl.edu.my'];
+
+        function getHint() {
+            return document.getElementById('emailInput').value.trim();
+        }
+
+        function validateEmail(email) {
+            if (!email) return true; // allow empty (skip hint)
+            const parts = email.split('@');
+            if (parts.length !== 2) return false;
+            return ALLOWED.includes(parts[1].toLowerCase());
+        }
+
+        function doLogin() {
+            const email = getHint();
+            const errEl = document.getElementById('emailError');
+            if (email && !validateEmail(email)) {
+                errEl.style.display = 'block';
+                document.getElementById('emailInput').focus();
+                return;
+            }
+            errEl.style.display = 'none';
+            const url = email ? '/auth/google?hint=' + encodeURIComponent(email) : '/auth/google';
+            window.location.href = url;
+        }
+
+        document.getElementById('emailInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') doLogin();
+        });
+
+        document.getElementById('emailInput').addEventListener('input', function() {
+            document.getElementById('emailError').style.display = 'none';
+        });
+
+        // Pre-fill email from URL param if redirected from unauthorized attempt
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            const email = params.get('email');
+            if (email) document.getElementById('emailInput').value = email;
+        })();
     </script>
 </body>
 </html>

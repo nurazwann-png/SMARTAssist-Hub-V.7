@@ -2328,28 +2328,30 @@ textarea.ff-input.ff-expandable { min-height: 110px; resize: vertical; }
     .message.assistant .message-bubble { font-size: 14px; }
 
     /* ── KPM Bubble: column layout on mobile (window top, avatar strip bottom) ── */
-    .kpm-bubble-overlay { flex-direction: column; }
+    .kpm-bubble-overlay { flex-direction: column !important; align-items: center !important; justify-content: flex-start !important; padding-top: 6vh; }
     .kpm-bubble-window {
-        width: 96vw;
-        height: 78vh;
-        border-radius: 16px 16px 0 0;
-        order: 1;
+        width: 96vw !important;
+        height: 72vh !important;
+        border-radius: 16px 16px 0 0 !important;
+        order: 1 !important;
+        flex-shrink: 0;
     }
     .kpm-avatar-wrap {
-        order: 2;
-        flex-direction: row;
-        width: 96vw;
-        justify-content: center;
-        gap: 12px;
-        padding: 8px 14px 12px;
-        padding-bottom: 12px;
-        border-radius: 0 0 16px 16px;
-        background: linear-gradient(180deg, rgba(30,10,50,0.97) 0%, rgba(15,5,30,0.99) 100%);
-        border: 1px solid rgba(248,113,113,0.22);
-        border-top: none;
-        box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+        order: 2 !important;
+        flex-direction: row !important;
+        width: 96vw !important;
+        justify-content: center !important;
+        align-items: center !important;
+        gap: 12px !important;
+        padding: 8px 14px 12px !important;
+        border-radius: 0 0 16px 16px !important;
+        background: linear-gradient(180deg, rgba(30,10,50,0.97) 0%, rgba(15,5,30,0.99) 100%) !important;
+        border: 1px solid rgba(248,113,113,0.22) !important;
+        border-top: none !important;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.5) !important;
+        flex-shrink: 0;
     }
-    .kpm-avatar-svg { width: 52px; height: 72px; }
+    .kpm-avatar-svg { width: 46px !important; height: 64px !important; }
     .kpm-avatar-label { font-size: 13px; letter-spacing: 3px; margin-top: 0; padding: 0; background-color: transparent; }
     .kpm-avatar-sublabel { font-size: 10px; margin-top: 1px; padding: 0; background: transparent; }
     .kpm-bubble-msg {
