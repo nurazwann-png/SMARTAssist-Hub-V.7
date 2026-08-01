@@ -2100,4 +2100,6 @@ async def api_save_preferences(request: Request):
 
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8112, reload=True)
+    port = int(os.getenv("PORT", "8112"))
+    reload = os.getenv("ENV", "development") == "development"
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=reload)
