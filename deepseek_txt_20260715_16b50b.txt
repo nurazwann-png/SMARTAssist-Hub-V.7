@@ -1,0 +1,165 @@
+================================================================================
+                    MASTER DOCUMENT SKILLS PROTOCOL
+                        For Claude Code
+================================================================================
+
+## 📋 INSTRUCTION FOR CLAUDE CODE
+
+ACTIVATE ALL DOCUMENT SKILLS AND AGENTS
+
+I need you to use ALL document-related skills and agents from my application for every documentation task. Follow this protocol:
+
+================================================================================
+                      UNIVERSAL DOCUMENT PROTOCOL
+================================================================================
+
+## 1. SKILL ACTIVATION (Always Active)
+
+Load and apply ALL document skills from my `.claude/skills/` directory. Prioritize these skills in this order:
+
+  1. `doc-init` - For new documentation projects
+  2. `doc-update` - For updating existing docs
+  3. `doc-compact` - For optimizing bloated documentation
+  4. Any custom document skills in my skills folder
+
+## 2. AGENT DEPLOYMENT
+
+When generating documents, automatically invoke these agents:
+
+  - document-generator: For creating new documents from scratch
+  - technical-writer: For technical documentation and API docs
+  - doc-updater: For maintaining and updating existing docs
+  - copywriter: For marketing, proposals, and business documents
+  - api-doc-generator: For API reference documentation
+
+## 3. TEMPLATE ENFORCEMENT
+
+- ALWAYS use the templates from my `.claude/skills/*/templates/` folder
+- If no template exists for a specific document type, ask me which format to use
+- Apply these formatting rules:
+  - Use tables with invisible borders for alignment
+  - Apply "Keep with next" for paragraph flow
+  - Use "In Line with Text" for all objects
+  - Enforce brand colors and fonts from my style guide
+
+## 4. DOCUMENT TYPES & FORMATS
+
+For each request, generate the appropriate format:
+
+  | Document Type      | Output Format | Skill/Agent             |
+  | :----------------- | :------------ | :---------------------- |
+  | Reports & Proposals| DOCX          | doc-init + copywriter   |
+  | Technical Docs     | MD / DOCX     | doc-init + technical-writer |
+  | Presentations      | PPTX          | doc-init + document-generator |
+  | API References     | MD / HTML     | api-doc-generator       |
+  | Business Letters   | DOCX          | copywriter              |
+  | Spreadsheets       | XLSX          | document-generator      |
+
+## 5. PPT GENERATION PROTOCOL
+
+For presentations, ALWAYS:
+
+  1. Start with `doc-init` to scaffold the structure
+  2. Use `document-generator` agent for slide creation
+  3. Apply templates from `.claude/skills/presentation-templates/`
+  4. Include:
+     - Title slide with branding
+     - Agenda/Overview slide
+     - Content slides with visuals (suggest images/diagrams)
+     - Summary/Conclusion slide
+     - Q&A slide
+
+## 6. QUALITY CHECKS (Auto-Execute)
+
+Run document validation after generation. Check for:
+
+  - Consistent formatting
+  - Correct template usage
+  - Proper heading hierarchy
+  - Image/table placement
+  - Page breaks and flow
+  - Brand compliance
+
+## 7. DATA INTEGRATION
+
+When generating from data:
+
+  1. Ask me for the data source (JSON, CSV, database, etc.)
+  2. Map fields to placeholders in templates
+  3. Auto-populate with provided data
+  4. Generate charts/graphs using `document-generator`
+
+## 8. MULTI-FORMAT EXPORT
+
+Always offer to export in:
+
+  - DOCX (Word)
+  - PPTX (PowerPoint)
+  - PDF (for final distribution)
+  - MD (Markdown)
+  - HTML (for web)
+
+## 9. COVERAGE TRACKING
+
+After generating documents, update the coverage status. Mark documentation as:
+  - Complete
+  - Partial
+  - Missing
+
+Log all generated documents in `HEALTH.md`
+
+## 10. SESSION PERSISTENCE
+
+At the end of each session, run `doc-update` to distill findings. Update AGENTS.md with new document capabilities. Flag any missing templates or skills.
+
+## 11. MCP INTEGRATION
+
+- Use document-loader-mcp for reading existing documents
+- Auto-detect file types (PDF, DOCX, XLSX, PPTX)
+- Extract text and structure for analysis
+- Use for: understanding existing docs, extracting templates, analyzing data
+
+================================================================================
+                         QUICK COMMAND SHORTCUTS
+================================================================================
+
+  /docs:generate [type] [title]  - Generate a new document
+  /docs:update [file]            - Update an existing document
+  /docs:ppt [title]              - Generate a presentation
+  /docs:read [file]              - Read and analyze a document
+  /docs:template [type]          - Show available templates
+  /docs:stats                    - Show documentation coverage
+  /docs:compact                  - Optimize documentation
+
+================================================================================
+                           SKILL OVERRIDE
+================================================================================
+
+If any skill fails or is missing, IMMEDIATELY:
+
+  1. Notify me with the missing skill name
+  2. Suggest an alternative approach
+  3. Continue with fallback templates from my `~/.claude/templates/`
+
+================================================================================
+                            REMEMBER
+================================================================================
+
+- ALL agents MUST use these skills
+- ALWAYS enforce formatting standards
+- ALWAYS ask for clarification if unsure
+- NEVER generate documents without template validation
+- ALWAYS maintain version control
+- ALWAYS update health tracking
+
+START NOW: Activate all document skills and confirm ready.
+
+================================================================================
+                      HOW TO INSTALL THIS PROTOCOL
+================================================================================
+
+## Option 1: Save as a command file
+
+  1. Save this file as: `.claude/commands/doc-master.txt`
+  
+  2. Reference it in your `CLAUDE.md`:

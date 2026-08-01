@@ -1,0 +1,218 @@
+PROJECT REQUIREMENT
+
+Saya mahu membina sistem web yang menggunakan Google OAuth 2.0 untuk login pengguna.
+
+OBJECTIVE
+- Pengguna login menggunakan akaun Google mereka.
+- Sistem tidak menyimpan password Google pengguna.
+- Selepas berjaya login, maklumat pengguna disimpan dalam MySQL database.
+- Jika pengguna sudah pernah login, terus log masuk ke sistem.
+- Jika pengguna belum wujud, cipta rekod pengguna baru secara automatik.
+
+TECH STACK
+- PHP Laravel 12
+- MySQL
+- Laravel Socialite
+- Bootstrap 5
+
+PLEASE GENERATE COMPLETE IMPLEMENTATION INCLUDING:
+
+1. INSTALLATION
+
+Provide all commands needed:
+
+composer require laravel/socialite
+
+Include all package configuration if necessary.
+
+--------------------------------------------------
+
+2. DATABASE
+
+Create migration for users table.
+
+Required fields:
+
+id
+google_id
+name
+email
+avatar
+email_verified_at
+created_at
+updated_at
+
+Email must be unique.
+
+--------------------------------------------------
+
+3. ENV CONFIGURATION
+
+Generate example .env settings:
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=
+
+--------------------------------------------------
+
+4. SERVICES CONFIGURATION
+
+Update:
+
+config/services.php
+
+Add Google OAuth configuration.
+
+--------------------------------------------------
+
+5. ROUTES
+
+Generate routes:
+
+/login
+/auth/google
+/auth/google/callback
+/dashboard
+/logout
+
+Apply authentication middleware where required.
+
+--------------------------------------------------
+
+6. CONTROLLER
+
+Generate complete controller:
+
+GoogleAuthController
+
+Functions:
+
+index()
+redirectToGoogle()
+handleGoogleCallback()
+logout()
+
+Requirements:
+
+- Redirect user to Google login page
+- Retrieve Google profile
+- Check whether user exists
+- Create user if not found
+- Login user automatically
+- Redirect to dashboard
+- Handle exceptions properly
+
+--------------------------------------------------
+
+7. USER MODEL
+
+Generate User model updates.
+
+Make fields fillable:
+
+google_id
+name
+email
+avatar
+
+--------------------------------------------------
+
+8. LOGIN PAGE
+
+Create Bootstrap login page.
+
+Requirements:
+
+- Modern UI
+- Centered card
+- "Continue with Google" button
+- Google logo
+- Responsive design
+
+--------------------------------------------------
+
+9. DASHBOARD PAGE
+
+Create dashboard page displaying:
+
+Profile Picture
+Name
+Email
+Logout button
+
+--------------------------------------------------
+
+10. LOGOUT
+
+Implement Laravel authentication logout.
+
+Destroy session and redirect to login page.
+
+--------------------------------------------------
+
+11. SECURITY REQUIREMENTS
+
+Implement:
+
+- Laravel authentication
+- CSRF protection
+- Session management
+- Exception handling
+- Unique email validation
+
+--------------------------------------------------
+
+12. PROJECT STRUCTURE
+
+Show complete directory structure:
+
+app/
+routes/
+resources/views/
+database/migrations/
+
+--------------------------------------------------
+
+13. DEPLOYMENT GUIDE
+
+Provide step-by-step instructions for:
+
+A. Creating Google OAuth Credentials in Google Cloud Console
+
+B. Configuring OAuth Consent Screen
+
+C. Creating OAuth Client ID
+
+D. Setting Authorized Redirect URI
+
+Example:
+
+http://localhost:8000/auth/google/callback
+
+and
+
+https://mydomain.com/auth/google/callback
+
+--------------------------------------------------
+
+14. TESTING
+
+Provide complete testing checklist:
+
+- New user login
+- Existing user login
+- Logout
+- Database insertion
+- Error handling
+- Invalid callback handling
+
+--------------------------------------------------
+
+IMPORTANT
+
+Generate production-ready Laravel code.
+Show every file completely.
+Do not omit code.
+Use Laravel best practices.
+Include comments explaining every major section.
