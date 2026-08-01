@@ -734,7 +734,24 @@ function applyLanguage(lang) {
 }
 
 function toggleLanguage() {
-    applyLanguage(currentLang === 'bm' ? 'en' : 'bm');
+    const next = currentLang === 'bm' ? 'en' : 'bm';
+    applyLanguage(next);
+    fetch('/api/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: next }),
+    }).catch(() => {});
+}
+
+async function loadUserPreferences() {
+    try {
+        const res = await fetch('/api/preferences');
+        if (!res.ok) return;
+        const prefs = await res.json();
+        if (prefs.language && prefs.language !== currentLang) {
+            applyLanguage(prefs.language);
+        }
+    } catch (_) {}
 }
 
 // ── DOM refs ──
@@ -3963,6 +3980,7 @@ let _hadCurrentFilter = '';
 })();
 document.getElementById('langToggle').addEventListener('click', toggleLanguage);
 applyLanguage(currentLang);
+loadUserPreferences();
 
 // Resume last session if available
 setTimeout(_checkResumeBanner, 800);

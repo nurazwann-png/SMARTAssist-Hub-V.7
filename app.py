@@ -62,6 +62,7 @@ from fastapi.responses import PlainTextResponse, Response
 
 from auth import router as auth_router, get_current_user
 from backend.profile_store import get_profile, save_profile
+from backend.prefs_store import get_prefs, save_prefs
 from backend.orchestrator import run_query
 from backend.session_store import get_store as _get_store
 from backend.user_memory import (
@@ -2056,6 +2057,23 @@ async def api_save_profile(request: Request):
     data = await request.json()
     profile = save_profile(user["sub"], user["email"], data)
     return JSONResponse({"ok": True, "profile": dict(profile)})
+
+
+@app.get("/api/preferences")
+async def api_get_preferences(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "Tidak log masuk."}, status_code=401)
+    return JSONResponse(get_prefs(user["sub"]))
+
+
+@app.patch("/api/preferences")
+async def api_save_preferences(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "Tidak log masuk."}, status_code=401)
+    data = await request.json()
+    return JSONResponse(save_prefs(user["sub"], data))
 
 
 if __name__ == "__main__":
