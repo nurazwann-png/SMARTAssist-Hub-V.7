@@ -168,7 +168,10 @@ async def index(request: Request):
     user = get_current_user(request)
     if not user:
         return RedirectResponse("/login")
-    profile = get_profile(user["sub"])
+    try:
+        profile = get_profile(user["sub"])
+    except Exception:
+        profile = {}
     agents_list = [
         {"key": k, "icon": v["icon"], "name": v["name"]}
         for k, v in AGENT_LABELS.items()
