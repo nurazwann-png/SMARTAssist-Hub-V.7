@@ -1008,7 +1008,10 @@ async function sendAgentIntro(agentKey) {
         addMessage(data.response, 'assistant', info.icon, info.name);
     } catch (_) {
         typingIndicator.classList.remove('active');
-        addMessage('Tidak dapat memuat ejen. Sila cuba lagi.', 'assistant', info.icon, info.name);
+        const msg = currentLang === 'en'
+            ? 'Server is offline. Please restart the server and reload the page.'
+            : 'Pelayan tidak aktif. Sila mulakan semula pelayan dan muat semula halaman ini.';
+        addMessage(msg, 'assistant', '⚠️', 'Sistem');
     }
 }
 
