@@ -111,6 +111,34 @@ app = FastAPI(title="SMARTAssist Hub", version="7.0")
 @app.on_event("startup")
 async def _on_startup():
     _tq_start_worker()
+    _run_schema_migration()
+
+
+def _run_schema_migration():
+    """Run schema.sql on startup — all statements use IF NOT EXISTS so safe to re-run."""
+    try:
+        import psycopg2
+        from pathlib import Path
+        db_url = os.getenv("DATABASE_URL")
+        if not db_url:
+            return
+        schema_file = Path(__file__).parent / "database" / "schema.sql"
+        if not schema_file.exists():
+            return
+        schema = schema_file.read_text(encoding="utf-8")
+        # Remove pgcrypto extension (not available in all schemas) and use uuid fallback
+        schema = schema.replace('CREATE EXTENSION IF NOT EXISTS "pgcrypto";', "")
+        schema = schema.replace(
+            "DEFAULT 'lh_' || encode(gen_random_bytes(4), 'hex')",
+            "DEFAULT 'lh_' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)",
+        )
+        conn = psycopg2.connect(db_url)
+        conn.autocommit = True
+        cur = conn.cursor()
+        cur.execute(schema)
+        conn.close()
+    except Exception as e:
+        print(f"[startup] schema migration warning: {e}")
 
 # Trust Cloud Run / reverse-proxy forwarded headers so request.url_for()
 # generates https:// URLs instead of http://
