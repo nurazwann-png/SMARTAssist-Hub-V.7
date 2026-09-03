@@ -264,8 +264,7 @@ class SessionStore:
     def prune_old_sessions(self, days: int = 30):
         with get_conn() as conn, dict_cur(conn) as cur:
             cur.execute(
-                "DELETE FROM sessions WHERE updated_at < NOW() - INTERVAL '%s days'",
-                (days,)
+                f"DELETE FROM sessions WHERE updated_at < NOW() - INTERVAL '{int(days)} days'"
             )
 
 

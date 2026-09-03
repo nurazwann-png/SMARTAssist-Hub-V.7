@@ -70,18 +70,15 @@ def save_version(
     fields_json = json.dumps(fields or {}, ensure_ascii=False)
     with get_conn() as conn, dict_cur(conn) as cur:
         cur.execute("""
-            SELECT COALESCE(MAX(version_number), 0) + 1
-            FROM document_versions
-            WHERE session_id = %s AND agent = %s
-        """, (session_id, agent))
-        next_v = cur.fetchone()[0]
-        cur.execute("""
             INSERT INTO document_versions
                 (session_id, agent, version_number, doc_type, fields, document_text)
-            VALUES (%s, %s, %s, %s, %s::jsonb, %s)
-            ON CONFLICT (session_id, agent, version_number) DO NOTHING
-        """, (session_id, agent, next_v, doc_type, fields_json, document_text))
-    return next_v
+            SELECT %s, %s, COALESCE(MAX(version_number), 0) + 1, %s, %s::jsonb, %s
+            FROM document_versions
+            WHERE session_id = %s AND agent = %s
+            RETURNING version_number
+        """, (session_id, agent, doc_type, fields_json, document_text, session_id, agent))
+        row = cur.fetchone()
+    return row[0] if row else 0
 
 
 def list_versions(session_id: str, agent: str) -> list[dict]:

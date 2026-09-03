@@ -223,11 +223,14 @@ def _worker_loop():
             with _db()() as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        "SELECT id, task_type, payload FROM bg_tasks WHERE status = %s "
-                        "ORDER BY created_at LIMIT 1",
-                        (PENDING,),
+                        "UPDATE bg_tasks SET status = %s "
+                        "WHERE id = (SELECT id FROM bg_tasks WHERE status = %s "
+                        "ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED) "
+                        "RETURNING id, task_type, payload",
+                        (RUNNING, PENDING),
                     )
                     row = cur.fetchone()
+                    conn.commit()
             if row:
                 task = {"id": row[0], "task_type": row[1], "payload": row[2]}
                 _process_one(task)

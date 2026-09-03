@@ -83,7 +83,7 @@ async def auth_callback(request: Request):
     # Auto-fill nama from Google — always sync on login so name stays current
     try:
         existing = get_profile(google_sub)
-        if not existing.get("nama") or existing.get("nama") == google_name:
+        if not existing.get("nama") or existing.get("nama") != google_name:
             save_profile(google_sub, email, {"nama": display_name})
     except Exception:
         pass  # DB unavailable — proceed without profile sync

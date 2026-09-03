@@ -242,7 +242,7 @@ async def chat(req: ChatRequest):
     structured = None
     if agent in ("data_analysis", "letter_generator", "report_generator", "document_reviewer"):
         structured = _parse_agent_json(output)
-        _shorten_doc_message(structured, getattr(req, "lang", "ms"))
+        _shorten_doc_message(structured, getattr(req, "lang", "bm"))
 
     return JSONResponse({
         "response": output,
@@ -346,7 +346,8 @@ def _pdf_page_lines(page):
 
 # In-memory cache of the most recent uploaded PDF bytes per session, so the
 # review step can locate each issue's text and highlight it on the page images.
-_REVIEW_PDF_CACHE = {}
+_REVIEW_PDF_CACHE: dict = {}  # session_id → bytes; capped at 20 entries (LRU)
+_REVIEW_PDF_CACHE_MAX = 20
 
 
 def _locate_issue_boxes(raw_pdf, issues):
@@ -462,6 +463,8 @@ async def review_upload(request: Request, file: UploadFile = File(...), session_
             doc_html = None
             # Cache raw bytes so the review step can locate & highlight issues
             _REVIEW_PDF_CACHE[session_id] = raw
+            if len(_REVIEW_PDF_CACHE) > _REVIEW_PDF_CACHE_MAX:
+                _REVIEW_PDF_CACHE.pop(next(iter(_REVIEW_PDF_CACHE)))
         elif ext in (".docx", ".doc"):
             # mammoth for rich HTML preview (preserves tables, bold, etc.)
             import mammoth
