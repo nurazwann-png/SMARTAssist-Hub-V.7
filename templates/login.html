@@ -194,6 +194,10 @@
         <div class="error-banner">
             ⚠️ Log masuk gagal. Sila cuba semula.
         </div>
+        {% elif error == 'demo_failed' %}
+        <div class="error-banner">
+            ⚠️ Kata laluan demo tidak sah.
+        </div>
         {% endif %}
 
         <div class="divider">Log masuk untuk teruskan</div>
@@ -223,6 +227,30 @@
         <div class="login-info">
             Sistem ini menggunakan akaun Google anda untuk pengesahan.<br>
             <strong>Kata laluan anda tidak disimpan</strong> oleh SMARTAssist Hub.
+        </div>
+
+        <!-- Demo account login -->
+        <div style="margin-top:24px;">
+            <button type="button" onclick="toggleDemo()"
+                style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline;">
+                Akaun Demo
+            </button>
+            <div id="demoForm" style="display:none;margin-top:12px;">
+                <form method="POST" action="/auth/demo">
+                    <input type="hidden" name="email" value="abishekdemo@moe.gov.my">
+                    <input type="password" name="password" placeholder="Kata laluan demo"
+                        style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);
+                               background:rgba(255,255,255,0.05);color:var(--text);font-size:14px;
+                               outline:none;box-sizing:border-box;margin-bottom:8px;"
+                        autocomplete="current-password">
+                    <button type="submit"
+                        style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);
+                               background:rgba(245,158,11,0.12);color:var(--gold);font-size:14px;
+                               font-weight:600;cursor:pointer;">
+                        Log Masuk sebagai Demo
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -300,6 +328,11 @@
         document.getElementById('emailInput').addEventListener('input', function() {
             document.getElementById('emailError').style.display = 'none';
         });
+
+        function toggleDemo() {
+            const f = document.getElementById('demoForm');
+            f.style.display = f.style.display === 'none' ? 'block' : 'none';
+        }
 
         // Pre-fill email from URL param if redirected from unauthorized attempt
         (function() {

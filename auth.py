@@ -100,5 +100,36 @@ async def logout(request: Request):
     return RedirectResponse("/login")
 
 
+# ── Demo account bypass ──────────────────────────────────────────
+_DEMO_EMAIL    = "abishekdemo@moe.gov.my"
+_DEMO_NAME     = "Abishek (Demo)"
+_DEMO_PASSWORD = os.getenv("DEMO_PASSWORD", "")
+
+@router.post("/auth/demo")
+async def demo_login(request: Request):
+    form = await request.form()
+    email    = (form.get("email") or "").strip().lower()
+    password = (form.get("password") or "").strip()
+
+    if email != _DEMO_EMAIL or password != _DEMO_PASSWORD:
+        return RedirectResponse("/login?error=demo_failed", status_code=303)
+
+    request.session["user"] = {
+        "email":   _DEMO_EMAIL,
+        "name":    _DEMO_NAME,
+        "picture": "",
+        "sub":     "demo-abishek-001",
+    }
+
+    try:
+        existing = get_profile("demo-abishek-001")
+        if not existing:
+            save_profile("demo-abishek-001", _DEMO_EMAIL, {"nama": _DEMO_NAME})
+    except Exception:
+        pass
+
+    return RedirectResponse("/", status_code=303)
+
+
 def get_current_user(request: Request) -> dict | None:
     return request.session.get("user")
