@@ -14,10 +14,9 @@ __pycache__/
 venv/
 env/
 
-# Database files (guna Cloud SQL di production)
+# Database files excluded — smartassist.db is rebuilt at image build time via ingest_kpm_docs.py
 *.db
 *.sqlite
-backend/data/
 
 # Fail sesi & upload sementara (guna Cloud Storage di production)
 static/session_data/

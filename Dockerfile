@@ -38,6 +38,9 @@ RUN mkdir -p static/letterheads static/report_images static/session_data \
              backend/data backend/data/registration backend/data/templates \
              backend/data/examples
 
+# Index KPM documents into SQLite for RAG (runs at build time so DB is baked into image)
+RUN python scripts/ingest_kpm_docs.py
+
 # Cloud Run injects PORT env var — default 8080
 ENV PORT=8080
 EXPOSE 8080
