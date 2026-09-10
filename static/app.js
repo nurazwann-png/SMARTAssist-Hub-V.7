@@ -2214,8 +2214,8 @@ function _buildMissingFieldsForm(missingLabels) {
                 const addLabel = def.type === 'pegawai-list' ? '＋ Tambah Pegawai' : '＋ Tambah Ahli';
                 const namaPh  = def.type === 'pegawai-list' ? 'Nama pegawai' : 'Nama ahli';
                 const extraAttr = def.type === 'pegawai-list' ? ' data-type="pegawai-list"' : '';
-                const semuaBtn = def.type === 'pegawai-list'
-                    ? `<button type="button" class="ff-ahli-semua" onclick="_toggleSemuaHadir('${iid}')">☑ Semua Guru/Staf Hadir</button>`
+                const semuaBtn = (def.type === 'pegawai-list' || def.type === 'ahli-list')
+                    ? `<button type="button" class="ff-ahli-semua" onclick="_toggleSemuaAhli('${iid}','${def.type}')">☑ Semua Guru dan Staf</button>`
                     : '';
                 widget = `<div class="ff-ahli-list" id="${iid}" data-label="${escapeAttr(label)}"${extraAttr}>
                     <div class="ff-ahli-row">
@@ -2341,6 +2341,39 @@ function _addAhliRow(listId) {
         <input class="ff-input ff-ahli-jawatan" type="text" placeholder="Jawatan">
         <button type="button" class="ff-ahli-remove" onclick="_removeAhliRow(this)" title="Buang">✕</button>`;
     list.appendChild(row);
+}
+
+function _toggleSemuaAhli(listId, listType) {
+    const list = document.getElementById(listId);
+    if (!list) return;
+    const btn = list.parentElement.querySelector('.ff-ahli-semua');
+    const isActive = btn && btn.classList.contains('active');
+    const isPegawai = listType === 'pegawai-list';
+    const namaPh = isPegawai ? 'Nama pegawai' : 'Nama ahli';
+
+    if (isActive) {
+        btn.classList.remove('active');
+        btn.textContent = '☑ Semua Guru dan Staf';
+        list.innerHTML = `<div class="ff-ahli-row">
+            <input class="ff-input ff-ahli-nama" type="text" placeholder="${namaPh}">
+            <input class="ff-input ff-ahli-jawatan" type="text" placeholder="Jawatan">
+            <button type="button" class="ff-ahli-remove" onclick="_removeAhliRow(this)" title="Buang">✕</button>
+        </div>`;
+        list.parentElement.querySelector('.ff-ahli-add').style.display = '';
+    } else {
+        const bilangan = prompt('Berapa ramai guru/staf?\n(Biarkan kosong jika tidak pasti)', '');
+        if (bilangan === null) return;
+        const namaEntry = bilangan.trim()
+            ? `Semua Guru dan Staf (${bilangan.trim()} orang)`
+            : 'Semua Guru dan Staf';
+        if (btn) { btn.classList.add('active'); btn.textContent = '✕ Batal'; }
+        list.innerHTML = `<div class="ff-ahli-row ff-ahli-row-semua">
+            <input class="ff-input ff-ahli-nama" type="text" value="${escapeAttr(namaEntry)}" readonly>
+            <input class="ff-input ff-ahli-jawatan" type="text" placeholder="Jawatan" value="Guru dan Staf">
+            <button type="button" class="ff-ahli-remove" onclick="_removeAhliRow(this)" title="Buang">✕</button>
+        </div>`;
+        list.parentElement.querySelector('.ff-ahli-add').style.display = 'none';
+    }
 }
 
 function _toggleSemuaHadir(listId) {

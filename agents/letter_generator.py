@@ -558,6 +558,27 @@ def handle(query: str, history: list[dict] | None = None, session_id: str = "def
         return (f"Assalamualaikum dan selamat datang{sapaan}! ✉️ Saya Penjana Surat Rasmi/Memo. Saya akan membantu anda menyediakan surat rasmi, memo dan surat siaran mengikut format KPM yang betul. Boleh beritahu saya apakah jenis surat yang perlu disediakan dan maklumat asasnya?\n\n"
                 "⚠️ Peringatan: Semua dokumen yang dijana adalah draf hasil AI. Sila semak dan sahkan semua kandungan, nama, tarikh serta rujukan dengan teliti sebelum digunakan secara rasmi.")
 
+    # ── Guard: reset session when user asks to start a new letter ──
+    _NEW_SESSION_KW = {
+        "buat surat baru", "surat baru", "mula semula", "mulakan semula",
+        "sesi baharu", "sesi baru", "dokumen baru", "surat lain",
+        "new letter", "new document", "start over", "start new",
+    }
+    query_lower_new = query.lower().strip()
+    if any(kw in query_lower_new for kw in _NEW_SESSION_KW):
+        clear_session(session_id)
+        if lang == "en":
+            return json.dumps({
+                "phase": 0,
+                "message": f"Starting a new document session{sapaan}. ✉️ What type of document do you need — an official letter, memo, or circular?",
+                "ready_to_save": False,
+            }, ensure_ascii=False)
+        return json.dumps({
+            "phase": 0,
+            "message": f"Sesi dokumen baharu dimulakan{sapaan}. ✉️ Apakah jenis dokumen yang diperlukan — surat rasmi, memo, atau surat siaran?",
+            "ready_to_save": False,
+        }, ensure_ascii=False)
+
     session = _get_session(session_id)
 
     # Parse form submission directly — map all Label: value pairs to field keys
@@ -740,6 +761,46 @@ Status sesi semasa:
             if required_keys.issubset(session["fields"].keys()):
                 session["fields"]["isi"] = f"Sukacita dimaklumkan bahawa {tajuk.rstrip('.')} akan diadakan seperti butiran berikut:"
 
+    # For memo: expand isi_user brief into langkah_kerja (agenda items) if not yet set
+    if (session.get("doc_type") == "memo"
+            and session["fields"].get("isi_user")
+            and not session["fields"].get("langkah_kerja")):
+        _tajuk_m = session["fields"].get("tajuk", "")
+        _isi_user_m = session["fields"].get("isi_user", "")
+        # Build explicit expanded sentences for each point
+        _poin_list = [p.strip() for p in re.split(r'[,;]', _isi_user_m) if p.strip()]
+        _poin_formatted = "\n".join(f"{i+1}. {p}" for i, p in enumerate(_poin_list))
+        _memo_lk_prompt = [
+            {"role": "system", "content": (
+                "Kamu adalah setiausaha mesyuarat sekolah yang menulis agenda mesyuarat rasmi KPM dalam "
+                "Bahasa Malaysia yang formal. Setiap item agenda MESTI ditulis sebagai ayat yang panjang dan bermakna "
+                "(sekurang-kurangnya 20 patah perkataan), menerangkan APA yang dibincangkan, TUJUAN perbincangan, "
+                "dan SKOP yang berkaitan. Balas HANYA dengan senarai agenda — satu ayat penuh per baris, "
+                "TANPA nombor, TANPA bullet."
+            )},
+            {"role": "user", "content": (
+                f"Mesyuarat: {_tajuk_m}\n\n"
+                f"Tukarkan SETIAP poin berikut kepada ayat agenda yang panjang, lengkap dan bermakna:\n"
+                f"{_poin_formatted}\n\n"
+                f"Untuk setiap poin, tulis satu ayat yang:\n"
+                f"- Jelaskan dengan terperinci apa yang akan dibincangkan\n"
+                f"- Nyatakan tujuan atau matlamat perbincangan tersebut\n"
+                f"- Tambahkan konteks yang relevan dengan tajuk mesyuarat\n"
+                f"- Minimum 20 patah perkataan per ayat\n\n"
+                f"CONTOH (untuk poin 'pembentangan kertas kerja'):\n"
+                f"Pembentangan kertas kerja berkaitan {_tajuk_m} oleh jawatankuasa pelaksana bagi "
+                f"membincangkan hala tuju, objektif dan strategi pelaksanaan program secara menyeluruh "
+                f"serta mendapatkan maklum balas daripada semua pihak yang terlibat."
+            )}
+        ]
+        try:
+            _lk_raw = chat_completion(messages=_memo_lk_prompt, temperature=0.6, max_tokens=800)
+            if _lk_raw and _lk_raw.strip():
+                session["fields"]["langkah_kerja"] = _lk_raw.strip()
+                _save_session(session_id, session)
+        except Exception:
+            pass
+
     # Jana isi surat secara automatik jika isi_user ada tapi isi belum dijana
     if (session.get("doc_type") == "surat"
             and session["fields"].get("isi_user")
@@ -757,9 +818,12 @@ Status sesi semasa:
                 f"Tajuk: {_tajuk}\n"
                 f"Penerima: {_penerima}\n"
                 f"Ringkasan isi dari pengguna: {_isi_user}\n\n"
-                "Tulis 2-4 perenggan bernombor (2., 3., 4. dst) yang formal, lengkap dan profesional. "
-                "Setiap perenggan bermula dengan nombor (contoh: '2. Sehubungan dengan itu...'). "
-                "Jangan masukkan 'Dengan segala hormatnya' atau 'Sekian'. "
+                "Tulis 2-4 perenggan bernombor yang formal, lengkap dan profesional. "
+                "MESTI bermula dari perenggan nombor 2 (contoh: '2. Tujuan surat ini adalah untuk...'). "
+                "Sambung dengan 3., 4. dan seterusnya mengikut keperluan. "
+                "JANGAN mulakan dari nombor 3 atau lebih — perenggan pertama MESTI bernombor 2. "
+                "JANGAN masukkan baris pembukaan seperti 'Dengan segala hormatnya' atau 'Dengan hormatnya perkara di atas adalah dirujuk' — ia sudah ada dalam templat. "
+                "JANGAN masukkan 'Sekian, terima kasih'. "
                 "Gunakan Bahasa Malaysia rasmi."
             )}
         ]
@@ -1298,10 +1362,20 @@ def _build_memo_html(f: dict) -> str:
     acara_indent = 'style="margin:2px 0 2px 4em;line-height:1.6"'
     normal = 'style="margin:6px 0;line-height:1.6"'
 
+    # Build agenda block (para 3) and closing attendance line (para 4 or 3 if no agenda)
+    roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
     langkah_html = ''
-    for i, step in enumerate(langkah_list):
-        num = i + 4
-        langkah_html += f'<p {hang}>{num}.&nbsp;&nbsp;&nbsp;&nbsp;{step}</p>'
+    if langkah_list:
+        sub_items = ''.join(
+            f'<p style="margin:3px 0 3px 3em;line-height:1.6;text-align:justify">({roman[i] if i < len(roman) else i+1})&nbsp;&nbsp;{step}</p>'
+            for i, step in enumerate(langkah_list)
+        )
+        langkah_html = (
+            f'<p {hang}>3.&nbsp;&nbsp;&nbsp;&nbsp;Agenda mesyuarat adalah seperti berikut:</p>'
+            f'{sub_items}'
+        )
+    closing_para_num = 4 if langkah_list else 3
+    closing_html = f'<p {hang}>{closing_para_num}.&nbsp;&nbsp;&nbsp;&nbsp;Kerjasama dan kehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.</p>'
 
     return (
         f'<div style="font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;color:#000">'
@@ -1317,8 +1391,8 @@ def _build_memo_html(f: dict) -> str:
         f'<p {acara_indent}><b>Tarikh</b>&emsp;&nbsp;: {tarikh_acara}</p>'
         f'<p {acara_indent}><b>Masa</b>&emsp;&emsp;: {masa_acara}</p>'
         f'<p {acara_indent}><b>Tempat</b>&emsp;: {tempat_acara}</p>'
-        f'<p {hang}>3.&nbsp;&nbsp;&nbsp;&nbsp;Kehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.</p>'
         f'{langkah_html}'
+        f'{closing_html}'
         f'<p {normal}>Sekian, terima kasih.</p>'
         f'<div style="page-break-inside:avoid">'
         f'<p style="margin:11pt 0 0 0;line-height:1.6"><b>&ldquo;MALAYSIA MADANI&rdquo;</b></p>'
@@ -1374,7 +1448,7 @@ def _build_surat_html(f: dict) -> str:
 
     isi_raw = str(f.get('isi', '') or '')
     import re as _re_isi
-    _DENGAN_RE = _re_isi.compile(r'^\s*dengan\s+segala\s+hormatnya', _re_isi.IGNORECASE)
+    _DENGAN_RE = _re_isi.compile(r'^\s*dengan\s+(segala\s+)?hormatnya\b', _re_isi.IGNORECASE)
     _TARIKH_BARIS_RE = _re_isi.compile(r'^\s*(Tarikh|Masa|Tempat|Venue|Date|Time)\s*:', _re_isi.IGNORECASE)
     _plain_p = 'margin:6px 0;line-height:1.6;text-align:justify'
     _indent_p = 'margin:2px 0 2px 4em;line-height:1.6'
@@ -1396,11 +1470,8 @@ def _build_surat_html(f: dict) -> str:
                 if _TARIKH_BARIS_RE.match(line_s):
                     isi_html += f'<p style="{_indent_p}">{line_s}</p>'
                 else:
-                    # Tambah nombor jika belum ada (contoh: surat pemakluman dari PDF)
-                    if _PARA_NUM_RE.match(line):
-                        display = line  # sudah ada nombor, guna terus
-                    else:
-                        display = f'{_para_num}. {line_s}'
+                    # Sentiasa re-number dari 2 supaya urutan betul
+                    display = f'{_para_num}.&nbsp;&nbsp;&nbsp;&nbsp;{line_s}'
                     isi_html += f'<p style="{_plain_p}">{display}</p>'
                 is_first = False
             else:
@@ -1647,28 +1718,40 @@ def _build_memo_docx(doc, fields: dict):
         acara_p = _p(f"{label:<8}: {val}", indent_cm=2)
         acara_p.paragraph_format.space_after = Pt(2)
 
-    p3 = doc.add_paragraph()
-    p3.paragraph_format.space_after = Pt(6)
-    p3.paragraph_format.space_before = Pt(6)
-    p3.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p3.paragraph_format.left_indent = Cm(1.27)
-    p3.paragraph_format.first_line_indent = Cm(-1.27)
-    r3 = p3.add_run("3.\tKehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.")
-    r3.font.size = Pt(12); r3.font.name = "Arial"
-
     langkah_str = fields.get('langkah_kerja', '')
     langkah_list = [l.strip() for l in langkah_str.split('\n') if l.strip()] if langkah_str else []
-    for i, step in enumerate(langkah_list):
-        num = i + 4
-        lk_para = doc.add_paragraph()
-        lk_para.paragraph_format.space_after = Pt(6)
-        lk_para.paragraph_format.space_before = Pt(0)
-        lk_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        lk_para.paragraph_format.left_indent = Cm(1.27)
-        lk_para.paragraph_format.first_line_indent = Cm(-1.27)
-        lk_run = lk_para.add_run(f"{num}.\t{step}")
-        lk_run.font.size = Pt(12)
-        lk_run.font.name = "Arial"
+    roman = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
+    if langkah_list:
+        # Para 3: agenda intro line
+        lk_intro = doc.add_paragraph()
+        lk_intro.paragraph_format.space_after = Pt(3)
+        lk_intro.paragraph_format.space_before = Pt(6)
+        lk_intro.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        lk_intro.paragraph_format.left_indent = Cm(1.27)
+        lk_intro.paragraph_format.first_line_indent = Cm(-1.27)
+        lk_intro_run = lk_intro.add_run("3.\tAgenda mesyuarat adalah seperti berikut:")
+        lk_intro_run.font.size = Pt(12); lk_intro_run.font.name = "Arial"
+        for i, step in enumerate(langkah_list):
+            sub_para = doc.add_paragraph()
+            sub_para.paragraph_format.space_after = Pt(2)
+            sub_para.paragraph_format.space_before = Pt(0)
+            sub_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            sub_para.paragraph_format.left_indent = Cm(2.8)
+            sub_para.paragraph_format.first_line_indent = Cm(-1.27)
+            label = roman[i] if i < len(roman) else str(i + 1)
+            sub_run = sub_para.add_run(f"({label})\t{step}")
+            sub_run.font.size = Pt(12); sub_run.font.name = "Arial"
+
+    # Closing paragraph (attendance/kerjasama) — always last numbered para
+    closing_num = 4 if langkah_list else 3
+    p_closing = doc.add_paragraph()
+    p_closing.paragraph_format.space_after = Pt(6)
+    p_closing.paragraph_format.space_before = Pt(6)
+    p_closing.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    p_closing.paragraph_format.left_indent = Cm(1.27)
+    p_closing.paragraph_format.first_line_indent = Cm(-1.27)
+    r_closing = p_closing.add_run(f"{closing_num}.\tKerjasama dan kehadiran tuan/puan pada tarikh dan masa yang ditetapkan amatlah dihargai.")
+    r_closing.font.size = Pt(12); r_closing.font.name = "Arial"
 
     doc.add_paragraph("")
     _p("Sekian, terima kasih.")
@@ -1705,9 +1788,8 @@ def prefill_from_memory(session_id: str, org_name: str = "", user_name: str = ""
     if org_name and not fields.get("nama_organisasi"):
         fields["nama_organisasi"] = org_name
         changed = True
-    if user_name and not fields.get("penandatangan_nama"):
-        fields["penandatangan_nama"] = user_name
-        changed = True
+    # penandatangan_nama is intentionally NOT auto-filled from profile —
+    # the signer is often a different person (e.g. the principal, not the preparer).
     if changed:
         _save_session(session_id, session)
 
