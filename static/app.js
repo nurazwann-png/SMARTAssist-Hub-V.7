@@ -646,12 +646,33 @@ function applyLanguage(lang) {
         else uploadBtn.title = dict.upload_tip_data;
     }
 
-    // Re-render agent nav bar if canvas is open (labels use currentLang)
+    // Re-render agent canvas UI if open (all lang-dependent elements)
     if (currentAgent) {
         updateAgentNavBar(currentAgent);
         const info = getAgentInfo(currentAgent);
+
+        // Header
         const nameEl = document.getElementById('canvasAgentName');
         if (nameEl) nameEl.textContent = info.name;
+
+        // Welcome screen (shown when no messages yet)
+        const welcomeTitle = document.getElementById('canvasWelcomeTitle');
+        if (welcomeTitle) welcomeTitle.textContent = info.name;
+        const welcomeDesc = document.getElementById('canvasWelcomeDesc');
+        if (welcomeDesc) welcomeDesc.textContent = info.desc;
+        const quickDiv = document.getElementById('canvasQuickActions');
+        if (quickDiv && info.quick) {
+            quickDiv.innerHTML = info.quick.map(q =>
+                `<button class="canvas-quick-btn" onclick="useQuickAction('${q.replace(/'/g, "\\'")}')">${q}</button>`
+            ).join('');
+        }
+
+        // Canvas history sidebar (time labels change locale, suffix changes lang)
+        loadCanvasHistory(currentAgent);
+
+        // History search placeholder
+        const hSearch = document.getElementById('historySearchInput');
+        if (hSearch) hSearch.placeholder = dict.history_search_ph || (lang === 'en' ? 'Search sessions...' : 'Cari sesi...');
     }
 
     // Coming-soon badge text
@@ -702,6 +723,35 @@ function applyLanguage(lang) {
     // History filter "All Agents" option
     const allAgentsOpt = document.querySelector('.agent-filter-option[data-agent="all"] .agent-filter-name');
     if (allAgentsOpt) allAgentsOpt.textContent = dict.all_agents_label;
+
+    // Re-render open history panel
+    if (document.getElementById('historyPanel')?.classList.contains('open')) {
+        _renderHistory();
+    }
+
+    // Update history agent dropdown labels in-place
+    const hadMenu = document.getElementById('hadMenu');
+    if (hadMenu) {
+        hadMenu.querySelectorAll('.had-item').forEach(item => {
+            const val = item.dataset.value;
+            const labelEl = item.querySelector('.had-item-label');
+            if (!labelEl) return;
+            if (!val) {
+                labelEl.textContent = dict.all_agents_label || (lang === 'en' ? 'All Agents' : 'Semua Ejen');
+            } else if (AGENT_INFO[val]) {
+                labelEl.textContent = AGENT_INFO[val].name[lang] || AGENT_INFO[val].name.bm;
+            }
+        });
+        // Update selected label too
+        const selLabel = document.getElementById('hadSelLabel');
+        if (selLabel && _hadCurrentFilter !== undefined) {
+            if (!_hadCurrentFilter) {
+                selLabel.textContent = dict.all_agents_label || (lang === 'en' ? 'All Agents' : 'Semua Ejen');
+            } else if (AGENT_INFO[_hadCurrentFilter]) {
+                selLabel.textContent = AGENT_INFO[_hadCurrentFilter].name[lang] || AGENT_INFO[_hadCurrentFilter].name.bm;
+            }
+        }
+    }
 
     // LH back button
     const lhBack = document.getElementById('lhBackBtn');
