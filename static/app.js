@@ -77,39 +77,15 @@ function _clearDraft() {
     localStorage.removeItem(_DRAFT_KEY);
 }
 
-function _checkResumeBanner() {
+// Auto-restore last session on page load (no confirmation needed — refresh should not lose work)
+function _autoRestoreSession() {
     const raw = localStorage.getItem(_DRAFT_KEY);
     if (!raw) return;
     let draft;
     try { draft = JSON.parse(raw); } catch (_) { _clearDraft(); return; }
     if (!draft.sessionId || !draft.agent) { _clearDraft(); return; }
-
-    const info = getAgentInfo(draft.agent);
-    const banner = document.createElement('div');
-    banner.id = 'resumeBanner';
-    banner.className = 'resume-banner';
-    banner.innerHTML = `
-        <span class="resume-banner-icon">${info.icon}</span>
-        <span class="resume-banner-text">${I18N[currentLang].resume_banner_text.replace('?', '')} <strong>${info.name}</strong>?</span>
-        <button class="resume-banner-yes" onclick="_resumeDraft()">${I18N[currentLang].resume_yes}</button>
-        <button class="resume-banner-no" onclick="_dismissResume()">${I18N[currentLang].resume_no}</button>`;
-    document.body.appendChild(banner);
-    requestAnimationFrame(() => banner.classList.add('show'));
-}
-
-function _resumeDraft() {
-    const raw = localStorage.getItem(_DRAFT_KEY);
-    if (!raw) return;
-    let draft;
-    try { draft = JSON.parse(raw); } catch (_) { return; }
-    _dismissResume();
+    // Restore silently — no banner, no prompt
     openAgent(draft.agent, draft.sessionId);
-}
-
-function _dismissResume() {
-    const banner = document.getElementById('resumeBanner');
-    if (banner) { banner.classList.remove('show'); setTimeout(() => banner.remove(), 300); }
-    _clearDraft();
 }
 
 // ── Fetch with timeout ──
@@ -959,9 +935,10 @@ function openAgent(agentKey, existingSessionId) {
 
     if (existingSessionId) {
         loadSessionMessages(existingSessionId);
+        _saveDraft();
     } else {
         loadCanvasHistory(agentKey);
-        sendAgentIntro(agentKey);
+        sendAgentIntro(agentKey).then(() => _saveDraft()).catch(() => {});
     }
 
     // Reload file manager if switching to data_analysis with an existing session
@@ -1058,6 +1035,7 @@ async function loadCanvasHistory(agentKey) {
 
 async function goHome() {
     await sendFarewell();
+    _clearDraft();
     agentCanvas.style.display = 'none';
     landingPage.style.display = '';
     currentAgent = null;
@@ -1167,6 +1145,8 @@ function _renderHistory(query = '') {
 function loadSession(sid, agent) {
     toggleHistory();
     openAgent(agent, sid);
+    // Persist so refresh returns to this session
+    localStorage.setItem(_DRAFT_KEY, JSON.stringify({ sessionId: sid, agent }));
 }
 
 async function deleteSession(sid) {
@@ -4090,8 +4070,8 @@ document.getElementById('langToggle').addEventListener('click', toggleLanguage);
 applyLanguage(currentLang);
 loadUserPreferences();
 
-// Resume last session if available
-setTimeout(_checkResumeBanner, 800);
+// Auto-restore last session on page load (refresh safe)
+setTimeout(_autoRestoreSession, 300);
 
 // Agent cards — apply coming-soon overlay and block disabled agents
 document.querySelectorAll('.agent-card').forEach(card => {
