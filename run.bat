@@ -50,16 +50,19 @@ if not exist ".env" (
 )
 echo  [OK] Fail .env ditemui
 
-:: Semak port 8112
+:: Semak sama ada server sudah berjalan di port 8112
 netstat -ano | findstr ":8112 " >nul 2>&1
 if %errorlevel% equ 0 (
     echo.
-    echo  [AMARAN] Port 8112 sedang digunakan oleh proses lain.
-    echo  Menamatkan proses lama...
-    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8112 "') do (
-        taskkill /PID %%a /F >nul 2>&1
-    )
-    timeout /t 2 >nul
+    echo  [OK] Server sudah berjalan di port 8112!
+    echo  ================================================
+    echo   Buka pelayar anda dan pergi ke:
+    echo   http://localhost:8112
+    echo  ================================================
+    echo.
+    start http://localhost:8112
+    pause
+    exit /b 0
 )
 
 echo.
@@ -69,9 +72,14 @@ echo   Buka pelayar anda dan pergi ke:
 echo   http://localhost:8112
 echo  ================================================
 echo.
+echo  PETUA: Biarkan tetingkap ini terbuka — jangan tutup.
+echo  Kali seterusnya jalankan run.bat, sistem akan terus
+echo  buka tanpa perlu tunggu semula.
+echo.
 echo  Tekan Ctrl+C untuk hentikan sistem.
 echo.
 
+start http://localhost:8112
 python -m uvicorn app:app --host 0.0.0.0 --port 8112
 
 echo.

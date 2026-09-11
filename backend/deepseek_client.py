@@ -1,12 +1,27 @@
 import os
 import time
 import logging
-from openai import OpenAI, APIError, APIConnectionError, APITimeoutError
 from dotenv import load_dotenv
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+# Lazy-imported on first use to avoid ~1.5s startup cost
+_OpenAI = None
+_APIError = None
+_APIConnectionError = None
+_APITimeoutError = None
+
+
+def _ensure_openai():
+    global _OpenAI, _APIError, _APIConnectionError, _APITimeoutError
+    if _OpenAI is None:
+        from openai import OpenAI, APIError, APIConnectionError, APITimeoutError
+        _OpenAI = OpenAI
+        _APIError = APIError
+        _APIConnectionError = APIConnectionError
+        _APITimeoutError = APITimeoutError
 
 _BASE_URL = "https://api.deepseek.com"
 _MODEL = "deepseek-chat"
@@ -85,16 +100,17 @@ class _CircuitBreaker:
 _circuit_breaker = _CircuitBreaker(_CB_FAILURE_THRESHOLD, _CB_RESET_TIMEOUT)
 
 
-def get_client() -> OpenAI:
+def get_client():
     global _client
     if _client is None:
+        _ensure_openai()
         api_key = os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
             raise RuntimeError(
                 "DEEPSEEK_API_KEY tidak ditemui dalam .env. "
                 "Sila tetapkan kunci API DeepSeek anda."
             )
-        _client = OpenAI(
+        _client = _OpenAI(
             api_key=api_key,
             base_url=_BASE_URL,
             timeout=_TIMEOUT_SECONDS,
@@ -131,11 +147,11 @@ def tool_completion(
             )
             _circuit_breaker.record_success()
             return response.choices[0].message
-        except APITimeoutError as e:
+        except _APITimeoutError as e:
             last_error = e
-        except APIConnectionError as e:
+        except _APIConnectionError as e:
             last_error = e
-        except APIError as e:
+        except _APIError as e:
             last_error = e
             if e.status_code and 400 <= e.status_code < 500:
                 _circuit_breaker.record_failure()
@@ -181,7 +197,7 @@ def stream_chat_completion(
             if delta:
                 yield delta
         _circuit_breaker.record_success()
-    except (APITimeoutError, APIConnectionError, APIError) as e:
+    except Exception as e:
         _circuit_breaker.record_failure()
         raise RuntimeError(f"Ralat penstriman API: {e}") from e
 
@@ -235,15 +251,15 @@ def chat_completion(
             _circuit_breaker.record_success()
             return response.choices[0].message.content
 
-        except APITimeoutError as e:
+        except _APITimeoutError as e:
             last_error = e
             logger.warning("[DeepSeek] Timeout pada percubaan %d: %s", attempt, e)
 
-        except APIConnectionError as e:
+        except _APIConnectionError as e:
             last_error = e
             logger.warning("[DeepSeek] Sambungan gagal pada percubaan %d: %s", attempt, e)
 
-        except APIError as e:
+        except _APIError as e:
             last_error = e
             # Ralat 4xx bermakna permintaan tidak sah — retry tidak akan membantu
             if e.status_code and 400 <= e.status_code < 500:

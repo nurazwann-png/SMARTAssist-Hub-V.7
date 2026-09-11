@@ -3869,34 +3869,100 @@ async function sendMessage() {
     _suppressUserMsg = false;
     setProcessing(true);
 
-    const endpoint = currentAgent ? '/api/agent-chat' : '/api/chat';
-    const body = currentAgent
-        ? { message, session_id: sessionId, agent: currentAgent, lang: currentLang }
-        : { message, session_id: sessionId, lang: currentLang };
     _lastRetryFn = () => { chatInput.value = message; sendMessage(); };
 
+    // Use streaming endpoint for all agent chats
+    const streamBody = { message, session_id: sessionId, agent: currentAgent || 'fallback', lang: currentLang };
+
     try {
-        const res = await fetchWithTimeout(endpoint, {
+        const res = await fetch('/api/agent-chat/stream', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            body: JSON.stringify(streamBody),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        lastActiveAgent = data.agent || currentAgent || 'fallback';
-        const _info = getAgentInfo(lastActiveAgent);
-        addMessage(data.response, 'assistant', _info.icon, _info.name, data.structured);
-        _saveDraft();
 
-        // Tanya followup jika dokumen baru sahaja siap
-        if (data.structured?.ready_to_save && !_awaitingFollowup) {
-            _awaitingFollowup = true;
-            const info = getAgentInfo(currentAgent || lastActiveAgent);
-            const followupMsg = currentLang === 'en'
-                ? 'Is there anything else I can help you with?'
-                : 'Adakah terdapat perkara lain yang boleh saya bantu?';
-            setTimeout(() => addMessage(followupMsg, 'assistant', info.icon, info.name), 600);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let streamDiv = null;
+        let collectedText = '';
+        let done = false;
+        const _agentInfo = getAgentInfo(currentAgent || 'fallback');
+
+        // Create streaming message bubble for token-streaming agents
+        const isStreamingAgent = !currentAgent || currentAgent === 'fallback' || currentAgent === 'kpm_support';
+        if (isStreamingAgent) {
+            const msgs = document.getElementById('chatMessages');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message assistant stream-msg';
+            wrapper.innerHTML = `<span class="agent-badge">${escapeHtml(_agentInfo.icon)} ${escapeHtml(_agentInfo.name)}</span><div class="msg-content stream-content"></div>`;
+            msgs.appendChild(wrapper);
+            streamDiv = wrapper.querySelector('.stream-content');
+            scrollToBottom();
+        } else {
+            // Show progress indicator in typing indicator area
+            typingIndicator.classList.add('active');
+        }
+
+        while (!done) {
+            const { value, done: readerDone } = await reader.read();
+            done = readerDone;
+            if (value) buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                let evt;
+                try { evt = JSON.parse(line.slice(6)); } catch { continue; }
+
+                if (evt.chunk) {
+                    // Token-by-token streaming (kpm_support / fallback)
+                    collectedText += evt.chunk;
+                    if (streamDiv) {
+                        streamDiv.innerHTML = escapeHtml(collectedText).replace(/\n/g, '<br>');
+                        scrollToBottom();
+                    }
+                } else if (evt.progress) {
+                    // Progress update for document agents
+                    typingIndicator.classList.add('active');
+                    const progEl = document.getElementById('typingProgressMsg');
+                    if (progEl) progEl.textContent = evt.progress;
+                    else typingIndicator.querySelector('span') && (typingIndicator.querySelector('span').textContent = evt.progress);
+                } else if (evt.error) {
+                    typingIndicator.classList.remove('active');
+                    if (streamDiv) streamDiv.innerHTML = escapeHtml(evt.error);
+                    else addMessage(evt.error, 'assistant', '⚠️', 'Sistem');
+                } else if (evt.done) {
+                    typingIndicator.classList.remove('active');
+                    const agentKey = evt.agent || currentAgent || 'fallback';
+                    lastActiveAgent = agentKey;
+                    const info = getAgentInfo(agentKey);
+
+                    if (streamDiv) {
+                        // Replace raw stream bubble with proper rendered message
+                        const parent = streamDiv.closest('.message');
+                        if (parent) parent.remove();
+                    }
+
+                    // For kpm_support done event, the KPM bubble handles its own render
+                    if (agentKey !== 'kpm_support') {
+                        const finalResponse = evt.response || collectedText;
+                        addMessage(finalResponse, 'assistant', info.icon, info.name, evt.structured);
+                        _saveDraft();
+
+                        if (evt.structured?.ready_to_save && !_awaitingFollowup) {
+                            _awaitingFollowup = true;
+                            const followupMsg = currentLang === 'en'
+                                ? 'Is there anything else I can help you with?'
+                                : 'Adakah terdapat perkara lain yang boleh saya bantu?';
+                            setTimeout(() => addMessage(followupMsg, 'assistant', info.icon, info.name), 600);
+                        }
+                    }
+                }
+            }
         }
     } catch (err) {
+        typingIndicator.classList.remove('active');
         if (err.name === 'AbortError') {
             _showRetryMessage('⚠️', I18N[currentLang].err_system);
         } else {

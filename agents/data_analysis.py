@@ -7,8 +7,21 @@ import re
 import pathlib
 import threading
 import builtins as _builtins
-import pandas as pd
 from backend.deepseek_client import chat_completion, tool_completion
+
+
+class _LazyPandas:
+    """Lazy proxy for pandas — defers the ~0.8s import until first use."""
+    _mod = None
+
+    def __getattr__(self, name):
+        if self._mod is None:
+            import pandas
+            object.__setattr__(self, '_mod', pandas)
+        return getattr(self._mod, name)
+
+
+pd = _LazyPandas()
 
 _DATA_DIR = pathlib.Path("static/session_data")
 

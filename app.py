@@ -1897,12 +1897,43 @@ async def agent_chat(req: AgentChatRequest, request: Request):
     })
 
 
+_PROGRESS_MSGS = {
+    "bm": {
+        "classifying": "Mengenal pasti permintaan anda...",
+        "data_analysis": "Menganalisis data...",
+        "letter_generator": "Menjana dokumen...",
+        "report_generator": "Menyediakan laporan...",
+        "document_reviewer": "Menyemak dokumen...",
+        "kpm_support": "Mencari maklumat...",
+        "fallback": "Memproses permintaan...",
+        "self_correcting": "Memperhalus kualiti dokumen...",
+        "auto_reviewing": "Menyemak semula dokumen...",
+    },
+    "en": {
+        "classifying": "Identifying your request...",
+        "data_analysis": "Analysing data...",
+        "letter_generator": "Generating document...",
+        "report_generator": "Preparing report...",
+        "document_reviewer": "Reviewing document...",
+        "kpm_support": "Searching for information...",
+        "fallback": "Processing request...",
+        "self_correcting": "Refining document quality...",
+        "auto_reviewing": "Re-checking document...",
+    },
+}
+
+
 @app.post("/api/agent-chat/stream")
 async def agent_chat_stream(req: AgentChatRequest, request: Request):
-    """SSE streaming endpoint for kpm_support — returns text chunks then a final JSON sentinel."""
+    """SSE streaming endpoint for all agents.
+    - kpm_support + fallback: true token-by-token streaming
+    - document agents: progress events then final JSON
+    Format: data: {"chunk":"…"} | {"progress":"…"} | {"done":true,"structured":{…},"response":"…","agent":"…"}
+    """
     from fastapi.responses import StreamingResponse as _StreamingResponse
     from backend.deepseek_client import stream_chat_completion
-    from agents.kpm_support import prepare_stream, _build_structured_response
+    import threading
+    import queue as _queue
 
     user = get_current_user(request)
     user_email = user.get("sub", "") if user else ""
@@ -1931,33 +1962,207 @@ async def agent_chat_stream(req: AgentChatRequest, request: Request):
     except Exception:
         pass
 
-    messages, docs = prepare_stream(req.message, history, req.session_id, req.lang, user_context)
+    lang = req.lang or "bm"
+    msgs = _PROGRESS_MSGS.get(lang, _PROGRESS_MSGS["bm"])
+    agent = req.agent
 
-    def event_gen():
-        collected = []
-        try:
-            for chunk in stream_chat_completion(messages, temperature=0.5, max_tokens=2000):
-                collected.append(chunk)
-                yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
-            return
-        raw = "".join(collected)
-        structured = _build_structured_response(raw, docs, req.lang)
-        output = json.dumps(structured, ensure_ascii=False)
-        if not is_intro:
-            store.append_message(req.session_id, {"role": "assistant", "content": output, "agent": "kpm_support"})
-            existing_meta = store.get_meta(req.session_id) or {}
-            store.upsert_meta(req.session_id, agent="kpm_support", title=existing_meta.get("title") or req.message[:60])
+    # ── KPM Support: true token streaming ──────────────────────────────────────
+    if agent == "kpm_support":
+        from agents.kpm_support import prepare_stream, _build_structured_response
+        messages, docs = prepare_stream(req.message, history, req.session_id, lang, user_context)
+
+        def _kpm_gen():
+            collected = []
             try:
-                if user_email:
-                    _update_memory(user_email, preferred_lang=req.lang, preferred_agent="kpm_support")
-                    _add_topic(user_email, req.message)
+                for chunk in stream_chat_completion(messages, temperature=0.5, max_tokens=2000):
+                    collected.append(chunk)
+                    yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+                return
+            raw = "".join(collected)
+            structured = _build_structured_response(raw, docs, lang)
+            output = json.dumps(structured, ensure_ascii=False)
+            if not is_intro:
+                store.append_message(req.session_id, {"role": "assistant", "content": output, "agent": "kpm_support"})
+                existing_meta = store.get_meta(req.session_id) or {}
+                store.upsert_meta(req.session_id, agent="kpm_support", title=existing_meta.get("title") or req.message[:60])
+                try:
+                    if user_email:
+                        _update_memory(user_email, preferred_lang=lang, preferred_agent="kpm_support")
+                        _add_topic(user_email, req.message)
+                except Exception:
+                    pass
+            yield f"data: {json.dumps({'done': True, 'structured': structured, 'agent': 'kpm_support'}, ensure_ascii=False)}\n\n"
+
+        return _StreamingResponse(_kpm_gen(), media_type="text/event-stream")
+
+    # ── Fallback: stream plain text token by token ──────────────────────────────
+    if agent == "fallback" or not agent:
+        messages_fb = [
+            {"role": "system", "content": (
+                "Anda ialah pembantu AI umum untuk SMARTAssist Hub, sistem sokongan PPD/KPM. "
+                "Jawab soalan pengguna dengan ringkas dan membantu dalam Bahasa Malaysia."
+            )},
+        ]
+        for m in history[-6:]:
+            messages_fb.append({"role": m["role"], "content": m["content"]})
+        messages_fb.append({"role": "user", "content": req.message})
+
+        def _fallback_gen():
+            collected = []
+            try:
+                for chunk in stream_chat_completion(messages_fb, temperature=0.5, max_tokens=2048):
+                    collected.append(chunk)
+                    yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+                return
+            raw = "".join(collected)
+            if not is_intro:
+                store.append_message(req.session_id, {"role": "assistant", "content": raw, "agent": "fallback"})
+                existing_meta = store.get_meta(req.session_id) or {}
+                store.upsert_meta(req.session_id, agent="fallback", title=existing_meta.get("title") or req.message[:60])
+            yield f"data: {json.dumps({'done': True, 'response': raw, 'agent': 'fallback'}, ensure_ascii=False)}\n\n"
+
+        return _StreamingResponse(_fallback_gen(), media_type="text/event-stream")
+
+    # ── Document agents: progress events + run in thread + final result ─────────
+    result_queue: _queue.Queue = _queue.Queue()
+
+    def _run_agent():
+        try:
+            from agents import data_analysis, letter_generator, kpm_support, report_generator, document_reviewer
+            import inspect
+            agent_map = {
+                "data_analysis": data_analysis,
+                "letter_generator": letter_generator,
+                "report_generator": report_generator,
+                "document_reviewer": document_reviewer,
+            }
+            module = agent_map.get(agent)
+            if module and hasattr(module, "handle"):
+                sig = inspect.signature(module.handle)
+                kwargs = {"query": req.message, "history": history}
+                if "session_id" in sig.parameters:
+                    kwargs["session_id"] = req.session_id
+                if "lang" in sig.parameters:
+                    kwargs["lang"] = lang
+                if "user_name" in sig.parameters:
+                    kwargs["user_name"] = user_name
+                if "user_context" in sig.parameters:
+                    kwargs["user_context"] = user_context
+                if agent == "letter_generator" and not is_intro and user_email:
+                    try:
+                        from agents.letter_generator import prefill_from_memory as _lg_prefill
+                        mem = _load_memory(user_email)
+                        _lg_prefill(req.session_id, org_name=mem.get("org_name", ""), user_name=user_name)
+                    except Exception:
+                        pass
+                output = module.handle(**kwargs)
+
+                JSON_AGENTS = {"data_analysis", "letter_generator", "report_generator", "document_reviewer"}
+                if agent in JSON_AGENTS and not is_intro:
+                    try:
+                        json.loads(output)
+                    except (json.JSONDecodeError, ValueError):
+                        sys_note = "[SISTEM: Balas HANYA dalam format JSON yang sah.]"
+                        retry_kwargs = {**kwargs, "query": req.message + f"\n\n{sys_note}"}
+                        try:
+                            output = module.handle(**retry_kwargs)
+                        except Exception:
+                            pass
+            else:
+                output = f"Agen '{agent}' tidak ditemui."
+        except Exception as e:
+            output = json.dumps({"message": f"Ralat: {e}", "status": "error"}, ensure_ascii=False)
+
+        result_queue.put(("agent_done", output))
+
+        # Self-correcting loop for document agents
+        structured = None
+        if agent in ("data_analysis", "letter_generator", "report_generator", "document_reviewer"):
+            structured = _parse_agent_json(output)
+
+        if agent == "document_reviewer" and structured and structured.get("issues"):
+            raw_pdf = _REVIEW_PDF_CACHE.get(req.session_id)
+            if raw_pdf:
+                try:
+                    _locate_issue_boxes(raw_pdf, structured["issues"])
+                    output = json.dumps(structured, ensure_ascii=False)
+                except Exception:
+                    pass
+
+        _DOC_AGENTS = {
+            "letter_generator": lambda s: "Memo Dalaman" if s.get("doc_type") == "memo" else "Surat Rasmi",
+            "report_generator": lambda s: "Laporan Satu Muka Surat",
+        }
+        if agent in _DOC_AGENTS and structured and structured.get("ready_to_save") and structured.get("document_preview"):
+            result_queue.put(("progress", msgs["self_correcting"]))
+            try:
+                from agents.document_reviewer import self_correcting_loop, auto_review
+                doc_type = _DOC_AGENTS[agent](structured)
+                final_doc, reasoning_trace = self_correcting_loop(
+                    session_id=req.session_id, agent=agent, doc_type=doc_type, lang=lang, max_rounds=3,
+                )
+                if final_doc and final_doc != structured["document_preview"]:
+                    structured["document_preview"] = final_doc
+                    if agent == "letter_generator" and structured.get("doc_type") == "memo":
+                        from agents.letter_generator import _build_memo_html
+                        agent_mod_lg = __import__("agents.letter_generator", fromlist=["letter_generator"])
+                        new_fields = agent_mod_lg.get_fields(req.session_id)
+                        structured["document_html"] = _build_memo_html(new_fields)
+                structured["reasoning_trace"] = reasoning_trace
+
+                result_queue.put(("progress", msgs["auto_reviewing"]))
+                final_text = structured["document_preview"]
+                review = auto_review(final_text, doc_type, req.session_id, lang)
+                if review:
+                    structured["auto_review"] = review
+                output = json.dumps(structured, ensure_ascii=False)
             except Exception:
                 pass
-        yield f"data: {json.dumps({'done': True, 'structured': structured}, ensure_ascii=False)}\n\n"
 
-    return _StreamingResponse(event_gen(), media_type="text/event-stream")
+        _shorten_doc_message(structured, lang)
+        result_queue.put(("final", output, structured))
+
+    t = threading.Thread(target=_run_agent, daemon=True)
+    t.start()
+
+    agent_info = AGENT_LABELS.get(agent, {"icon": "\U0001f4ac", "name": agent})
+
+    def _doc_gen():
+        yield f"data: {json.dumps({'progress': msgs.get(agent, msgs['fallback'])}, ensure_ascii=False)}\n\n"
+        while True:
+            try:
+                item = result_queue.get(timeout=120)
+            except _queue.Empty:
+                yield f"data: {json.dumps({'error': 'Masa tamat. Sila cuba lagi.'}, ensure_ascii=False)}\n\n"
+                return
+            kind = item[0]
+            if kind == "progress":
+                yield f"data: {json.dumps({'progress': item[1]}, ensure_ascii=False)}\n\n"
+            elif kind == "agent_done":
+                pass  # intermediate — wait for final
+            elif kind == "final":
+                _, output, structured = item
+                if not is_intro:
+                    store.append_message(req.session_id, {"role": "assistant", "content": output, "agent": agent})
+                    existing_meta = store.get_meta(req.session_id) or {}
+                    store.upsert_meta(req.session_id, agent=agent, title=existing_meta.get("title") or req.message[:60])
+                    try:
+                        if user_email:
+                            _update_memory(user_email, preferred_lang=lang, preferred_agent=agent)
+                            _add_topic(user_email, req.message)
+                            org = _extract_org_name(req.message)
+                            if org:
+                                _update_memory(user_email, org_name=org)
+                    except Exception:
+                        pass
+                yield f"data: {json.dumps({'done': True, 'response': output, 'structured': structured, 'agent': agent, 'agent_icon': agent_info['icon'], 'agent_name': agent_info['name']}, ensure_ascii=False)}\n\n"
+                return
+
+    return _StreamingResponse(_doc_gen(), media_type="text/event-stream")
 
 
 @app.get("/api/sessions/{session_id}/versions")

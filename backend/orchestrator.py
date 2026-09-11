@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import TypedDict, Annotated
-from langgraph.graph import StateGraph, END
 
 from backend.deepseek_client import chat_completion
 
@@ -149,7 +148,8 @@ def route_intent(state: OrchestratorState) -> str:
 
 # ── Graph assembly ──
 
-def build_graph() -> StateGraph:
+def build_graph():
+    from langgraph.graph import StateGraph, END
     graph = StateGraph(OrchestratorState)
 
     graph.add_node("classify_intent", classify_intent)
