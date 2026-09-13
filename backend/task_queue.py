@@ -230,7 +230,6 @@ def _worker_loop():
                         (RUNNING, PENDING),
                     )
                     row = cur.fetchone()
-                    conn.commit()
             if row:
                 task = {"id": row[0], "task_type": row[1], "payload": row[2]}
                 _process_one(task)

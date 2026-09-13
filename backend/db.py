@@ -57,10 +57,17 @@ def get_conn():
         yield conn
         conn.commit()
     except Exception:
-        conn.rollback()
+        try:
+            if not conn.closed:
+                conn.rollback()
+        except Exception:
+            pass
         raise
     finally:
-        pool.putconn(conn)
+        try:
+            pool.putconn(conn)
+        except Exception:
+            pass
 
 
 def dict_cur(conn):
