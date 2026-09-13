@@ -99,6 +99,7 @@ PHASES:
 - Phase 1: Kumpul maklumat secara berperingkat (satu field setiap giliran). JANGAN tanya "isi" — isi akan dijana automatik.
 - Phase 2: JANA ISI KANDUNGAN SECARA AUTOMATIK berdasarkan tajuk dan semua maklumat yang dikumpul. Simpan hasil dalam fields_collected dengan key "isi". Jika fields_collected sudah mengandungi "isi_user" (ringkasan/panduan dari pengguna melalui borang), WAJIB gunakan ia sebagai konteks untuk jana isi yang penuh, formal dan berformat dengan betul — JANGAN salin teks "isi_user" secara verbatim, jana semula dalam ayat rasmi yang lengkap. Jika maklumat tidak mencukupi, tanya soalan spesifik untuk mendapat konteks tambahan. JANGAN minta pengguna tulis isi sendiri.
   * Untuk SURAT: tulis isi dengan bernombor perenggan (2., 3., 4. dst), bahasa formal, lengkap dan profesional.
+  * PENTING — ISI SURAT: JANGAN SEKALI-KALI masukkan ayat "Merujuk kepada surat..." atau "Merujuk kepada surat tuan/puan..." dalam field 'isi'. Ayat pembuka "Dengan hormatnya perkara di atas adalah dirujuk." sudah dimasukkan secara automatik oleh sistem sebelum perenggan isi. Mulakan terus dengan perenggan isi pertama (2.) tanpa sebarang ayat rujukan surat. Perenggan isi pertama hendaklah bermula dengan kandungan sebenar surat seperti "Sukacita dimaklumkan bahawa...", "Adalah dimaklumkan bahawa...", atau "Pihak kami ingin menjemput..." bergantung kepada tujuan surat.
   * Untuk MEMO: field 'isi' WAJIB mengandungi SATU AYAT PENDEK SAHAJA tanpa sebarang newline — contoh: "Sukacita dimaklumkan bahawa mesyuarat akan diadakan seperti butiran berikut:". DILARANG KERAS memasukkan tarikh/masa/tempat, nombor perenggan (3., 4.), atau kandungan lain dalam 'isi'. Sistem akan papar tarikh_acara/masa_acara/tempat_acara secara berasingan. Field 'langkah_kerja' (PILIHAN) mengandungi langkah-langkah tindakan yang perlu diambil, SATU LANGKAH SETIAP BARIS (pisahkan dengan \n), contoh: "Semak senarai hadir\nSediakan kertas kerja\nHubungi peserta yang tidak hadir". Tanya tentang langkah_kerja hanya jika konteks memo memerlukan tindakan susulan.
 - Phase 3: Tunjukkan pratonton dokumen lengkap — SEMAK tiada [PLACEHOLDER] kekal
 - Phase 4: Dokumen disahkan dan sedia untuk dimuat turun / dihantar emel
@@ -258,10 +259,12 @@ def inject_pdf_context(session_id: str, fields: dict, doc_type: str) -> None:
         if v and str(v).strip():
             session["fields"][k] = str(v).strip()
 
-    # Bina ayat wajib pemakluman dan prepend ke isi
+    # Simpan ayat rujukan dalam field berasingan — jangan masuk dalam isi
+    # supaya AI tidak overwrite semasa phase 2
     ref_part  = f"No. Ruj: {rujukan_asal}" if rujukan_asal else "surat tersebut"
     date_part = f", bertarikh {tarikh_asal}" if tarikh_asal else ""
     ayat_wajib = f"Merujuk kepada surat {ref_part}{date_part}, adalah dimaklumkan perkara berikut untuk makluman dan tindakan pihak tuan/puan."
+    session["fields"]["isi_rujukan"] = ayat_wajib
 
     # Fallback: jana isi asas dari tajuk jika isi_pemakluman tiada
     if not session["fields"].get("isi"):
@@ -273,11 +276,6 @@ def inject_pdf_context(session_id: str, fields: dict, doc_type: str) -> None:
             f"makluman dan tindakan selanjutnya."
         )
         session["fields"]["isi"] = fallback_isi
-
-    # Prepend ayat wajib ke isi (hanya jika belum ada)
-    isi_semasa = session["fields"].get("isi", "")
-    if "Merujuk kepada surat" not in isi_semasa:
-        session["fields"]["isi"] = ayat_wajib + "\n\n" + isi_semasa
     # Flag untuk beritahu AI bahawa ada konteks dari PDF (surat pemakluman)
     session["pdf_context"] = True
     session["is_pemakluman"] = True
@@ -306,6 +304,22 @@ def _find_missing_fields(doc_type: str, collected: dict) -> list[dict]:
                     result.extend(extras)
             return result
     return base
+
+
+def _renumber_paragraphs(text: str) -> str:
+    """Renumber numbered paragraphs (e.g. 2. 4. 5.) to be sequential starting from 2."""
+    import re as _re
+    lines = text.split('\n')
+    counter = [2]  # paragraphs start from 2 in KPM letters
+    result = []
+    for line in lines:
+        m = _re.match(r'^(\d+)\.\s+(.+)', line)
+        if m:
+            result.append(f"{counter[0]}. {m.group(2)}")
+            counter[0] += 1
+        else:
+            result.append(line)
+    return '\n'.join(result)
 
 
 def _has_placeholders(text: str) -> list[str]:
@@ -830,7 +844,7 @@ Status sesi semasa:
         try:
             _isi_raw = chat_completion(messages=_isi_prompt, temperature=0.4, max_tokens=800)
             if _isi_raw and _isi_raw.strip():
-                session["fields"]["isi"] = _isi_raw.strip()
+                session["fields"]["isi"] = _renumber_paragraphs(_isi_raw.strip())
                 _save_session(session_id, session)
         except Exception:
             # Fallback: guna isi_user terus jika API call gagal
@@ -842,7 +856,7 @@ Status sesi semasa:
         if all_filled:
             session["phase"] = max(session["phase"], 3)
             parsed["phase"] = session["phase"]
-        doc_text = _build_document(session["doc_type"], session["fields"])
+        doc_text = _renumber_paragraphs(_build_document(session["doc_type"], session["fields"]))
         placeholders = _has_placeholders(doc_text)
         parsed["document_preview"] = doc_text
         if session["doc_type"] == "memo":
@@ -1184,15 +1198,36 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
 
         total_isi_lines = sum(len(_split_isi_lines(p)) for p in isi_paras)
 
-        for i, para_text in enumerate(isi_paras):
+        import re as _re_word
+        _TARIKH_BARIS_RE_WORD = _re_word.compile(
+            r'^\s*(Tarikh|Masa|Tempat|Venue|Date|Time)\s*:', _re_word.IGNORECASE
+        )
+        _word_para_num = 2
+        # Jika surat pemakluman (dari PDF upload), insert ayat rujukan sebagai para 2 automatik
+        _rujukan_asal_w = str(fields.get('rujukan_asal', '') or '')
+        _tarikh_asal_w  = str(fields.get('tarikh_asal', '') or '')
+        if _rujukan_asal_w or _tarikh_asal_w:
+            _ref_part_w  = f"No. Ruj: {_rujukan_asal_w}" if _rujukan_asal_w else "surat tersebut"
+            _date_part_w = f", bertarikh {_tarikh_asal_w}" if _tarikh_asal_w else ""
+            _isi_rujukan_w = f"Merujuk kepada surat {_ref_part_w}{_date_part_w}, adalah dimaklumkan perkara berikut untuk makluman dan tindakan pihak tuan/puan."
+            _add_isi_para(f"{_word_para_num}.\t{_isi_rujukan_w}", left_cm=0, hanging_cm=0)
+            doc.add_paragraph("")
+            _word_para_num += 1
+        for para_text in isi_paras:
             lines = _split_isi_lines(para_text)
             if not lines:
                 continue
             _, first_body, _ = lines[0]
+            # Tarikh/Masa/Tempat block — render indented without paragraph number
+            if _TARIKH_BARIS_RE_WORD.match(first_body):
+                for _, body, _ in lines:
+                    _add_isi_para(f"\t{body}", left_cm=1.25, hanging_cm=1.25)
+                doc.add_paragraph("")
+                continue
             has_children = len(lines) > 1
             if has_children:
                 # Has sub-items/continuations — use hanging indent
-                _add_isi_para(f"{i+2}.\t{first_body}", left_cm=1.25, hanging_cm=1.25)
+                _add_isi_para(f"{_word_para_num}.\t{first_body}", left_cm=1.25, hanging_cm=1.25)
                 for pfx, body, is_sub in lines[1:]:
                     if is_sub:
                         _add_isi_para(f"{pfx}\t{body}", left_cm=2.5, hanging_cm=1.25)
@@ -1200,8 +1235,9 @@ def _build_surat_docx(doc, doc_text: str, fields: dict = None):
                         _add_isi_para(body, left_cm=1.25, hanging_cm=0)
             else:
                 # Plain paragraph — no hanging indent
-                _add_isi_para(f"{i+2}.\t{first_body}", left_cm=0, hanging_cm=0)
+                _add_isi_para(f"{_word_para_num}.\t{first_body}", left_cm=0, hanging_cm=0)
             doc.add_paragraph("")
+            _word_para_num += 1
 
         _p("Sekian, terima kasih.", align=WD_ALIGN_PARAGRAPH.JUSTIFY)
         doc.add_paragraph("")
@@ -1455,12 +1491,24 @@ def _build_surat_html(f: dict) -> str:
     _PARA_NUM_RE = _re_isi.compile(r'^\d+\.\s*')
     isi_html = ""
     _para_num = 2
+    # Jika surat pemakluman (dari PDF upload), insert ayat rujukan sebagai para 2 automatik
+    _rujukan_asal = str(f.get('rujukan_asal', '') or '')
+    _tarikh_asal  = str(f.get('tarikh_asal', '') or '')
+    if _rujukan_asal or _tarikh_asal:
+        _ref_part  = f"No. Ruj: {_rujukan_asal}" if _rujukan_asal else "surat tersebut"
+        _date_part = f", bertarikh {_tarikh_asal}" if _tarikh_asal else ""
+        isi_rujukan = f"Merujuk kepada surat {_ref_part}{_date_part}, adalah dimaklumkan perkara berikut untuk makluman dan tindakan pihak tuan/puan."
+        display = f'{_para_num}.&nbsp;&nbsp;&nbsp;&nbsp;{isi_rujukan}'
+        isi_html += f'<p style="{_plain_p}">{display}</p>'
+        isi_html += '<p style="margin:0 0 4px 0"></p>'
+        _para_num += 1
     for para_text in [p.strip() for p in isi_raw.split('\n\n') if p.strip()]:
         # Skip duplicate "Dengan segala hormatnya" — already shown as fixed opening line
         if _DENGAN_RE.match(_strip_para_num(para_text)):
             continue
         lines = para_text.split('\n')
         is_first = True
+        _is_numbered_block = False
         for line in lines:
             line = line.strip()
             if not line:
@@ -1473,6 +1521,7 @@ def _build_surat_html(f: dict) -> str:
                     # Sentiasa re-number dari 2 supaya urutan betul
                     display = f'{_para_num}.&nbsp;&nbsp;&nbsp;&nbsp;{line_s}'
                     isi_html += f'<p style="{_plain_p}">{display}</p>'
+                    _is_numbered_block = True
                 is_first = False
             else:
                 line_s = _strip_para_num(line)
@@ -1481,7 +1530,8 @@ def _build_surat_html(f: dict) -> str:
                 else:
                     isi_html += f'<p style="{_plain_p}">{line_s}</p>'
         isi_html += '<p style="margin:0 0 4px 0"></p>'
-        _para_num += 1
+        if _is_numbered_block:
+            _para_num += 1
 
     n = 'style="margin:6px 0;line-height:1.6"'
     # Ruj.Kami+Tarikh right-aligned, then address left — per template

@@ -110,7 +110,7 @@ CREATE INDEX IF NOT EXISTS idx_feedback_agent   ON feedback (agent);
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS letterheads (
-    id                      TEXT        PRIMARY KEY DEFAULT 'lh_' || encode(gen_random_bytes(4), 'hex'),
+    id                      TEXT        PRIMARY KEY DEFAULT 'lh_' || left(replace(gen_random_uuid()::text, '-', ''), 8),
     google_sub              TEXT        REFERENCES user_profiles (google_sub) ON DELETE SET NULL,
     name                    TEXT        NOT NULL DEFAULT '',
     filename                TEXT        NOT NULL,       -- nama fail fizikal di disk

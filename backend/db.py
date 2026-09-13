@@ -43,6 +43,7 @@ def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
             minconn=2,
             maxconn=20,
             dsn=_DATABASE_URL,
+            options="-c search_path=public",
         )
     return _pool
 

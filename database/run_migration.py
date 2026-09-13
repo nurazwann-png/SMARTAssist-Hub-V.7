@@ -20,15 +20,20 @@ if not db_url:
 # Ganti localhost dengan 127.0.0.1 untuk elak isu IPv6
 db_url = db_url.replace("@localhost:", "@127.0.0.1:")
 
-migrations = sorted(Path(__file__).parent.glob("migration_*.sql"))
-if not migrations:
-    print("Tiada fail migration ditemui.")
-    sys.exit(0)
+schema_file = Path(__file__).parent / "schema.sql"
+migrations = [schema_file] + sorted(Path(__file__).parent.glob("migration_*.sql"))
 
 try:
-    conn = psycopg2.connect(db_url)
-    conn.autocommit = False
+    conn = psycopg2.connect(db_url, options="-c search_path=public")
+    conn.autocommit = True
     cur = conn.cursor()
+
+    # Ensure public schema exists and user has create rights (PostgreSQL 15+)
+    cur.execute("CREATE SCHEMA IF NOT EXISTS public")
+    cur.execute("GRANT ALL ON SCHEMA public TO postgres")
+    cur.execute("SET search_path TO public")
+    cur.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto"')
+    cur.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')
 
     for mig in migrations:
         print(f"Menjalankan {mig.name}...")
@@ -36,7 +41,6 @@ try:
         cur.execute(sql)
         print(f"  ✓ {mig.name} selesai")
 
-    conn.commit()
     print("\nSemua migration berjaya dijalankan.")
 
     # Tunjukkan semua table sekarang

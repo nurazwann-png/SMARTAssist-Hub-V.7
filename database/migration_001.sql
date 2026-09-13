@@ -1,3 +1,5 @@
+SET search_path TO public;
+
 -- =============================================================================
 -- SMARTAssist Hub V.7 — Migration 001
 -- Tambah table yang belum ada: document_versions, audit_logs,
@@ -94,7 +96,7 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS scheduled_tasks (
-    id              TEXT        PRIMARY KEY DEFAULT 'sched_' || encode(gen_random_bytes(4), 'hex'),
+    id              TEXT        PRIMARY KEY DEFAULT 'sched_' || left(replace(gen_random_uuid()::text, '-', ''), 8),
     google_sub      TEXT        REFERENCES user_profiles (google_sub) ON DELETE CASCADE,
     name            TEXT        NOT NULL DEFAULT '',        -- nama mesra pengguna
     cron_expression TEXT        NOT NULL,                   -- contoh: '0 8 * * 1' = Isnin 8am

@@ -1346,8 +1346,13 @@ async def download_report(request: Request, session_id: str = "default"):
     )
 
 
+class SaveDocRequest(BaseModel):
+    session_id: str = "default"
+    content: str
+
+
 @app.post("/api/report/save")
-async def save_report(req: "SaveDocRequest"):
+async def save_report(req: SaveDocRequest):
     session = rg_get_session(req.session_id)
     if session:
         session["document"] = req.content
@@ -1406,11 +1411,6 @@ async def report_image_file(safe_name: str):
     if not p.exists():
         return JSONResponse({"error": "Fail tidak ditemui."}, status_code=404)
     return _FileResponse(str(p))
-
-
-class SaveDocRequest(BaseModel):
-    session_id: str = "default"
-    content: str
 
 
 @app.post("/api/document/save")
@@ -1812,6 +1812,12 @@ async def agent_chat(req: AgentChatRequest, request: Request):
     except Exception as e:
         output = f"Ralat: {e}"
 
+    if is_intro:
+        # Save greeting so session restores properly on page refresh
+        existing_msgs = store.get_messages(req.session_id)
+        if not existing_msgs:
+            store.append_message(req.session_id, {"role": "assistant", "content": output, "agent": agent})
+            store.upsert_meta(req.session_id, agent=agent, title="")
     if not is_intro:
         store.append_message(req.session_id, {"role": "assistant", "content": output, "agent": agent})
         existing_meta = store.get_meta(req.session_id) or {}

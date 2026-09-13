@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smartassist-v1';
+const CACHE_NAME = 'smartassist-v3';
 const STATIC_ASSETS = [
   '/',
   '/static/style.css',
